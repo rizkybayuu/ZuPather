@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.1] - 2026-10-16
+
+Milestone patch release establishing complete asset freezing into a single standalone binary, embedded font subsystem, Space Arena engine safeguards, and modal UI refinements.
+
+### Added
+- **Embedded Asset Pipeline (100% Standalone Self-Contained Binary)**:
+  - Embedded all 4 application font files (`AtkinsonHyperlegible-Regular.ttf` ~53 KB, `AtkinsonHyperlegible-Bold.ttf`, `JetBrainsMono-Regular.ttf`, `JetBrainsMono-Bold.ttf`) directly as Win32 PE resources (`IDR_FONT_*`). ZuPather dynamically mounts them in memory via `AddFontMemResourceEx`, ensuring custom UI typography renders on any Windows system with zero external font files or installation.
+  - Embedded all 14 gameplay and preview sprites (`SMALLFROGonPAD.png`, `COIN.png`, `SKULL.png`, and 11 `baBall*.png` colored ball textures) as Win32 binary resources (`IDR_SPRITE_*`) stream-loaded into GDI+ via `SHCreateMemStream` with disk fallback.
+  - Embedded application splash image (`ZuSPLASHscreen.jpg`), vector GitHub brand logo (`github.svg`), and high-resolution icon (`ZUpather.ico`).
+  - Integrated official Windows PE `VERSIONINFO` metadata resource directly into the executable (File Version 0.1.1.0, Product Version 0.1.1).
+- **Space Arena Safeguards & Explanatory Feedback**:
+  - Integrated dedicated `[SPACE ARENA]` badge beside the dialog title and `[Overridden by Space]` asset header indicators when `space="true"` (`g_map_is_space`).
+  - Added an informative confirmation notice when saving a Space map or toggling the Space checkbox, detailing the 6 visual layers and engine attributes overridden by Zuma's procedural starfield.
+
+### Changed
+- **Save Canvas Modal Refinement**:
+  - Maintained clean, non-intrusive subtitle `Saves canvas folder and settings.xml to ./canvas/<name>/` across all modes, perfectly harmonized with live animation RAM budget telemetry.
+  - Polished themed confirmation modals by removing unnecessary horizontal divider lines for a cleaner modern aesthetic.
+- **Splash Screen Version Alignment**:
+  - Updated in-app splash screen version indicator badge to `v0.1.1`.
+
+### Fixed
+- **State & XML Persistence**:
+  - Fixed `load_canvas_settings_xml()` attribute reset behavior during folder scans to ensure `g_map_is_space` state is never inadvertently cleared.
+  - Preserved `map_is_space` and `map_has_skullrot` in `UndoSnapshot` during undo/redo history operations.
+- **Progression Difficulty Combobox Freezing**:
+  - Resolved an interaction freeze where clicking the Progression Difficulty dropdown on levels with zero cutout/sprite assets became unresponsive by providing an independent window subclass procedure (`g_orig_save_combo_diff_proc`).
+
+---
+
 ## [0.1.0.1] - 2026-10-16
 
 Maintenance update establishing pure portable configuration isolation and visual splash version alignment.

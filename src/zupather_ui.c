@@ -4999,9 +4999,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                                                     " * Background Color (bgcolor): Ignored. Zuma forces the cosmic space void.\r\n"
                                                     " * Hue Rotation (huerot): Ignored for background rendering.\r\n"
                                                     " * BackgroundAlpha Cutouts: Static atmospheric and earthquake layers will not render against the space starfield.\r\n"
-                                                    " * Cutout Layers: May float awkwardly over dynamic space particles.\r\n\r\n"
+                                                    " * Cutout Layers: May float awkwardly over dynamic space particles.\r\n"
+                                                    " * Sprite Layers: Ignored or may float awkwardly over dynamic space particles.\r\n\r\n"
                                                     "Do you want to enable Space mode for this map?";
-                                                int res = show_themed_choice_dialog_ex(hwnd, "Space Mode Warning", "Procedural Space Arena Activated", space_warn, "Enable Space", "Cancel", NULL, 580, 380);
+                                                int res = show_themed_choice_dialog_ex(hwnd, "Space Mode Warning", "Procedural Space Arena Activated", space_warn, "Enable Space", "Cancel", NULL, 600, 420);
                                                 if (res == 1) {
                                                     g_map_is_space = true;
                                                 }

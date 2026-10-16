@@ -72,7 +72,9 @@ typedef struct {
     int  canvas_h;
     char canvas_folder[MAX_PATH];
     int  level_difficulty;
+    bool map_has_skullrot;
     float map_skullrot;
+    bool map_is_space;
     int  curve_submode;
 
     /* Background image descriptor */
@@ -139,7 +141,9 @@ static void capture_current_state(UndoMemorySnapshot *snap, const char *action_n
     snap->canvas_h = g_canvas_h;
     strncpy(snap->canvas_folder, g_canvas_folder, sizeof(snap->canvas_folder) - 1);
     snap->level_difficulty = (int)g_level_difficulty;
+    snap->map_has_skullrot = g_map_has_skullrot;
     snap->map_skullrot = g_map_skullrot;
+    snap->map_is_space = g_map_is_space;
     snap->curve_submode = (int)g_curve_submode;
 
     /* 2. Background image */
@@ -247,7 +251,9 @@ static void restore_state(const UndoMemorySnapshot *snap, HWND hwnd_main) {
     }
     strncpy(g_canvas_folder, snap->canvas_folder, sizeof(g_canvas_folder) - 1);
     g_level_difficulty = (LevelDifficulty)snap->level_difficulty;
+    g_map_has_skullrot = snap->map_has_skullrot;
     g_map_skullrot = snap->map_skullrot;
+    g_map_is_space = snap->map_is_space;
     g_curve_submode = (CurveSubMode)snap->curve_submode;
 
     /* 2. Restore Background Image */

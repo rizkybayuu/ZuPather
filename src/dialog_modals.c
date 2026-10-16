@@ -1534,6 +1534,7 @@ void sync_save_dialog_title_if_open(const char *title, HWND sender_hwnd) {
 
 static WNDPROC g_orig_save_chk_proc = NULL;
 static WNDPROC g_orig_save_combo_proc = NULL;
+static WNDPROC g_orig_save_combo_diff_proc = NULL;
 static void format_calc_ram_str(uint64_t bytes, char *out_buf, size_t sz);
 
 static void sync_save_dlg_asset_controls(HWND hwnd) {
@@ -1761,6 +1762,11 @@ static LRESULT CALLBACK SaveComboDiffListSubclassProc(HWND hwnd, UINT msg, WPARA
 }
 
 static LRESULT CALLBACK SaveThemedComboSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    WNDPROC orig_proc = (g_save_dlg_data && hwnd == g_save_dlg_data->hwnd_combo_diff)
+                        ? g_orig_save_combo_diff_proc
+                        : g_orig_save_combo_proc;
+    if (!orig_proc) orig_proc = DefWindowProcA;
+
     switch (msg) {
         case WM_PAINT: {
             PAINTSTRUCT ps;
@@ -1811,10 +1817,10 @@ static LRESULT CALLBACK SaveThemedComboSubclassProc(HWND hwnd, UINT msg, WPARAM 
             DeleteObject(ar_br);
             DeleteObject(ar_pen);
 
-            int sel = (int)CallWindowProcA(g_orig_save_combo_proc ? g_orig_save_combo_proc : DefWindowProcA, hwnd, CB_GETCURSEL, 0, 0);
+            int sel = (int)CallWindowProcA(orig_proc, hwnd, CB_GETCURSEL, 0, 0);
             char text[64] = {0};
             if (sel >= 0) {
-                CallWindowProcA(g_orig_save_combo_proc ? g_orig_save_combo_proc : DefWindowProcA, hwnd, CB_GETLBTEXT, sel, (LPARAM)text);
+                CallWindowProcA(orig_proc, hwnd, CB_GETLBTEXT, sel, (LPARAM)text);
             }
 
             bool is_dev = (strstr(text, "Dev-Test") != NULL);
@@ -1838,7 +1844,7 @@ static LRESULT CALLBACK SaveThemedComboSubclassProc(HWND hwnd, UINT msg, WPARAM 
         case WM_ERASEBKGND:
             return 1;
     }
-    return CallWindowProcA(g_orig_save_combo_proc ? g_orig_save_combo_proc : DefWindowProcA, hwnd, msg, wParam, lParam);
+    return CallWindowProcA(orig_proc, hwnd, msg, wParam, lParam);
 }
 
 static LRESULT CALLBACK SaveCanvasModalProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -1878,6 +1884,24 @@ static LRESULT CALLBACK SaveCanvasModalProc(HWND hwnd, UINT msg, WPARAM wParam, 
             RECT rc_title = {24, 16, rc.right - 24, 38};
             DrawTextA(mem_dc, "Save Canvas Project", -1, &rc_title, DT_SINGLELINE | DT_LEFT | DT_TOP);
 
+            if (g_map_is_space) {
+                RECT rc_calc = {0, 0, 0, 0};
+                DrawTextA(mem_dc, "Save Canvas Project", -1, &rc_calc, DT_CALCRECT | DT_SINGLELINE);
+                int badge_x = 24 + (rc_calc.right - rc_calc.left) + 8;
+                int badge_y = 17;
+                RECT rc_sp_badge = {badge_x, badge_y, badge_x + 90, badge_y + 18};
+                HBRUSH sp_br = CreateSolidBrush(RGB(110, 45, 175));
+                HPEN sp_p = CreatePen(PS_SOLID, 1, RGB(145, 75, 220));
+                SelectObject(mem_dc, sp_br);
+                SelectObject(mem_dc, sp_p);
+                RoundRect(mem_dc, rc_sp_badge.left, rc_sp_badge.top, rc_sp_badge.right, rc_sp_badge.bottom, 4, 4);
+                DeleteObject(sp_br);
+                DeleteObject(sp_p);
+                SetTextColor(mem_dc, RGB(255, 255, 255));
+                SelectObject(mem_dc, g_font_primary_bold);
+                DrawTextA(mem_dc, "SPACE ARENA", -1, &rc_sp_badge, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
+            }
+
             SetTextColor(mem_dc, th->text_secondary);
             SelectObject(mem_dc, g_font_primary_regular);
             RECT rc_sub = {24, 38, rc.right - 24, 56};
@@ -1904,7 +1928,7 @@ static LRESULT CALLBACK SaveCanvasModalProc(HWND hwnd, UINT msg, WPARAM wParam, 
                     snprintf(ram_str, sizeof(ram_str), "Animation RAM: %s / %s Pool", used_str, max_str);
                 }
 
-                RECT rc_ram_txt = {rc.right - 350, 16, rc.right - 24, 38};
+                RECT rc_ram_txt = {rc.right - 220, 16, rc.right - 24, 38};
                 SetTextColor(mem_dc, anim_report.exceeds_budget ? (anim_report.total_capped_ram_bytes >= anim_report.ram_budget_bytes ? RGB(235, 140, 40) : th->text_accent_blue) : ((g_current_theme == THEME_DARK) ? RGB(80, 200, 120) : RGB(25, 140, 60)));
                 SelectObject(mem_dc, g_font_primary_bold);
                 DrawTextA(mem_dc, ram_str, -1, &rc_ram_txt, DT_SINGLELINE | DT_RIGHT | DT_TOP);
@@ -2091,9 +2115,31 @@ static LRESULT CALLBACK SaveCanvasModalProc(HWND hwnd, UINT msg, WPARAM wParam, 
                 }
             } else {
                 RECT rc_empty = rc_strip;
-                SetTextColor(mem_dc, th->text_dim);
-                SelectObject(mem_dc, g_font_primary_regular);
-                DrawTextA(mem_dc, "No images or overlay assets detected in canvas", -1, &rc_empty, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
+                if (g_map_is_space) {
+                    COLORREF sp_card_bg = (g_current_theme == THEME_DARK) ? RGB(38, 24, 56) : RGB(244, 236, 252);
+                    COLORREF sp_card_bd = (g_current_theme == THEME_DARK) ? RGB(140, 70, 220) : RGB(160, 90, 230);
+                    HBRUSH sp_cbr = CreateSolidBrush(sp_card_bg);
+                    HPEN sp_cpen = CreatePen(PS_SOLID, 1, sp_card_bd);
+                    SelectObject(mem_dc, sp_cbr);
+                    SelectObject(mem_dc, sp_cpen);
+                    RoundRect(mem_dc, rc_empty.left + 8, rc_empty.top + 6, rc_empty.right - 8, rc_empty.bottom - 6, 6, 6);
+                    DeleteObject(sp_cbr);
+                    DeleteObject(sp_cpen);
+
+                    RECT rc_sp_title = {rc_empty.left + 16, rc_empty.top + 12, rc_empty.right - 16, rc_empty.top + 28};
+                    SetTextColor(mem_dc, (g_current_theme == THEME_DARK) ? RGB(230, 185, 255) : RGB(120, 30, 180));
+                    SelectObject(mem_dc, g_font_primary_bold);
+                    DrawTextA(mem_dc, "SPACE ARENA (space=\"true\")", -1, &rc_sp_title, DT_SINGLELINE | DT_LEFT | DT_TOP);
+
+                    RECT rc_sp_desc = {rc_empty.left + 16, rc_empty.top + 32, rc_empty.right - 16, rc_empty.bottom - 8};
+                    SetTextColor(mem_dc, (g_current_theme == THEME_DARK) ? RGB(200, 180, 220) : RGB(90, 60, 120));
+                    SelectObject(mem_dc, g_font_primary_regular);
+                    DrawTextA(mem_dc, "Procedural 3D starfield active in Zuma Deluxe.\r\nBackground, cutouts, sprites, and bgcolor are overridden.", -1, &rc_sp_desc, DT_LEFT | DT_WORDBREAK);
+                } else {
+                    SetTextColor(mem_dc, th->text_dim);
+                    SelectObject(mem_dc, g_font_primary_regular);
+                    DrawTextA(mem_dc, "No images or overlay assets detected in canvas", -1, &rc_empty, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
+                }
             }
 
             /* Detail hover / selected status text below carousel */
@@ -2163,10 +2209,14 @@ static LRESULT CALLBACK SaveCanvasModalProc(HWND hwnd, UINT msg, WPARAM wParam, 
             /* 3. Asset Export Options Header */
             if (g_save_dlg_data && g_save_dlg_data->selected_asset_idx >= 0 && g_save_dlg_data->selected_asset_idx < g_save_dlg_data->plan.count) {
                 SaveCanvasAssetItem *sel_it = &g_save_dlg_data->plan.items[g_save_dlg_data->selected_asset_idx];
-                char opt_hdr[128];
-                snprintf(opt_hdr, sizeof(opt_hdr), "Export Options for %s (%s):", sel_it->label, sel_it->id_name);
+                char opt_hdr[160];
+                if (g_map_is_space) {
+                    snprintf(opt_hdr, sizeof(opt_hdr), "Export Options: %s (%s) [Overridden by Space]:", sel_it->label, sel_it->id_name);
+                } else {
+                    snprintf(opt_hdr, sizeof(opt_hdr), "Export Options for %s (%s):", sel_it->label, sel_it->id_name);
+                }
                 SelectObject(mem_dc, g_font_primary_bold);
-                SetTextColor(mem_dc, th->text_primary);
+                SetTextColor(mem_dc, g_map_is_space ? ((g_current_theme == THEME_DARK) ? RGB(215, 160, 255) : RGB(130, 40, 190)) : th->text_primary);
                 RECT rc_lbl_opt = {24, 246, rc.right - 24, 264};
                 DrawTextA(mem_dc, opt_hdr, -1, &rc_lbl_opt, DT_SINGLELINE | DT_LEFT | DT_TOP | DT_NOPREFIX);
             } else {
@@ -2723,6 +2773,23 @@ static LRESULT CALLBACK SaveCanvasModalProc(HWND hwnd, UINT msg, WPARAM wParam, 
                     }
                 }
 
+                if (g_map_is_space) {
+                    const char *space_note =
+                        "Enabling space=\"true\" converts this level into a procedural space arena in Zuma Deluxe.\r\n\r\n"
+                        "CRITICAL: The following attributes and visual layers will be IGNORED or overridden by the Zuma game engine:\r\n\r\n"
+                        " * Background Graphic (image): Completely ignored. Zuma replaces it with a procedural field of 1,000 3D stars and a scrolling nebula.\r\n"
+                        " * Background Color (bgcolor): Ignored. Zuma forces the cosmic space void.\r\n"
+                        " * Hue Rotation (huerot): Ignored for background rendering.\r\n"
+                        " * BackgroundAlpha Cutouts: Static atmospheric and earthquake layers will not render against the space starfield.\r\n"
+                        " * Cutout Layers: May float awkwardly over dynamic space particles.\r\n"
+                        " * Sprite Layers: Ignored or may float awkwardly over dynamic space particles.\r\n\r\n"
+                        "Do you want to proceed with saving this Space canvas project?";
+                    int res = show_themed_choice_dialog_ex(hwnd, "Space Mode Warning", "Procedural Space Arena Activated", space_note, "Save Level", "Cancel", NULL, 600, 420);
+                    if (res != 1) {
+                        break;
+                    }
+                }
+
                 SaveCanvasAssetPlan final_plan = g_save_dlg_data->plan;
                 DestroyWindow(hwnd);
                 show_saving_canvas_modal(g_hwnd_main, name_buf, title_buf, &final_plan);
@@ -2756,6 +2823,7 @@ static LRESULT CALLBACK SaveCanvasModalProc(HWND hwnd, UINT msg, WPARAM wParam, 
             }
             g_orig_save_chk_proc = NULL;
             g_orig_save_combo_proc = NULL;
+            g_orig_save_combo_diff_proc = NULL;
             g_orig_save_combo_diff_list_proc = NULL;
             g_last_diff_hover_idx = -1;
             EnableWindow(g_hwnd_main, TRUE);
@@ -3639,7 +3707,9 @@ void show_save_canvas_dialog(HWND parent_hwnd) {
         24, 324, 194, 160, hwnd_dlg, (HMENU)ID_SAVE_COMBO_DIFF, hinst, NULL
     );
     SendMessage(g_save_dlg_data->hwnd_combo_diff, WM_SETFONT, (WPARAM)g_font_primary_regular, TRUE);
-    SetWindowLongPtrA(g_save_dlg_data->hwnd_combo_diff, GWLP_WNDPROC, (LONG_PTR)SaveThemedComboSubclassProc);
+    g_orig_save_combo_diff_proc = (WNDPROC)SetWindowLongPtrA(
+        g_save_dlg_data->hwnd_combo_diff, GWLP_WNDPROC, (LONG_PTR)SaveThemedComboSubclassProc
+    );
 
     SendMessageA(g_save_dlg_data->hwnd_combo_diff, CB_ADDSTRING, 0, (LPARAM)"Dev-Test (Testing Kit)");
     SendMessageA(g_save_dlg_data->hwnd_combo_diff, CB_ADDSTRING, 0, (LPARAM)"Easy (Relaxed)");
@@ -5919,13 +5989,7 @@ static LRESULT CALLBACK ThemedConfirmModalProc(HWND hwnd, UINT msg, WPARAM wPara
             FillRect(hdc, &rc_client, bg_brush);
             DeleteObject(bg_brush);
 
-            HPEN sep_pen = CreatePen(PS_SOLID, 1, th->bar_border);
-            HPEN old_pen = (HPEN)SelectObject(hdc, sep_pen);
             int sep_y = rc_client.bottom - 50;
-            MoveToEx(hdc, 0, sep_y, NULL);
-            LineTo(hdc, rc_client.right, sep_y);
-            SelectObject(hdc, old_pen);
-            DeleteObject(sep_pen);
 
             int icon_x = 22;
             int icon_y = 20;
@@ -5933,7 +5997,7 @@ static LRESULT CALLBACK ThemedConfirmModalProc(HWND hwnd, UINT msg, WPARAM wPara
 
             HBRUSH badge_brush = CreateSolidBrush(warn_col);
             HPEN null_pen = (HPEN)GetStockObject(NULL_PEN);
-            old_pen = (HPEN)SelectObject(hdc, null_pen);
+            HPEN old_pen = (HPEN)SelectObject(hdc, null_pen);
             HBRUSH old_brush = (HBRUSH)SelectObject(hdc, badge_brush);
             Ellipse(hdc, icon_x, icon_y, icon_x + icon_d, icon_y + icon_d);
             SelectObject(hdc, old_brush);

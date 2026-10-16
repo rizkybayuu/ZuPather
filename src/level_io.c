@@ -1288,69 +1288,71 @@ bool load_canvas_settings_xml(
                 }
             }
 
-            /* Parse Map & Developer Attributes */
-            reset_map_and_dev_attributes();
+            /* Parse Map & Developer Attributes (only when opening canvas into active editor) */
+            if (out_coins != NULL || out_cutouts != NULL || out_sprites != NULL || out_bgalphas != NULL) {
+                reset_map_and_dev_attributes();
 
-            char *sk_attr = strstr(gfx_tag, "skullrot=\"");
-            if (sk_attr) {
-                g_map_has_skullrot = true;
-                g_map_skullrot = (float)atof(sk_attr + 10);
-            }
-            char *sp_attr = strstr(gfx_tag, "space=\"");
-            if (sp_attr && strncmp(sp_attr + 7, "true", 4) == 0) {
-                g_map_is_space = true;
-            }
-            char *dc_attr = strstr(gfx_tag, "drawcurve=\"");
-            if (dc_attr) {
-                g_dev_has_drawcurve = true;
-                g_dev_drawcurve = (strncmp(dc_attr + 11, "false", 5) != 0);
-            }
-            char *dt_attr = strstr(gfx_tag, "drawtunnels=\"");
-            if (dt_attr) {
-                g_dev_has_drawtunnels = true;
-                g_dev_drawtunnels = (strncmp(dt_attr + 13, "false", 5) != 0);
-            }
-            char *cc_attr = strstr(gfx_tag, "curvecolor=\"");
-            if (cc_attr) {
-                char *q = strchr(cc_attr + 12, '"');
-                if (q) {
-                    size_t l = q - (cc_attr + 12);
-                    if (l >= sizeof(g_dev_curvecolor)) l = sizeof(g_dev_curvecolor) - 1;
-                    strncpy(g_dev_curvecolor, cc_attr + 12, l);
-                    g_dev_curvecolor[l] = '\0';
-                    g_dev_has_curvecolor = true;
+                char *sk_attr = strstr(gfx_tag, "skullrot=\"");
+                if (sk_attr) {
+                    g_map_has_skullrot = true;
+                    g_map_skullrot = (float)atof(sk_attr + 10);
                 }
-            }
-            char *bg_attr = strstr(gfx_tag, "bgcolor=\"");
-            if (bg_attr) {
-                char *q = strchr(bg_attr + 9, '"');
-                if (q) {
-                    size_t l = q - (bg_attr + 9);
-                    if (l >= sizeof(g_dev_bgcolor)) l = sizeof(g_dev_bgcolor) - 1;
-                    strncpy(g_dev_bgcolor, bg_attr + 9, l);
-                    g_dev_bgcolor[l] = '\0';
-                    g_dev_has_bgcolor = true;
+                char *sp_attr = strstr(gfx_tag, "space=\"");
+                if (sp_attr && strncmp(sp_attr + 7, "true", 4) == 0) {
+                    g_map_is_space = true;
                 }
-            }
-            char *da_attr = strstr(gfx_tag, "destroyall=\"");
-            if (da_attr) {
-                g_dev_has_destroyall = true;
-                g_dev_destroyall = (strncmp(da_attr + 12, "false", 5) != 0);
-            }
-            char *hr_attr = strstr(gfx_tag, "huerot=\"");
-            if (hr_attr) {
-                g_dev_has_huerot = true;
-                g_dev_huerot = (float)atof(hr_attr + 8);
-            }
-            char *tf_attr = strstr(gfx_tag, "treasurefreq=\"");
-            if (tf_attr) {
-                g_dev_has_treasurefreq = true;
-                g_dev_treasurefreq = atoi(tf_attr + 14);
-            }
-            char *pt_attr = strstr(gfx_tag, "partime=\"");
-            if (pt_attr) {
-                g_dev_has_partime = true;
-                g_dev_partime = atoi(pt_attr + 9);
+                char *dc_attr = strstr(gfx_tag, "drawcurve=\"");
+                if (dc_attr) {
+                    g_dev_has_drawcurve = true;
+                    g_dev_drawcurve = (strncmp(dc_attr + 11, "false", 5) != 0);
+                }
+                char *dt_attr = strstr(gfx_tag, "drawtunnels=\"");
+                if (dt_attr) {
+                    g_dev_has_drawtunnels = true;
+                    g_dev_drawtunnels = (strncmp(dt_attr + 13, "false", 5) != 0);
+                }
+                char *cc_attr = strstr(gfx_tag, "curvecolor=\"");
+                if (cc_attr) {
+                    char *q = strchr(cc_attr + 12, '"');
+                    if (q) {
+                        size_t l = q - (cc_attr + 12);
+                        if (l >= sizeof(g_dev_curvecolor)) l = sizeof(g_dev_curvecolor) - 1;
+                        strncpy(g_dev_curvecolor, cc_attr + 12, l);
+                        g_dev_curvecolor[l] = '\0';
+                        g_dev_has_curvecolor = true;
+                    }
+                }
+                char *bg_attr = strstr(gfx_tag, "bgcolor=\"");
+                if (bg_attr) {
+                    char *q = strchr(bg_attr + 9, '"');
+                    if (q) {
+                        size_t l = q - (bg_attr + 9);
+                        if (l >= sizeof(g_dev_bgcolor)) l = sizeof(g_dev_bgcolor) - 1;
+                        strncpy(g_dev_bgcolor, bg_attr + 9, l);
+                        g_dev_bgcolor[l] = '\0';
+                        g_dev_has_bgcolor = true;
+                    }
+                }
+                char *da_attr = strstr(gfx_tag, "destroyall=\"");
+                if (da_attr) {
+                    g_dev_has_destroyall = true;
+                    g_dev_destroyall = (strncmp(da_attr + 12, "false", 5) != 0);
+                }
+                char *hr_attr = strstr(gfx_tag, "huerot=\"");
+                if (hr_attr) {
+                    g_dev_has_huerot = true;
+                    g_dev_huerot = (float)atof(hr_attr + 8);
+                }
+                char *tf_attr = strstr(gfx_tag, "treasurefreq=\"");
+                if (tf_attr) {
+                    g_dev_has_treasurefreq = true;
+                    g_dev_treasurefreq = atoi(tf_attr + 14);
+                }
+                char *pt_attr = strstr(gfx_tag, "partime=\"");
+                if (pt_attr) {
+                    g_dev_has_partime = true;
+                    g_dev_partime = atoi(pt_attr + 9);
+                }
             }
         }
 

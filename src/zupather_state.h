@@ -243,6 +243,19 @@ typedef void(WINAPI *pfnFlushMenuThemes)(void);
 
 #define RIGHT_PANEL_WIDTH         254
 #define TOOLBAR_NEEDED_WIDTH      620
+#define ZUPATHER_VERSION_STR      "v0.1.1"
+
+/* Embedded Resource IDs */
+#define IDR_SPLASH_JPG              101
+#define IDR_GITHUB_SVG              102
+#define IDR_FONT_ATKINSON_REGULAR   103
+#define IDR_FONT_ATKINSON_BOLD      104
+#define IDR_FONT_JETBRAINS_REGULAR  105
+#define IDR_FONT_JETBRAINS_BOLD     106
+#define IDR_SPRITE_FROG             107
+#define IDR_SPRITE_COIN             108
+#define IDR_SPRITE_SKULL            109
+#define IDR_SPRITE_BALL_BASE        110
 
 /* Font Face Names */
 #define FONT_PRIMARY_NAME   "Atkinson Hyperlegible"

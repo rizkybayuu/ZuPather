@@ -758,6 +758,12 @@ void apply_control_dark_mode(HWND hwnd_ctrl, bool is_dark) {
 void load_frog_sprite(void) {
     if (g_has_frog_img) return;
 
+    /* 1. Try embedded resource (IDR_SPRITE_FROG) */
+    if (image_load_from_resource(IDR_SPRITE_FROG, &g_frog_img)) {
+        g_has_frog_img = true;
+        return;
+    }
+
     char exe_dir[MAX_PATH] = {0};
     GetModuleFileNameA(NULL, exe_dir, MAX_PATH);
     char *p1 = strrchr(exe_dir, '\\');
@@ -786,6 +792,12 @@ void load_frog_sprite(void) {
 
 void load_coin_sprite(void) {
     if (g_has_coin_img) return;
+
+    /* 1. Try embedded resource (IDR_SPRITE_COIN) */
+    if (image_load_from_resource(IDR_SPRITE_COIN, &g_coin_img)) {
+        g_has_coin_img = true;
+        return;
+    }
 
     char exe_dir[MAX_PATH] = {0};
     GetModuleFileNameA(NULL, exe_dir, MAX_PATH);
@@ -1224,6 +1236,12 @@ void load_level_preview_assets(void) {
 
     for (int i = 0; i < LEVEL_PREVIEW_BALL_COLORS; ++i) {
         if (!g_has_ball_imgs[i]) {
+            /* 1. Try embedded resource (IDR_SPRITE_BALL_BASE + i) */
+            if (image_load_from_resource(IDR_SPRITE_BALL_BASE + i, &g_ball_imgs[i])) {
+                g_has_ball_imgs[i] = true;
+                continue;
+            }
+
             char path_buf[MAX_PATH];
             snprintf(path_buf, sizeof(path_buf), "%sassets\\media\\%s", exe_dir, s_ball_files[i]);
             if (image_load_from_file(path_buf, &g_ball_imgs[i])) {
@@ -1243,14 +1261,19 @@ void load_level_preview_assets(void) {
     }
 
     if (!g_has_skull_img) {
-        char skull_path[MAX_PATH];
-        snprintf(skull_path, sizeof(skull_path), "%sassets\\media\\SKULL.png", exe_dir);
-        if (image_load_from_file(skull_path, &g_skull_img)) {
+        /* 1. Try embedded resource (IDR_SPRITE_SKULL) */
+        if (image_load_from_resource(IDR_SPRITE_SKULL, &g_skull_img)) {
             g_has_skull_img = true;
-        } else if (image_load_from_file("assets\\media\\SKULL.png", &g_skull_img)) {
-            g_has_skull_img = true;
-        } else if (image_load_from_file("D:\\Files\\Project\\Reverse Engineer\\ZuPather - Zuma Deluxe Path Maker\\assets\\media\\SKULL.png", &g_skull_img)) {
-            g_has_skull_img = true;
+        } else {
+            char skull_path[MAX_PATH];
+            snprintf(skull_path, sizeof(skull_path), "%sassets\\media\\SKULL.png", exe_dir);
+            if (image_load_from_file(skull_path, &g_skull_img)) {
+                g_has_skull_img = true;
+            } else if (image_load_from_file("assets\\media\\SKULL.png", &g_skull_img)) {
+                g_has_skull_img = true;
+            } else if (image_load_from_file("D:\\Files\\Project\\Reverse Engineer\\ZuPather - Zuma Deluxe Path Maker\\assets\\media\\SKULL.png", &g_skull_img)) {
+                g_has_skull_img = true;
+            }
         }
     }
 }
@@ -1769,7 +1792,30 @@ void trigger_add_bgalpha(HWND hwnd) {
     SetFocus(hwnd);
 }
 
+static HANDLE s_hfont_mem[4] = {NULL, NULL, NULL, NULL};
+
+static void load_embedded_font_res(int res_id, int slot) {
+    HRSRC hRes = FindResourceA(NULL, MAKEINTRESOURCEA(res_id), (LPCSTR)RT_RCDATA);
+    if (!hRes) return;
+    HGLOBAL hMem = LoadResource(NULL, hRes);
+    if (!hMem) return;
+    DWORD sz = SizeofResource(NULL, hRes);
+    const void *ptr = LockResource(hMem);
+    if (!ptr || sz == 0) return;
+    DWORD num_fonts = 0;
+    HANDLE h = AddFontMemResourceEx((PVOID)ptr, sz, NULL, &num_fonts);
+    if (h) {
+        s_hfont_mem[slot] = h;
+    }
+}
+
 void init_fonts(void) {
+    /* 1. Register process-private embedded fonts directly from RAM (100% portable) */
+    load_embedded_font_res(IDR_FONT_ATKINSON_REGULAR, 0);
+    load_embedded_font_res(IDR_FONT_ATKINSON_BOLD, 1);
+    load_embedded_font_res(IDR_FONT_JETBRAINS_REGULAR, 2);
+    load_embedded_font_res(IDR_FONT_JETBRAINS_BOLD, 3);
+
     g_font_primary_regular = CreateFontA(-13, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
         DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
         DEFAULT_PITCH | FF_SWISS, FONT_PRIMARY_NAME);
@@ -1799,6 +1845,13 @@ void destroy_fonts(void) {
     if (g_font_title_bold)      DeleteObject(g_font_title_bold);
     if (g_font_mono_regular)    DeleteObject(g_font_mono_regular);
     if (g_font_mono_bold)       DeleteObject(g_font_mono_bold);
+
+    for (int i = 0; i < 4; ++i) {
+        if (s_hfont_mem[i]) {
+            RemoveFontMemResourceEx(s_hfont_mem[i]);
+            s_hfont_mem[i] = NULL;
+        }
+    }
 }
 
 int get_workspace_height(HWND hwnd) {
