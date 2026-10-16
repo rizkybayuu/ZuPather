@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.1] - 2026-10-16
 
-Milestone patch release establishing complete asset freezing into a single standalone binary, embedded font subsystem, Space Arena engine safeguards, and modal UI refinements.
+Comprehensive portability update embedding all typography fonts and gameplay sprites directly into the unified executable, alongside Space Arena attribute safeguards and dialog interaction fixes.
 
 ### Added
 - **Embedded Asset Pipeline (100% Standalone Self-Contained Binary)**:
