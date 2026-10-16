@@ -11,17 +11,14 @@ on:
 jobs:
   build:
     name: ${{ matrix.name }}
-    runs-on: windows-latest
+    runs-on: windows-2022
     strategy:
       fail-fast: false
       matrix:
         include:
           - name: "MSVC (x64)"
-            generator: "Visual Studio 17 2022"
-            arch: "-A x64"
             toolchain: "msvc"
           - name: "MinGW-w64 (x64)"
-            generator: "MinGW Makefiles"
             toolchain: "mingw"
 
     steps:
@@ -49,7 +46,7 @@ jobs:
       - name: Configure CMake (MSVC)
         if: matrix.toolchain == 'msvc'
         run: |
-          cmake -B build -G "${{ matrix.generator }}" ${{ matrix.arch }} -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+          cmake -B build -A x64 -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
 
       - name: Build (MSVC)
         if: matrix.toolchain == 'msvc'
