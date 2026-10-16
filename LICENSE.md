@@ -74,7 +74,7 @@ SOFTWARE.
 ### Atkinson Hyperlegible Font
 - **Copyright**: Copyright (c) 2020-2021, Braille Institute of America, Inc., with Reserved Font Name "Atkinson Hyperlegible".
 - **License**: [SIL Open Font License (OFL), Version 1.1](assets/fonts/OFL.txt) (http://scripts.sil.org/OFL).
-- **Official Source**: [Braille Institute Atkinson Hyperlegible](https://www.brailleinstitute.org/atkinson-hyperlegible-font)
+- **Official Source**: [Google Fonts: Atkinson Hyperlegible](https://fonts.google.com/specimen/Atkinson+Hyperlegible) / [Braille Institute](https://brailleinstitute.org/freefont/)
 - **Role in ZuPather**: Primary user interface typography utilized across menus, dialogs, buttons, and HUD indicators. Specifically chosen for high character distinction and optimal legibility in low-contrast, dark/light modding environments.
 
 ### JetBrains Mono Font

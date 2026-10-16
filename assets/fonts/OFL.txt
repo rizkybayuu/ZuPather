@@ -3,7 +3,7 @@ SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
 This license applies to the embedded fonts included in ZuPather:
 1. Atkinson Hyperlegible (Bold & Regular)
    Copyright (c) 2020-2021, Braille Institute of America, Inc.
-   (https://www.brailleinstitute.org/atkinson-hyperlegible-font)
+   (https://fonts.google.com/specimen/Atkinson+Hyperlegible)
    with Reserved Font Name "Atkinson Hyperlegible".
 
 2. JetBrains Mono (Bold & Regular)

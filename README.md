@@ -201,7 +201,7 @@ ZuPather.exe genxml my_project.zupath
 
 ZuPather embeds and utilizes the following open-source libraries and typefaces:
 
-- **[Atkinson Hyperlegible](https://www.brailleinstitute.org/atkinson-hyperlegible-font)**: Copyright (c) 2020-2021, Braille Institute of America, Inc., with Reserved Font Name "Atkinson Hyperlegible". Licensed under the [SIL Open Font License 1.1](assets/fonts/OFL.txt). Engineered to provide maximum character distinction for UI labels, menus, and viewport controls.
+- **[Atkinson Hyperlegible](https://fonts.google.com/specimen/Atkinson+Hyperlegible)**: Copyright (c) 2020-2021, Braille Institute of America, Inc., with Reserved Font Name "Atkinson Hyperlegible". Licensed under the [SIL Open Font License 1.1](assets/fonts/OFL.txt). Engineered to provide maximum character distinction for UI labels, menus, and viewport controls.
 - **[JetBrains Mono](https://www.jetbrains.com/lp/mono/)**: Copyright (c) 2020 JetBrains s.r.o., with Reserved Font Name "JetBrains Mono". Licensed under the [SIL Open Font License 1.1](assets/fonts/OFL.txt). Utilized for monospace coordinate readouts, attribute inspector tables, and numerical telemetry.
 - **[stb_image & stb_image_write](https://github.com/nothings/stb)**: Authored by Sean T. Barrett (nothings) and contributors. Released into the Public Domain / MIT Dual License. Provides C99 image raster ingestion.
 
