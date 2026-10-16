@@ -12,6 +12,8 @@ ZuPather.exe
 *.lib
 *.a
 *.exp
+*.zip
+*.7z
 
 # Intermediate Build Artifacts & Logs
 build.log
