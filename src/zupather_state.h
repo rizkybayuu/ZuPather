@@ -243,7 +243,7 @@ typedef void(WINAPI *pfnFlushMenuThemes)(void);
 
 #define RIGHT_PANEL_WIDTH         254
 #define TOOLBAR_NEEDED_WIDTH      620
-#define ZUPATHER_VERSION_STR      "v0.1.1.1"
+#define ZUPATHER_VERSION_STR      "v0.1.2"
 
 /* Embedded Resource IDs */
 #define IDR_SPLASH_JPG              101
@@ -370,7 +370,8 @@ typedef enum {
     PEN_DRAG_ANCHOR,           /* Moving anchor */
     PEN_DRAG_HANDLE_IN,        /* Dragging incoming handle */
     PEN_DRAG_HANDLE_OUT,       /* Dragging outgoing handle */
-    PEN_DRAG_MARQUEE           /* Shift+drag marquee box */
+    PEN_DRAG_MARQUEE,          /* Shift+drag marquee box */
+    PEN_DRAG_INSERT_NODE       /* Inserting node on curve segment, optional immediate drag */
 } PenDragState;
 
 /* Marquee Selection Modes & Snapshot */
@@ -437,6 +438,7 @@ extern bool        g_has_bg_image;
 extern TreasurePoint g_treasure_points[MAX_TREASURE_POINTS];
 extern int           g_treasure_point_count;
 extern bool          g_placing_coin;
+extern bool          g_picked_up_coin;
 extern int           g_hovered_coin_idx;
 extern CanvasImage   g_coin_img;
 extern bool          g_has_coin_img;
@@ -444,6 +446,7 @@ extern bool          g_has_coin_img;
 extern LevelBackgroundAlpha g_bg_alphas[MAX_BG_ALPHAS];
 extern int           g_bg_alpha_count;
 extern bool          g_placing_bgalpha;
+extern bool          g_picked_up_bgalpha;
 extern bool          g_placing_bgalpha_vector;
 extern int           g_hovered_bgalpha_idx;
 extern int           g_selected_bgalpha_idx;
@@ -465,6 +468,7 @@ extern char          g_pending_bgalpha_filepath[MAX_PATH];
 extern LevelCutout   g_cutouts[MAX_CUTOUTS];
 extern int           g_cutout_count;
 extern bool          g_placing_cutout;
+extern bool          g_picked_up_cutout;
 extern int           g_hovered_cutout_idx;
 extern int           g_selected_cutout_idx;
 extern int           g_pending_cutout_pri;
@@ -485,6 +489,7 @@ extern HDC           g_pending_cutout_hdc_dark;
 extern LevelSprite   g_sprites[MAX_SPRITES];
 extern int           g_sprite_count;
 extern bool          g_placing_sprite;
+extern bool          g_picked_up_sprite;
 extern int           g_hovered_sprite_idx;
 extern int           g_selected_sprite_idx;
 extern int           g_pending_sprite_pri;
@@ -575,6 +580,12 @@ extern float        g_var_hover_x;
 extern float        g_var_hover_y;
 extern uint8_t      g_var_hover_tun;
 extern uint8_t      g_var_hover_prio;
+
+extern int          g_hovered_curve_seg_path;
+extern int          g_hovered_curve_seg_idx;
+extern float        g_hovered_curve_seg_t;
+extern float        g_hovered_curve_seg_cx;
+extern float        g_hovered_curve_seg_cy;
 
 extern PenDragState g_pen_drag_state;
 extern int          g_drag_path_idx;
@@ -835,6 +846,7 @@ void start_overlay_priority_adjustment(HWND hwnd, int type, int idx);
 void confirm_overlay_priority_adjustment(HWND hwnd);
 void cancel_overlay_priority_adjustment(HWND hwnd);
 void toggle_overlay_variable_mode(HWND hwnd);
+bool cycle_overlay_selection_at(HWND hwnd, float cx, float cy);
 void snapshot_object_selection(void);
 void snap_vector_45_deg(float dx, float dy, float *out_dx, float *out_dy);
 void handle_select_all(HWND hwnd);

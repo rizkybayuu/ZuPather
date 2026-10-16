@@ -401,14 +401,164 @@ bool hit_test_bezier(
     return false;
 }
 
+/* Hit Test for Bezier Curve Segments (Find segment and parameter t under cursor) */
+bool hit_test_bezier_segment(
+    int mx, int my,
+    const RECT *rc_canvas,
+    float max_screen_dist,
+    int *out_path_idx,
+    int *out_seg_idx,
+    float *out_t,
+    float *out_canvas_x,
+    float *out_canvas_y
+) {
+    if (!g_has_canvas || g_path_count == 0 || !rc_canvas) return false;
+
+    float max_d_sq = max_screen_dist * max_screen_dist;
+    float best_dist_sq = 1e18f;
+    int best_p = -1;
+    int best_seg = -1;
+    float best_t = 0.5f;
+    float best_cx = 0.0f;
+    float best_cy = 0.0f;
+
+    /* Check paths: active path first (if valid and >= 2 nodes), then other paths */
+    for (int pass = 0; pass < 2; ++pass) {
+        for (int p = 0; p < g_path_count; ++p) {
+            if (pass == 0 && p != g_active_path_idx) continue;
+            if (pass == 1 && p == g_active_path_idx) continue;
+
+            BezierPath *bp = &g_paths[p];
+            if (bp->node_count < 2) continue;
+
+            int num_segs = bp->is_closed ? bp->node_count : (bp->node_count - 1);
+            for (int i = 0; i < num_segs; ++i) {
+                const BezierNode *n0 = &bp->nodes[i];
+                const BezierNode *n1 = (i + 1 < bp->node_count) ? &bp->nodes[i + 1] : &bp->nodes[0];
+
+                float p0x = n0->x, p0y = n0->y;
+                float p1x = n0->x + n0->hout_x, p1y = n0->y + n0->hout_y;
+                float p2x = n1->x + n1->hin_x, p2y = n1->y + n1->hin_y;
+                float p3x = n1->x, p3y = n1->y;
+
+                /* Fast bounding box check with screen margin */
+                float min_x = fminf(fminf(p0x, p1x), fminf(p2x, p3x));
+                float max_x = fmaxf(fmaxf(p0x, p1x), fmaxf(p2x, p3x));
+                float min_y = fminf(fminf(p0y, p1y), fminf(p2y, p3y));
+                float max_y = fmaxf(fmaxf(p0y, p1y), fmaxf(p2y, p3y));
+
+                float margin = (max_screen_dist / g_zoom) + 6.0f;
+                if (g_canvas_mouse_x < min_x - margin || g_canvas_mouse_x > max_x + margin ||
+                    g_canvas_mouse_y < min_y - margin || g_canvas_mouse_y > max_y + margin) {
+                    continue;
+                }
+
+                /* Sample 32 steps along segment */
+                const int SAMPLES = 32;
+                float seg_best_d_sq = 1e18f;
+                float seg_best_t = 0.5f;
+                float seg_best_bx = 0.0f, seg_best_by = 0.0f;
+
+                for (int s = 0; s <= SAMPLES; ++s) {
+                    float t = (float)s / (float)SAMPLES;
+                    float it = 1.0f - t;
+                    float it2 = it * it;
+                    float it3 = it2 * it;
+                    float t2 = t * t;
+                    float t3 = t2 * t;
+
+                    float bx = it3 * p0x + 3.0f * it2 * t * p1x + 3.0f * it * t2 * p2x + t3 * p3x;
+                    float by = it3 * p0y + 3.0f * it2 * t * p1y + 3.0f * it * t2 * p2y + t3 * p3y;
+
+                    int bsx = rc_canvas->left + (int)roundf(bx * g_zoom);
+                    int bsy = rc_canvas->top + (int)roundf(by * g_zoom);
+
+                    float d_sq = (float)((mx - bsx) * (mx - bsx) + (my - bsy) * (my - bsy));
+                    if (d_sq < seg_best_d_sq) {
+                        seg_best_d_sq = d_sq;
+                        seg_best_t = t;
+                        seg_best_bx = bx;
+                        seg_best_by = by;
+                    }
+                }
+
+                /* Refine t with 8 iterations of ternary search */
+                float t_low = fmaxf(0.001f, seg_best_t - 1.0f / (float)SAMPLES);
+                float t_high = fminf(0.999f, seg_best_t + 1.0f / (float)SAMPLES);
+
+                for (int iter = 0; iter < 8; ++iter) {
+                    float m1 = t_low + (t_high - t_low) / 3.0f;
+                    float m2 = t_high - (t_high - t_low) / 3.0f;
+
+                    float it1 = 1.0f - m1;
+                    float bx1 = it1 * it1 * it1 * p0x + 3.0f * it1 * it1 * m1 * p1x + 3.0f * it1 * m1 * m1 * p2x + m1 * m1 * m1 * p3x;
+                    float by1 = it1 * it1 * it1 * p0y + 3.0f * it1 * it1 * m1 * p1y + 3.0f * it1 * m1 * m1 * p2y + m1 * m1 * m1 * p3y;
+                    int bsx1 = rc_canvas->left + (int)roundf(bx1 * g_zoom);
+                    int bsy1 = rc_canvas->top + (int)roundf(by1 * g_zoom);
+                    float d1 = (float)((mx - bsx1) * (mx - bsx1) + (my - bsy1) * (my - bsy1));
+
+                    float it2 = 1.0f - m2;
+                    float bx2 = it2 * it2 * it2 * p0x + 3.0f * it2 * it2 * m2 * p1x + 3.0f * it2 * m2 * m2 * p2x + m2 * m2 * m2 * p3x;
+                    float by2 = it2 * it2 * it2 * p0y + 3.0f * it2 * it2 * m2 * p1y + 3.0f * it2 * m2 * m2 * p2y + m2 * m2 * m2 * p3y;
+                    int bsx2 = rc_canvas->left + (int)roundf(bx2 * g_zoom);
+                    int bsy2 = rc_canvas->top + (int)roundf(by2 * g_zoom);
+                    float d2 = (float)((mx - bsx2) * (mx - bsx2) + (my - bsy2) * (my - bsy2));
+
+                    if (d1 < d2) {
+                        t_high = m2;
+                        if (d1 < seg_best_d_sq) {
+                            seg_best_d_sq = d1;
+                            seg_best_t = m1;
+                            seg_best_bx = bx1;
+                            seg_best_by = by1;
+                        }
+                    } else {
+                        t_low = m1;
+                        if (d2 < seg_best_d_sq) {
+                            seg_best_d_sq = d2;
+                            seg_best_t = m2;
+                            seg_best_bx = bx2;
+                            seg_best_by = by2;
+                        }
+                    }
+                }
+
+                /* Exclude ends that are right on top of existing anchors (t < 0.03 or t > 0.97) */
+                if (seg_best_t < 0.03f || seg_best_t > 0.97f) continue;
+
+                if (seg_best_d_sq < best_dist_sq) {
+                    best_dist_sq = seg_best_d_sq;
+                    best_p = p;
+                    best_seg = i;
+                    best_t = seg_best_t;
+                    best_cx = seg_best_bx;
+                    best_cy = seg_best_by;
+                }
+            }
+        }
+        /* If found on active path (pass 0), prioritize it! */
+        if (best_p >= 0 && best_dist_sq <= max_d_sq) break;
+    }
+
+    if (best_p >= 0 && best_dist_sq <= max_d_sq) {
+        if (out_path_idx) *out_path_idx = best_p;
+        if (out_seg_idx)  *out_seg_idx  = best_seg;
+        if (out_t)         *out_t         = best_t;
+        if (out_canvas_x) *out_canvas_x = best_cx;
+        if (out_canvas_y) *out_canvas_y = best_cy;
+        return true;
+    }
+    return false;
+}
+
 
 /* Helper to render an arc-length span along the cached polyline */
 static void draw_curve_span_arc(HDC hdc, BezierPath *bp, const RECT *rc_canvas, double s_start, double s_end, HPEN pen) {
     if (!bp) return;
     if (bp->cache.is_dirty) path_cache_update(bp);
-    if (bp->cache.count < 2 || !bp->cache.S || !bp->cache.x || !bp->cache.y) return;
     const PathCache *c = &bp->cache;
-    if (s_start >= s_end) return;
+    if (c->count < 2 || !c->S || !c->x || !c->y) return;
+    if (!isfinite(s_start) || !isfinite(s_end) || s_start >= s_end) return;
 
     HPEN old_pen = (HPEN)SelectObject(hdc, pen);
 
@@ -556,6 +706,7 @@ static COLORREF get_priority_mixed_color(COLORREF base_col, int prio) {
 /* Render genuine circular dotted line (titik-titik bukan putus) for unhittable tunnel sections */
 static void draw_curve_span_dots(HDC hdc, BezierPath *bp, const RECT *rc_canvas, double s_start, double s_end, COLORREF col, int pen_width) {
     if (!bp || s_start >= s_end) return;
+    if (!isfinite(s_start) || !isfinite(s_end)) return;
     if (bp->cache.is_dirty) path_cache_update(bp);
     const PathCache *c = &bp->cache;
     if (c->count < 2 || !c->S || !c->x || !c->y) return;
@@ -565,6 +716,7 @@ static void draw_curve_span_dots(HDC hdc, BezierPath *bp, const RECT *rc_canvas,
 
     double screen_spacing = 6.0; /* Constant screen pixels interval between dots */
     double spacing = screen_spacing / (g_zoom > 0.01f ? g_zoom : 1.0f);
+    if (spacing < 0.5) spacing = 0.5;
 
     HBRUSH dot_br = CreateSolidBrush(col);
     HPEN dot_pen = CreatePen(PS_SOLID, 1, col);
@@ -572,7 +724,8 @@ static void draw_curve_span_dots(HDC hdc, BezierPath *bp, const RECT *rc_canvas,
     HPEN old_pen = (HPEN)SelectObject(hdc, dot_pen);
 
     double s = s_start;
-    while (s <= s_end) {
+    int max_dots = 10000;
+    while (s <= s_end && --max_dots >= 0) {
         int i0 = 0;
         while (i0 < c->count - 1 && c->S[i0 + 1] < s) i0++;
         double t0 = (c->S[i0 + 1] > c->S[i0]) ? (s - c->S[i0]) / (c->S[i0 + 1] - c->S[i0]) : 0.0;
@@ -698,10 +851,12 @@ static void draw_curve_directional_arrows(HDC hdc, BezierPath *bp, const RECT *r
     if (bp->cache.is_dirty) path_cache_update(bp);
     const PathCache *c = &bp->cache;
     if (c->count < 2 || c->total_length < 25.0 || !c->S || !c->x || !c->y) return;
+    if (!isfinite(c->total_length) || c->total_length > 100000.0) return;
 
     double arrow_spacing = 65.0; /* px arc-length interval */
     double s = 35.0;
-    while (s < c->total_length - 20.0) {
+    int max_arrows = 1000;
+    while (s < c->total_length - 20.0 && --max_arrows >= 0) {
         int i0 = 0;
         while (i0 < c->count - 1 && c->S[i0 + 1] < s) i0++;
         double t0 = (c->S[i0 + 1] > c->S[i0]) ? (s - c->S[i0]) / (c->S[i0 + 1] - c->S[i0]) : 0.0;
@@ -1546,7 +1701,81 @@ static void render_bezier_curves(HDC mem_dc, const RECT *rc_canvas, int client_w
         int hit_p = -1, hit_n = -1, hit_type = -1;
         bool is_hover_item = hit_test_bezier(g_mouse_screen_x, g_mouse_screen_y, rc_canvas, &hit_p, &hit_n, &hit_type);
 
-        if (!is_hover_item) {
+        bool is_alt_down = (GetKeyState(VK_MENU) & 0x8000) != 0;
+        int seg_p = -1, seg_idx = -1;
+        float seg_t = 0.0f, seg_cx = 0.0f, seg_cy = 0.0f;
+        bool is_hover_seg = false;
+        if (!is_hover_item && is_alt_down) {
+            is_hover_seg = hit_test_bezier_segment(g_mouse_screen_x, g_mouse_screen_y, rc_canvas, 8.0f, &seg_p, &seg_idx, &seg_t, &seg_cx, &seg_cy);
+        }
+
+        if (is_hover_seg) {
+            g_hovered_curve_seg_path = seg_p;
+            g_hovered_curve_seg_idx  = seg_idx;
+            g_hovered_curve_seg_t    = seg_t;
+            g_hovered_curve_seg_cx   = seg_cx;
+            g_hovered_curve_seg_cy   = seg_cy;
+
+            int isx = rc_canvas->left + (int)roundf(seg_cx * g_zoom);
+            int isy = rc_canvas->top + (int)roundf(seg_cy * g_zoom);
+
+            int r = 6;
+            HBRUSH br_dot = CreateSolidBrush(RGB(0, 220, 255));
+            HPEN pen_bdr = CreatePen(PS_SOLID, 2, RGB(15, 25, 45));
+            HBRUSH old_b = (HBRUSH)SelectObject(mem_dc, br_dot);
+            HPEN old_p = (HPEN)SelectObject(mem_dc, pen_bdr);
+
+            Ellipse(mem_dc, isx - r, isy - r, isx + r + 1, isy + r + 1);
+
+            HPEN pen_plus = CreatePen(PS_SOLID, 2, RGB(15, 25, 45));
+            SelectObject(mem_dc, pen_plus);
+            MoveToEx(mem_dc, isx - 3, isy, NULL);
+            LineTo(mem_dc, isx + 4, isy);
+            MoveToEx(mem_dc, isx, isy - 3, NULL);
+            LineTo(mem_dc, isx, isy + 4);
+
+            SelectObject(mem_dc, old_b);
+            SelectObject(mem_dc, old_p);
+            DeleteObject(br_dot);
+            DeleteObject(pen_bdr);
+            DeleteObject(pen_plus);
+
+            char badge_str[128];
+            snprintf(badge_str, sizeof(badge_str), "+Insert Node (Alt+LMB) [%.0f, %.0f]", seg_cx, seg_cy);
+            SelectObject(mem_dc, g_font_mono_bold);
+            SIZE b_sz;
+            GetTextExtentPoint32A(mem_dc, badge_str, (int)strlen(badge_str), &b_sz);
+
+            int badge_pad_x = 8;
+            int badge_pad_y = 4;
+            int badge_w = b_sz.cx + badge_pad_x * 2;
+            int badge_h = b_sz.cy + badge_pad_y * 2;
+            int badge_x = isx + 12;
+            int badge_y = isy - badge_h - 6;
+            if (badge_y < rc_canvas->top + 6) badge_y = isy + 14;
+            if (badge_x + badge_w > rc_canvas->right - 6) badge_x = isx - badge_w - 12;
+
+            RECT rc_badge_bg = { badge_x, badge_y, badge_x + badge_w, badge_y + badge_h };
+            HBRUSH br_badge = CreateSolidBrush(RGB(15, 25, 45));
+            HPEN pen_badge = CreatePen(PS_SOLID, 1, RGB(0, 220, 255));
+            HBRUSH old_bb = (HBRUSH)SelectObject(mem_dc, br_badge);
+            HPEN old_bp = (HPEN)SelectObject(mem_dc, pen_badge);
+            RoundRect(mem_dc, rc_badge_bg.left, rc_badge_bg.top, rc_badge_bg.right, rc_badge_bg.bottom, 6, 6);
+            SelectObject(mem_dc, old_bb);
+            SelectObject(mem_dc, old_bp);
+            DeleteObject(br_badge);
+            DeleteObject(pen_badge);
+
+            SetBkMode(mem_dc, TRANSPARENT);
+            SetTextColor(mem_dc, RGB(0, 220, 255));
+            RECT rc_badge_txt = { badge_x, badge_y, badge_x + badge_w, badge_y + badge_h };
+            DrawTextA(mem_dc, badge_str, -1, &rc_badge_txt, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        } else {
+            g_hovered_curve_seg_path = -1;
+            g_hovered_curve_seg_idx  = -1;
+        }
+
+        if (!is_hover_item && !is_hover_seg) {
             bool is_shift = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
 
             if (g_active_path_idx >= 0 && g_active_path_idx < g_path_count) {
@@ -2187,8 +2416,8 @@ void render_splash_elements(HDC mem_dc, int view_w, int view_h, const ThemeColor
         SelectObject(mem_dc, old_pen);
         DeleteObject(img_pen);
 
-        /* Version badge "v0.1.1.1" at bottom-right corner of splash banner image (Adaptive Dark/Light) */
-        int ver_w = 68;
+        /* Version badge "v0.1.2" at bottom-right corner of splash banner image (Adaptive Dark/Light) */
+        int ver_w = 60;
         int ver_h = 20;
         int ver_x = banner_x + banner_w - ver_w - 8;
         int ver_y = banner_y + banner_h - ver_h - 8;

@@ -14,6 +14,17 @@ bool hit_test_bezier(
     int *out_type /* 0=anchor, 1=hout, 2=hin */
 );
 
+bool hit_test_bezier_segment(
+    int mx, int my,
+    const RECT *rc_canvas,
+    float max_screen_dist,
+    int *out_path_idx,
+    int *out_seg_idx,
+    float *out_t,
+    float *out_canvas_x,
+    float *out_canvas_y
+);
+
 CanvasHandleType hit_test_canvas_handles(int client_w, int work_h, int sx, int sy);
 void render_canvas_transform_handles(HDC hdc, int client_w, int work_h, const ThemeColors *th);
 

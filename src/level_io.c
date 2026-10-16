@@ -1836,6 +1836,12 @@ bool execute_open_canvas_folder(HWND hwnd, const char *folder_path) {
     set_canvas_size(hwnd, canvas_w, canvas_h);
     sync_all_map_attr_edits_from_state();
 
+    undo_reset();
+    undo_ensure_baseline();
+    if (g_hwnd_main && IsWindow(g_hwnd_main)) {
+        undo_redo_update_menu(g_hwnd_main);
+    }
+
     zoom_to_fit(hwnd);
     update_status_bar();
     InvalidateRect(hwnd, NULL, FALSE);

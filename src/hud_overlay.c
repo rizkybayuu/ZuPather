@@ -16,6 +16,10 @@ static const GuideRow s_draw_guide[] = {
 
     /* Secondary Tool & Geometry Actions */
     { "LMB",             "Add node / Drag tangent handles", false },
+    { "Alt+LMB on Curve","Insert new node between points", false },
+    { "Insert",          "Subdivide before node at midpoint", false },
+    { "RMB",             "Finish curve / Start new track", false },
+    { "Enter / Esc",     "Finish or cancel curve drawing", false },
     { "Ctrl + LMB",      "Select active node / Drag move", false },
     { "Ctrl + Drag",     "Marquee replace selection",     false },
     { "Ctrl+Shift+LMB",  "Add node to selection",         false },
@@ -34,8 +38,8 @@ static const GuideRow s_draw_guide[] = {
     { "Delete",          "Delete selected anchor point(s)", false },
     { "Shift + Del",     "Delete path of selected node",  false },
     { "Shift + RMB",     "Delete clicked path directly",  false },
-    { "RMB Anchor",      "Quick delete clicked anchor",   false },
-    { "RMB Handle",      "Quick retract clicked handle",  false },
+    { "RMB Anchor",      "Quick delete clicked anchor (idle)", false },
+    { "RMB Handle",      "Quick retract clicked handle (idle)", false },
     { "X",               "Split track at interior node",  false },
     { "R",               "Reverse track flow direction",  false },
     { "J",               "Join 2 endpoints (auto-flow)",  false },
@@ -201,6 +205,7 @@ static const char *g_overlay_guide_lines[] = {
     "RMB (Right Click): Delete hovered overlay item (or cancel)",
     "Selection & Multi-Select:",
     "  * Ctrl + LMB: Select item (Replace selection)",
+    "  * Ctrl + Alt + LMB: Select underneath (cycle layers)",
     "  * Ctrl + Shift + LMB / Drag: Add to Multi-Select",
     "  * Alt + Shift + LMB / Drag: Subtract from Multi-Select",
     "  * Ctrl + Alt + Shift + LMB / Drag: Toggle Multi-Select",
@@ -226,7 +231,9 @@ int get_overlay_guide_content_height(void) {
     int total_h = 28; /* Top title bar (24px) + margin (4px) */
     for (int i = 0; i < num_lines; ++i) {
         bool is_footer_shortcuts = (i == num_lines - 1);
-        bool is_header = (i == 0 || i == 5 || i == 14);
+        bool is_header = (i == 0 ||
+                          strcmp(g_overlay_guide_lines[i], "Selection & Multi-Select:") == 0 ||
+                          strcmp(g_overlay_guide_lines[i], "Overlay Variable Adjustment:") == 0);
         HFONT font = is_header ? g_font_primary_bold : (is_footer_shortcuts ? g_font_mono_bold : g_font_primary_regular);
         HFONT old_f = (HFONT)SelectObject(screen_dc, font);
         RECT rc = { 0, 0, text_w, 0 };
@@ -862,7 +869,9 @@ void render_overlay_guide_hud(HDC mem_dc, int client_w, int work_h, const ThemeC
 
         int num_lines = (int)(sizeof(g_overlay_guide_lines) / sizeof(g_overlay_guide_lines[0]));
         for (int i = 0; i < num_lines; ++i) {
-            bool is_header = (i == 0 || i == 5 || i == 14);
+            bool is_header = (i == 0 ||
+                              strcmp(g_overlay_guide_lines[i], "Selection & Multi-Select:") == 0 ||
+                              strcmp(g_overlay_guide_lines[i], "Overlay Variable Adjustment:") == 0);
             bool is_footer_shortcuts = (i == num_lines - 1);
 
             if (is_header) {
@@ -2287,7 +2296,8 @@ static const char *g_preview_guide_lines[] = {
     " - Design Zuma track curves using vector bezier paths (up to 10 paths).",
     "   * Draw Submode (Pen Tool):",
     "     - LMB: Place anchor nodes and drag tangent handles to curve the path.",
-    "     - Keys: C:Corner, S:Smooth, R:Reverse, X:Split, J:Join, N:New Path.",
+    "     - Alt + LMB on Curve: Insert new anchor node between existing points.",
+    "     - Keys: C:Corner, S:Smooth, R:Reverse, X:Split, J:Join, Insert:Subdivide before node, N:New.",
     "     - Endpoints automatically spawn Zuma skull targets (merged if < 20px).",
     "   * Attribute Submode (Tab Toggle):",
     "     - Press Tab to switch between Draw and Attribute submodes.",

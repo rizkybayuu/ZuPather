@@ -4988,6 +4988,7 @@ void prompt_change_background_image(HWND hwnd) {
     if (GetOpenFileNameA(&ofn)) {
         CanvasImage new_img;
         if (image_load_from_file(filepath, &new_img)) {
+            undo_ensure_baseline();
             if (g_has_bg_image) {
                 image_free(&g_canvas_img);
             }

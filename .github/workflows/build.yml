@@ -1,0 +1,78 @@
+name: Build ZuPather CI
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "MSVC (x64)"
+            generator: "Visual Studio 17 2022"
+            arch: "-A x64"
+            toolchain: "msvc"
+          - name: "MinGW-w64 (x64)"
+            generator: "MinGW Makefiles"
+            toolchain: "mingw"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup MSYS2 (MinGW)
+        if: matrix.toolchain == 'mingw'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: false
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-make
+            mingw-w64-x86_64-libwebp
+            mingw-w64-x86_64-binutils
+
+      - name: Install vcpkg dependencies (MSVC)
+        if: matrix.toolchain == 'msvc'
+        run: |
+          vcpkg install libwebp:x64-windows
+
+      - name: Configure CMake (MSVC)
+        if: matrix.toolchain == 'msvc'
+        run: |
+          cmake -B build -G "${{ matrix.generator }}" ${{ matrix.arch }} -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+
+      - name: Build (MSVC)
+        if: matrix.toolchain == 'msvc'
+        run: |
+          cmake --build build --config Release
+
+      - name: Build (MinGW via MSYS2)
+        if: matrix.toolchain == 'mingw'
+        shell: msys2 {0}
+        run: |
+          cmake -B build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --config Release
+
+      - name: Upload Binary Artifact (MSVC)
+        if: matrix.toolchain == 'msvc'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZuPather-MSVC-x64
+          path: build/Release/ZuPather.exe
+
+      - name: Upload Binary Artifact (MinGW)
+        if: matrix.toolchain == 'mingw'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZuPather-MinGW-x64
+          path: build/ZuPather.exe

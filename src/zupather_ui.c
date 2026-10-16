@@ -2077,6 +2077,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
                 case ID_MENU_CANVAS_REMOVE_IMG:
                     if (g_has_bg_image) {
+                        undo_ensure_baseline();
                         image_free(&g_canvas_img);
                         g_has_bg_image = false;
                         undo_snapshot_capture("Remove Background");
@@ -2215,8 +2216,16 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                         free_pending_bgalpha();
                     }
                     load_coin_sprite();
-                    g_placing_coin = !g_placing_coin;
                     if (g_placing_coin) {
+                        bool was_picked = g_picked_up_coin;
+                        g_picked_up_coin = false;
+                        g_placing_coin = false;
+                        if (was_picked) {
+                            undo_snapshot_capture("Delete Coin");
+                        }
+                    } else {
+                        g_placing_coin = true;
+                        g_picked_up_coin = false;
                         g_hovered_coin_idx = -1;
                         POINT pt;
                         GetCursorPos(&pt);
@@ -2487,6 +2496,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     int nw = atoi(buf_w);
                     int nh = atoi(buf_h);
                     if (nw > 0 && nh > 0) {
+                        undo_ensure_baseline();
                         set_canvas_size(hwnd, nw, nh);
                         undo_snapshot_capture("Resize Canvas");
                     }
@@ -2495,21 +2505,25 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 }
 
                 case ID_BTN_CV_PRESET_640:
+                    undo_ensure_baseline();
                     set_canvas_size(hwnd, 640, 480);
                     undo_snapshot_capture("Resize Canvas 640x480");
                     SetFocus(hwnd);
                     break;
                 case ID_BTN_CV_PRESET_800:
+                    undo_ensure_baseline();
                     set_canvas_size(hwnd, 800, 600);
                     undo_snapshot_capture("Resize Canvas 800x600");
                     SetFocus(hwnd);
                     break;
                 case ID_BTN_CV_PRESET_1024:
+                    undo_ensure_baseline();
                     set_canvas_size(hwnd, 1024, 768);
                     undo_snapshot_capture("Resize Canvas 1024x768");
                     SetFocus(hwnd);
                     break;
                 case ID_BTN_CV_PRESET_1280:
+                    undo_ensure_baseline();
                     set_canvas_size(hwnd, 1280, 720);
                     undo_snapshot_capture("Resize Canvas 1280x720");
                     SetFocus(hwnd);
@@ -2639,24 +2653,28 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 }
 
                 case ID_MENU_CANVAS_640_480:
+                    undo_ensure_baseline();
                     set_canvas_size(hwnd, 640, 480);
                     undo_snapshot_capture("Resize Canvas 640x480");
                     SetFocus(hwnd);
                     break;
 
                 case ID_MENU_CANVAS_800_600:
+                    undo_ensure_baseline();
                     set_canvas_size(hwnd, 800, 600);
                     undo_snapshot_capture("Resize Canvas 800x600");
                     SetFocus(hwnd);
                     break;
 
                 case ID_MENU_CANVAS_1024_768:
+                    undo_ensure_baseline();
                     set_canvas_size(hwnd, 1024, 768);
                     undo_snapshot_capture("Resize Canvas 1024x768");
                     SetFocus(hwnd);
                     break;
 
                 case ID_MENU_CANVAS_1280_720:
+                    undo_ensure_baseline();
                     set_canvas_size(hwnd, 1280, 720);
                     undo_snapshot_capture("Resize Canvas 1280x720");
                     SetFocus(hwnd);
@@ -3874,7 +3892,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     }
                     InvalidateRect(hwnd, NULL, FALSE);
                     return 0;
-                } else if (g_pen_drag_state == PEN_DRAG_ANCHOR) {
+                } else if (g_pen_drag_state == PEN_DRAG_ANCHOR || g_pen_drag_state == PEN_DRAG_INSERT_NODE) {
                     if (g_drag_path_idx >= 0 && g_drag_path_idx < g_path_count) {
                         BezierPath *bp = &g_paths[g_drag_path_idx];
                         if (g_drag_node_idx >= 0 && g_drag_node_idx < bp->node_count) {
@@ -4084,9 +4102,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     InvalidateRect(hwnd, NULL, FALSE);
                 }
 
-                /* Check cutouts hover */
+                /* Check overlay hover (Cutout, Sprite, BgAlpha) */
+                int top_co = -1, sel_co = -1;
                 if (g_has_canvas && g_cutout_count > 0) {
-                    int hit_idx = -1;
                     for (int i = g_cutout_count - 1; i >= 0; i--) {
                         int cw = g_cutouts[i].has_img ? g_cutouts[i].img.width : (g_has_default_cutout_img ? g_default_cutout_img.width : 160);
                         int ch = g_cutouts[i].has_img ? g_cutouts[i].img.height : (g_has_default_cutout_img ? g_default_cutout_img.height : 140);
@@ -4094,26 +4112,14 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                             g_canvas_mouse_x <= (float)(g_cutouts[i].x + cw) &&
                             g_canvas_mouse_y >= (float)g_cutouts[i].y &&
                             g_canvas_mouse_y <= (float)(g_cutouts[i].y + ch)) {
-                            hit_idx = i;
-                            break;
+                            if (top_co == -1) top_co = i;
+                            if (g_cutouts[i].selected && sel_co == -1) sel_co = i;
                         }
                     }
-                    if (hit_idx != g_hovered_cutout_idx) {
-                        g_hovered_cutout_idx = hit_idx;
-                        if (hit_idx >= 0) {
-                            g_selected_cutout_idx = hit_idx;
-                            g_overlay_active_tab = 0;
-                        }
-                        InvalidateRect(hwnd, NULL, FALSE);
-                    }
-                } else if (g_hovered_cutout_idx != -1) {
-                    g_hovered_cutout_idx = -1;
-                    InvalidateRect(hwnd, NULL, FALSE);
                 }
 
-                /* Check sprites hover */
+                int top_sp = -1, sel_sp = -1;
                 if (g_has_canvas && g_sprite_count > 0) {
-                    int hit_idx = -1;
                     for (int i = g_sprite_count - 1; i >= 0; i--) {
                         int sw = g_sprites[i].has_img ? g_sprites[i].img.width : (g_has_default_sprite_img ? g_default_sprite_img.width : 120);
                         int sh = g_sprites[i].has_img ? g_sprites[i].img.height : (g_has_default_sprite_img ? g_default_sprite_img.height : 120);
@@ -4121,26 +4127,14 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                             g_canvas_mouse_x <= (float)(g_sprites[i].x + sw) &&
                             g_canvas_mouse_y >= (float)g_sprites[i].y &&
                             g_canvas_mouse_y <= (float)(g_sprites[i].y + sh)) {
-                            hit_idx = i;
-                            break;
+                            if (top_sp == -1) top_sp = i;
+                            if (g_sprites[i].selected && sel_sp == -1) sel_sp = i;
                         }
                     }
-                    if (hit_idx != g_hovered_sprite_idx) {
-                        g_hovered_sprite_idx = hit_idx;
-                        if (hit_idx >= 0) {
-                            g_selected_sprite_idx = hit_idx;
-                            g_overlay_active_tab = 1;
-                        }
-                        InvalidateRect(hwnd, NULL, FALSE);
-                    }
-                } else if (g_hovered_sprite_idx != -1) {
-                    g_hovered_sprite_idx = -1;
-                    InvalidateRect(hwnd, NULL, FALSE);
                 }
 
-                /* Check bgalphas hover: ONLY IF cursor is NOT hovering Cutout or Sprite! */
-                if (g_hovered_cutout_idx == -1 && g_hovered_sprite_idx == -1 && g_has_canvas && g_bg_alpha_count > 0) {
-                    int hit_idx = -1;
+                int top_ba = -1, sel_ba = -1;
+                if (g_has_canvas && g_bg_alpha_count > 0) {
                     for (int i = g_bg_alpha_count - 1; i >= 0; i--) {
                         int bw = g_bg_alphas[i].has_img ? g_bg_alphas[i].img.width : (g_has_default_bgalpha_img ? g_default_bgalpha_img.width : 160);
                         int bh = g_bg_alphas[i].has_img ? g_bg_alphas[i].img.height : (g_has_default_bgalpha_img ? g_default_bgalpha_img.height : 140);
@@ -4148,16 +4142,53 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                             g_canvas_mouse_x <= (float)(g_bg_alphas[i].x + bw) &&
                             g_canvas_mouse_y >= (float)g_bg_alphas[i].y &&
                             g_canvas_mouse_y <= (float)(g_bg_alphas[i].y + bh)) {
-                            hit_idx = i;
-                            break;
+                            if (top_ba == -1) top_ba = i;
+                            if (g_bg_alphas[i].selected && sel_ba == -1) sel_ba = i;
                         }
                     }
-                    if (hit_idx != g_hovered_bgalpha_idx) {
-                        g_hovered_bgalpha_idx = hit_idx;
-                        InvalidateRect(hwnd, NULL, FALSE);
+                }
+
+                int new_co = -1, new_sp = -1, new_ba = -1;
+                if (sel_co >= 0) {
+                    new_co = sel_co;
+                } else if (sel_sp >= 0) {
+                    new_sp = sel_sp;
+                } else if (sel_ba >= 0) {
+                    new_ba = sel_ba;
+                } else if (top_co >= 0) {
+                    new_co = top_co;
+                } else if (top_sp >= 0) {
+                    new_sp = top_sp;
+                } else if (top_ba >= 0) {
+                    new_ba = top_ba;
+                }
+
+                bool hover_changed = false;
+                if (new_co != g_hovered_cutout_idx) {
+                    g_hovered_cutout_idx = new_co;
+                    if (new_co >= 0 && get_selected_object_count() == 0) {
+                        g_selected_cutout_idx = new_co;
+                        g_overlay_active_tab = 0;
                     }
-                } else if (g_hovered_bgalpha_idx != -1) {
-                    g_hovered_bgalpha_idx = -1;
+                    hover_changed = true;
+                }
+                if (new_sp != g_hovered_sprite_idx) {
+                    g_hovered_sprite_idx = new_sp;
+                    if (new_sp >= 0 && get_selected_object_count() == 0) {
+                        g_selected_sprite_idx = new_sp;
+                        g_overlay_active_tab = 1;
+                    }
+                    hover_changed = true;
+                }
+                if (new_ba != g_hovered_bgalpha_idx) {
+                    g_hovered_bgalpha_idx = new_ba;
+                    if (new_ba >= 0 && get_selected_object_count() == 0) {
+                        g_selected_bgalpha_idx = new_ba;
+                        g_overlay_active_tab = 2;
+                    }
+                    hover_changed = true;
+                }
+                if (hover_changed) {
                     InvalidateRect(hwnd, NULL, FALSE);
                 }
             } else if (g_mode_element) {
@@ -4347,6 +4378,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
         case WM_MOUSELEAVE: {
             g_var_hover_active = false;
+            g_hovered_curve_seg_path = -1;
+            g_hovered_curve_seg_idx  = -1;
             if (g_frog_hovered) {
                 g_frog_hovered = false;
                 InvalidateRect(hwnd, NULL, FALSE);
@@ -4384,6 +4417,20 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             SetFocus(hwnd);
             int mx = GET_X_LPARAM(lParam);
             int my = GET_Y_LPARAM(lParam);
+
+            /* Auto-recover if mouse capture or drag state was stuck from a missed WM_LBUTTONUP */
+            if (g_pen_drag_state != PEN_DRAG_NONE || g_obj_drag_state != OBJ_DRAG_NONE) {
+                if (GetCapture() == hwnd) ReleaseCapture();
+                if (g_pen_drag_state == PEN_DRAG_MARQUEE) free_marquee_snapshot();
+                g_pen_drag_state = PEN_DRAG_NONE;
+                g_obj_drag_state = OBJ_DRAG_NONE;
+                g_drag_path_idx = -1;
+                g_drag_node_idx = -1;
+            }
+
+            if (g_has_canvas && my >= TOOLBAR_HEIGHT) {
+                undo_ensure_baseline();
+            }
 
             if (g_placing_frog && g_has_canvas && my >= TOOLBAR_HEIGHT) {
                 RECT rc_client;
@@ -4424,8 +4471,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     g_treasure_points[g_treasure_point_count].dist1 = 35;
                     g_hovered_coin_idx = g_treasure_point_count;
                     g_treasure_point_count++;
-                    undo_snapshot_capture("Add Coin");
+                    undo_snapshot_capture(g_picked_up_coin ? "Move Coin" : "Add Coin");
                 }
+                g_picked_up_coin = false;
                 g_placing_coin = false;
                 if (g_btn_coin) InvalidateRect(g_btn_coin, NULL, TRUE);
                 InvalidateRect(hwnd, NULL, FALSE);
@@ -4482,8 +4530,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                         deselect_all_objects();
                         g_bg_alphas[g_bg_alpha_count - 1].selected = true;
                         g_selected_bgalpha_idx = g_bg_alpha_count - 1;
-                        undo_snapshot_capture("Add Background Alpha");
+                        undo_snapshot_capture(g_picked_up_bgalpha ? "Move Background Alpha" : "Add Background Alpha");
                     }
+                    g_picked_up_bgalpha = false;
                     g_placing_bgalpha = false;
                     g_placing_bgalpha_vector = false;
                     free_pending_bgalpha();
@@ -4540,8 +4589,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     sync_cutout_image_names();
                     g_selected_cutout_idx = g_cutout_count - 1;
                     g_overlay_active_tab = 0;
-                    undo_snapshot_capture("Add Cutout Overlay");
+                    undo_snapshot_capture(g_picked_up_cutout ? "Move Cutout" : "Add Cutout Overlay");
                 }
+                g_picked_up_cutout = false;
                 g_placing_cutout = false;
                 free_pending_cutout();
                 if (g_btn_overlay) InvalidateRect(g_btn_overlay, NULL, TRUE);
@@ -4587,8 +4637,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     sync_sprite_image_names();
                     g_selected_sprite_idx = g_sprite_count - 1;
                     g_overlay_active_tab = 1;
-                    undo_snapshot_capture("Add Sprite Decoration");
+                    undo_snapshot_capture(g_picked_up_sprite ? "Move Sprite" : "Add Sprite Decoration");
                 }
+                g_picked_up_sprite = false;
                 g_placing_sprite = false;
                 free_pending_sprite();
                 if (g_btn_overlay) InvalidateRect(g_btn_overlay, NULL, TRUE);
@@ -5327,6 +5378,19 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 return 0;
             }
 
+            /* 1e. Overlay Mode: Ctrl + Alt + LMB Deep Selection / Cycle Overlapping Layers */
+            if (g_mode_overlay && g_has_canvas && my >= TOOLBAR_HEIGHT &&
+                (GetKeyState(VK_CONTROL) & 0x8000) && (GetKeyState(VK_MENU) & 0x8000) && !(GetKeyState(VK_SHIFT) & 0x8000)) {
+                RECT rc_client;
+                GetClientRect(hwnd, &rc_client);
+                int client_w = rc_client.right - rc_client.left;
+                int work_h = get_workspace_height(hwnd);
+                float cx, cy;
+                screen_to_canvas(client_w, work_h, mx, my, &cx, &cy);
+                cycle_overlay_selection_at(hwnd, cx, cy);
+                return 0;
+            }
+
             /* 2. Selection Mode (Ctrl / Alt+Shift / Ctrl+Shift / Ctrl+Alt+Shift + LMB / Drag) or Pick-Up existing Objects */
             bool is_ctrl  = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
             bool is_shift = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
@@ -5502,6 +5566,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 /* Priority 1: Cutout (Top-most) */
                 if (g_hovered_cutout_idx >= 0 && g_hovered_cutout_idx < g_cutout_count) {
                     int idx = g_hovered_cutout_idx;
+                    undo_ensure_baseline();
                     free_pending_cutout();
                     g_overlay_current_prio = g_cutouts[idx].pri;
                     g_pending_cutout_pri = g_overlay_current_prio;
@@ -5537,6 +5602,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     g_hovered_cutout_idx = -1;
                     sync_cutout_image_names();
                     g_placing_cutout = true;
+                    g_picked_up_cutout = true;
                     if (g_btn_overlay) InvalidateRect(g_btn_overlay, NULL, TRUE);
                     InvalidateRect(hwnd, NULL, FALSE);
                     update_status_bar();
@@ -5545,6 +5611,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 /* Priority 2: Sprite */
                 if (g_hovered_sprite_idx >= 0 && g_hovered_sprite_idx < g_sprite_count) {
                     int idx = g_hovered_sprite_idx;
+                    undo_ensure_baseline();
                     free_pending_sprite();
                     g_overlay_current_prio = g_sprites[idx].pri;
                     g_pending_cutout_pri = g_overlay_current_prio;
@@ -5572,6 +5639,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     g_hovered_sprite_idx = -1;
                     sync_sprite_image_names();
                     g_placing_sprite = true;
+                    g_picked_up_sprite = true;
                     if (g_btn_overlay) InvalidateRect(g_btn_overlay, NULL, TRUE);
                     InvalidateRect(hwnd, NULL, FALSE);
                     update_status_bar();
@@ -5580,6 +5648,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 /* Priority 3: BackgroundAlpha (Bottom-most overlay layer, no Priority) */
                 if (g_hovered_bgalpha_idx >= 0 && g_hovered_bgalpha_idx < g_bg_alpha_count) {
                     int idx = g_hovered_bgalpha_idx;
+                    undo_ensure_baseline();
                     free_pending_bgalpha();
                     /* BackgroundAlpha has no Priority, do not change priority */
                     if (g_bg_alphas[idx].has_img) {
@@ -5599,6 +5668,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     sync_bgalpha_image_names();
                     g_placing_bgalpha = true;
                     g_placing_bgalpha_vector = false;
+                    g_picked_up_bgalpha = true;
                     if (g_btn_overlay) InvalidateRect(g_btn_overlay, NULL, TRUE);
                     InvalidateRect(hwnd, NULL, FALSE);
                     update_status_bar();
@@ -5621,12 +5691,14 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     return 0;
                 }
                 if (g_hovered_coin_idx >= 0 && g_hovered_coin_idx < g_treasure_point_count) {
+                    undo_ensure_baseline();
                     for (int i = g_hovered_coin_idx; i < g_treasure_point_count - 1; i++) {
                         g_treasure_points[i] = g_treasure_points[i + 1];
                     }
                     g_treasure_point_count--;
                     g_hovered_coin_idx = -1;
                     g_placing_coin = true;
+                    g_picked_up_coin = true;
                     if (g_btn_coin) InvalidateRect(g_btn_coin, NULL, TRUE);
                     InvalidateRect(hwnd, NULL, FALSE);
                     update_status_bar();
@@ -5984,6 +6056,37 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                             return 0;
                         }
                     } else {
+                        /* If holding Ctrl + Alt without Shift, clicking on curve segment splits & inserts node */
+                        if (is_ctrl && is_alt && !is_shift) {
+                            int seg_p = -1, seg_idx = -1;
+                            float seg_t = 0.0f, seg_cx = 0.0f, seg_cy = 0.0f;
+                            if (hit_test_bezier_segment(mx, my, &rc_canvas, 8.0f, &seg_p, &seg_idx, &seg_t, &seg_cx, &seg_cy)) {
+                                undo_ensure_baseline();
+                                BezierPath *bp = &g_paths[seg_p];
+                                if (bezier_path_split_segment(bp, seg_idx, seg_t)) {
+                                    int new_node_idx = seg_idx + 1;
+                                    g_active_path_idx = seg_p;
+                                    g_active_node_idx = new_node_idx;
+                                    for (int p = 0; p < g_path_count; ++p) {
+                                        for (int i = 0; i < g_paths[p].node_count; ++i) {
+                                            g_paths[p].nodes[i].selected = (p == seg_p && i == new_node_idx);
+                                        }
+                                    }
+                                    g_pen_drag_state = PEN_DRAG_INSERT_NODE;
+                                    g_drag_path_idx = seg_p;
+                                    g_drag_node_idx = new_node_idx;
+                                    g_drag_anchor_start_x = bp->nodes[new_node_idx].x;
+                                    g_drag_anchor_start_y = bp->nodes[new_node_idx].y;
+                                    g_drag_mouse_start_cx = cx;
+                                    g_drag_mouse_start_cy = cy;
+                                    SetCapture(hwnd);
+                                    InvalidateRect(hwnd, NULL, FALSE);
+                                    update_status_bar();
+                                    return 0;
+                                }
+                            }
+                        }
+
                         /* Click/Drag empty area: Start Marquee Drag with modifier mode */
                         g_pen_drag_state = PEN_DRAG_MARQUEE;
                         g_marquee_start_x = mx;
@@ -6047,6 +6150,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
                     /* If Alt is held on an anchor: convert corner / pull handles */
                     if (is_alt && hit && hit_type == 0) {
+                        undo_ensure_baseline();
                         bezier_path_make_corner_node(&g_paths[hit_p], hit_n);
                         g_pen_drag_state = PEN_DRAG_NEW_HANDLE;
                         g_drag_path_idx = hit_p;
@@ -6062,6 +6166,39 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                         InvalidateRect(hwnd, NULL, FALSE);
                         update_status_bar();
                         return 0;
+                    }
+
+
+                    /* Special Condition: MUST hold Alt (Alt+LMB) to insert a new node on an existing curve segment.
+                       Normal Left Click is strictly reserved for drawing curves without disturbance! */
+                    if (is_alt && !hit) {
+                        int seg_p = -1, seg_idx = -1;
+                        float seg_t = 0.0f, seg_cx = 0.0f, seg_cy = 0.0f;
+                        if (hit_test_bezier_segment(mx, my, &rc_canvas, 8.0f, &seg_p, &seg_idx, &seg_t, &seg_cx, &seg_cy)) {
+                            undo_ensure_baseline();
+                            BezierPath *bp = &g_paths[seg_p];
+                            if (bezier_path_split_segment(bp, seg_idx, seg_t)) {
+                                int new_node_idx = seg_idx + 1;
+                                g_active_path_idx = seg_p;
+                                g_active_node_idx = new_node_idx;
+                                for (int p = 0; p < g_path_count; ++p) {
+                                    for (int i = 0; i < g_paths[p].node_count; ++i) {
+                                        g_paths[p].nodes[i].selected = (p == seg_p && i == new_node_idx);
+                                    }
+                                }
+                                g_pen_drag_state = PEN_DRAG_INSERT_NODE;
+                                g_drag_path_idx = seg_p;
+                                g_drag_node_idx = new_node_idx;
+                                g_drag_anchor_start_x = bp->nodes[new_node_idx].x;
+                                g_drag_anchor_start_y = bp->nodes[new_node_idx].y;
+                                g_drag_mouse_start_cx = cx;
+                                g_drag_mouse_start_cy = cy;
+                                SetCapture(hwnd);
+                                InvalidateRect(hwnd, NULL, FALSE);
+                                update_status_bar();
+                                return 0;
+                            }
+                        }
                     }
 
                     /* Regular Left Click: Continue selected active path OR create a new path */
@@ -6261,14 +6398,16 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             }
             if (g_pen_drag_state != PEN_DRAG_NONE) {
                 bool was_new_node = (g_pen_drag_state == PEN_DRAG_NEW_HANDLE);
-                if (g_pen_drag_state == PEN_DRAG_ANCHOR && g_drag_path_idx >= 0 && g_drag_path_idx < g_path_count) {
+                bool was_insert   = (g_pen_drag_state == PEN_DRAG_INSERT_NODE);
+                if ((g_pen_drag_state == PEN_DRAG_ANCHOR || g_pen_drag_state == PEN_DRAG_INSERT_NODE) && g_drag_path_idx >= 0 && g_drag_path_idx < g_path_count) {
                     bezier_path_prune_collapsed_spans(&g_paths[g_drag_path_idx]);
                 }
                 ReleaseCapture();
                 g_pen_drag_state = PEN_DRAG_NONE;
                 g_drag_path_idx = -1;
                 g_drag_node_idx = -1;
-                undo_snapshot_capture(was_new_node ? "Add Curve Node" : "Edit Curve Node");
+                const char *action_title = was_insert ? "Insert Curve Node" : (was_new_node ? "Add Curve Node" : "Edit Curve Node");
+                undo_snapshot_capture(action_title);
                 InvalidateRect(hwnd, NULL, FALSE);
                 update_status_bar();
                 return 0;
@@ -6308,6 +6447,31 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         }
 
         case WM_RBUTTONDOWN: {
+            /* 0. If mouse drag or pen drag is active, right-click cancels drag and releases capture immediately */
+            if (g_pen_drag_state != PEN_DRAG_NONE || g_obj_drag_state != OBJ_DRAG_NONE) {
+                if (GetCapture() == hwnd) ReleaseCapture();
+                if (g_pen_drag_state == PEN_DRAG_MARQUEE) free_marquee_snapshot();
+                g_pen_drag_state = PEN_DRAG_NONE;
+                g_obj_drag_state = OBJ_DRAG_NONE;
+                g_drag_path_idx = -1;
+                g_drag_node_idx = -1;
+                if (g_mode_curve && g_curve_submode == CURVE_SUBMODE_DRAW && g_active_path_idx >= 0) {
+                    if (g_active_path_idx < g_path_count && g_paths[g_active_path_idx].node_count == 0) {
+                        compact_empty_paths();
+                    }
+                    g_active_path_idx = -1;
+                    g_active_node_idx = -1;
+                    for (int p = 0; p < g_path_count; ++p) {
+                        for (int i = 0; i < g_paths[p].node_count; ++i) {
+                            g_paths[p].nodes[i].selected = false;
+                        }
+                    }
+                }
+                InvalidateRect(hwnd, NULL, FALSE);
+                update_status_bar();
+                return 0;
+            }
+
             /* 1. If currently adjusting BackgroundAlpha Motion, right-click MUST ONLY CANCEL motion adjustment!
                   NEVER delete the BackgroundAlpha or anything else! */
             if (g_placing_bgalpha_vector && g_editing_bgalpha_idx >= 0) {
@@ -6327,6 +6491,16 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
             /* 2. If placing a new object / vector, right-click cancels placement */
             if (g_placing_frog || g_placing_coin || g_placing_cutout || g_placing_sprite || g_placing_bgalpha || g_placing_bgalpha_vector) {
+                bool was_picked_cutout  = g_picked_up_cutout;
+                bool was_picked_sprite  = g_picked_up_sprite;
+                bool was_picked_bgalpha = g_picked_up_bgalpha;
+                bool was_picked_coin    = g_picked_up_coin;
+
+                g_picked_up_cutout  = false;
+                g_picked_up_sprite  = false;
+                g_picked_up_bgalpha = false;
+                g_picked_up_coin    = false;
+
                 g_placing_frog = false;
                 g_placing_coin = false;
                 g_placing_cutout = false;
@@ -6337,6 +6511,17 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 free_pending_cutout();
                 free_pending_sprite();
                 free_pending_bgalpha();
+
+                if (was_picked_cutout) {
+                    undo_snapshot_capture("Delete Cutout");
+                } else if (was_picked_sprite) {
+                    undo_snapshot_capture("Delete Sprite");
+                } else if (was_picked_bgalpha) {
+                    undo_snapshot_capture("Delete Background Alpha");
+                } else if (was_picked_coin) {
+                    undo_snapshot_capture("Delete Coin");
+                }
+
                 if (g_btn_frog) InvalidateRect(g_btn_frog, NULL, TRUE);
                 if (g_btn_coin) InvalidateRect(g_btn_coin, NULL, TRUE);
                 if (g_btn_overlay) InvalidateRect(g_btn_overlay, NULL, TRUE);
@@ -6412,6 +6597,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                             }
                         }
                         if (hit_p >= 0 && hit_p < g_path_count) {
+                            undo_ensure_baseline();
                             bezier_path_free(&g_paths[hit_p]);
                             memset(&g_paths[hit_p], 0, sizeof(BezierPath));
                             compact_empty_paths();
@@ -6423,11 +6609,37 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                         return 0;
                     }
 
+                    /* Plain RMB Click in Draw Mode:
+                       If a curve is currently being drawn (active path), RMB finishes and finalizes
+                       drawing the curve, cleanly detaching prospective rubber-band preview so that
+                       the next LMB click starts a brand new curve. */
+                    if (g_active_path_idx >= 0) {
+                        if (GetCapture() == hwnd) ReleaseCapture();
+                        g_pen_drag_state = PEN_DRAG_NONE;
+                        g_drag_path_idx = -1;
+                        g_drag_node_idx = -1;
+                        if (g_active_path_idx < g_path_count && g_paths[g_active_path_idx].node_count == 0) {
+                            compact_empty_paths();
+                        }
+                        g_active_path_idx = -1;
+                        g_active_node_idx = -1;
+                        for (int p = 0; p < g_path_count; ++p) {
+                            for (int i = 0; i < g_paths[p].node_count; ++i) {
+                                g_paths[p].nodes[i].selected = false;
+                            }
+                        }
+                        InvalidateRect(hwnd, NULL, FALSE);
+                        update_status_bar();
+                        return 0;
+                    }
+
+                    /* No active curve being drawn: RMB inspects handles/anchors for quick editing */
                     int hit_p = -1, hit_n = -1, hit_type = -1;
                     if (hit_test_bezier(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), &rc_canvas, &hit_p, &hit_n, &hit_type)) {
                         BezierPath *bp = &g_paths[hit_p];
                         if (hit_type == 0) {
                             /* RMB on Anchor: Quick delete node */
+                            undo_ensure_baseline();
                             bezier_path_remove_node(bp, hit_n);
                             bezier_path_prune_collapsed_spans(bp);
                             if (bp->node_count == 0) {
@@ -6441,6 +6653,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                             return 0;
                         } else if (hit_type == 1) {
                             /* RMB on Outgoing handle: Retract hout */
+                            undo_ensure_baseline();
                             bp->nodes[hit_n].hout_x = 0.0f;
                             bp->nodes[hit_n].hout_y = 0.0f;
                             bp->nodes[hit_n].type = NODE_CUSP;
@@ -6451,6 +6664,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                             return 0;
                         } else if (hit_type == 2) {
                             /* RMB on Incoming handle: Retract hin */
+                            undo_ensure_baseline();
                             bp->nodes[hit_n].hin_x = 0.0f;
                             bp->nodes[hit_n].hin_y = 0.0f;
                             bp->nodes[hit_n].type = NODE_CUSP;
@@ -6484,6 +6698,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 return 0;
             }
             if (g_mode_element && g_hovered_coin_idx >= 0 && g_hovered_coin_idx < g_treasure_point_count) {
+                undo_ensure_baseline();
                 for (int i = g_hovered_coin_idx; i < g_treasure_point_count - 1; i++) {
                     g_treasure_points[i] = g_treasure_points[i + 1];
                 }
@@ -6496,6 +6711,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             }
             if (g_mode_overlay && g_hovered_cutout_idx >= 0 && g_hovered_cutout_idx < g_cutout_count) {
                 int idx = g_hovered_cutout_idx;
+                undo_ensure_baseline();
                 free_cutout(&g_cutouts[idx]);
                 for (int i = idx; i < g_cutout_count - 1; i++) {
                     g_cutouts[i] = g_cutouts[i + 1];
@@ -6514,6 +6730,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             }
             if (g_mode_overlay && g_hovered_sprite_idx >= 0 && g_hovered_sprite_idx < g_sprite_count) {
                 int idx = g_hovered_sprite_idx;
+                undo_ensure_baseline();
                 free_sprite(&g_sprites[idx]);
                 for (int i = idx; i < g_sprite_count - 1; i++) {
                     g_sprites[i] = g_sprites[i + 1];
@@ -6532,6 +6749,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             }
             if (g_mode_overlay && g_hovered_bgalpha_idx >= 0 && g_hovered_bgalpha_idx < g_bg_alpha_count) {
                 int idx = g_hovered_bgalpha_idx;
+                undo_ensure_baseline();
                 free_bgalpha(&g_bg_alphas[idx]);
                 for (int i = idx; i < g_bg_alpha_count - 1; i++) {
                     g_bg_alphas[i] = g_bg_alphas[i + 1];
@@ -6547,7 +6765,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             return 0;
         }
 
+        case WM_CANCELMODE:
+        case WM_KILLFOCUS:
         case WM_CAPTURECHANGED: {
+            if (GetCapture() == hwnd) {
+                ReleaseCapture();
+            }
             g_is_dragging_guide_thumb = false;
             g_is_dragging_guide_bg = false;
             g_is_dragging_ov_guide_thumb = false;
@@ -6570,6 +6793,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             g_is_dragging_prev_info_bg = false;
             g_drag_canvas_handle = CANVAS_HANDLE_NONE;
             g_is_panning = false;
+            g_var_dragging = false;
             if (g_pen_drag_state == PEN_DRAG_MARQUEE) {
                 free_marquee_snapshot();
             }
@@ -6578,11 +6802,30 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             g_drag_path_idx = -1;
             g_drag_node_idx = -1;
             InvalidateRect(hwnd, NULL, FALSE);
+            update_status_bar();
             return 0;
         }
 
+        case WM_SYSKEYDOWN: {
+            if (wParam == VK_MENU && g_mode_curve) {
+                InvalidateRect(hwnd, NULL, FALSE);
+                update_status_bar();
+                return 0;
+            }
+            break;
+        }
+
+        case WM_SYSKEYUP: {
+            if (wParam == VK_MENU && g_mode_curve) {
+                InvalidateRect(hwnd, NULL, FALSE);
+                update_status_bar();
+                return 0;
+            }
+            break;
+        }
+
         case WM_KEYUP: {
-            if (wParam == VK_SHIFT && g_mode_curve) {
+            if ((wParam == VK_SHIFT || wParam == VK_MENU || wParam == VK_CONTROL) && g_mode_curve) {
                 InvalidateRect(hwnd, NULL, FALSE);
                 update_status_bar();
                 return 0;
@@ -6627,6 +6870,32 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             }
 
             if (wParam == VK_ESCAPE) {
+                if (g_pen_drag_state != PEN_DRAG_NONE || g_obj_drag_state != OBJ_DRAG_NONE) {
+                    if (GetCapture() == hwnd) ReleaseCapture();
+                    if (g_pen_drag_state == PEN_DRAG_MARQUEE) free_marquee_snapshot();
+                    g_pen_drag_state = PEN_DRAG_NONE;
+                    g_obj_drag_state = OBJ_DRAG_NONE;
+                    g_drag_path_idx = -1;
+                    g_drag_node_idx = -1;
+                    InvalidateRect(hwnd, NULL, FALSE);
+                    update_status_bar();
+                    return 0;
+                }
+                if (g_mode_curve) {
+                    /* Cancel prospective curve rubber-band by deselecting active path and nodes */
+                    if (g_active_path_idx >= 0 || g_active_node_idx >= 0) {
+                        g_active_path_idx = -1;
+                        g_active_node_idx = -1;
+                        for (int p = 0; p < g_path_count; ++p) {
+                            for (int i = 0; i < g_paths[p].node_count; ++i) {
+                                g_paths[p].nodes[i].selected = false;
+                            }
+                        }
+                        InvalidateRect(hwnd, NULL, FALSE);
+                        update_status_bar();
+                        return 0;
+                    }
+                }
                 if (g_adjusting_overlay_priority) {
                     cancel_overlay_priority_adjustment(hwnd);
                     return 0;
@@ -6638,6 +6907,16 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     return 0;
                 }
                 if (g_placing_frog || g_placing_coin || g_placing_cutout || g_placing_sprite || g_placing_bgalpha || g_placing_bgalpha_vector) {
+                    bool was_picked_cutout  = g_picked_up_cutout;
+                    bool was_picked_sprite  = g_picked_up_sprite;
+                    bool was_picked_bgalpha = g_picked_up_bgalpha;
+                    bool was_picked_coin    = g_picked_up_coin;
+
+                    g_picked_up_cutout  = false;
+                    g_picked_up_sprite  = false;
+                    g_picked_up_bgalpha = false;
+                    g_picked_up_coin    = false;
+
                     g_placing_frog = false;
                     g_placing_coin = false;
                     g_placing_cutout = false;
@@ -6648,6 +6927,17 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     free_pending_cutout();
                     free_pending_sprite();
                     free_pending_bgalpha();
+
+                    if (was_picked_cutout) {
+                        undo_snapshot_capture("Delete Cutout");
+                    } else if (was_picked_sprite) {
+                        undo_snapshot_capture("Delete Sprite");
+                    } else if (was_picked_bgalpha) {
+                        undo_snapshot_capture("Delete Background Alpha");
+                    } else if (was_picked_coin) {
+                        undo_snapshot_capture("Delete Coin");
+                    }
+
                     if (g_btn_frog) InvalidateRect(g_btn_frog, NULL, TRUE);
                     if (g_btn_coin) InvalidateRect(g_btn_coin, NULL, TRUE);
                     if (g_btn_overlay) InvalidateRect(g_btn_overlay, NULL, TRUE);
@@ -6655,6 +6945,24 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     update_status_bar();
                 }
                 return 0;
+            }
+
+            if (wParam == VK_RETURN) {
+                if (g_mode_curve && g_curve_submode == CURVE_SUBMODE_DRAW) {
+                    /* Finish drawing active curve, detach prospective rubber band */
+                    if (g_active_path_idx >= 0) {
+                        g_active_path_idx = -1;
+                        g_active_node_idx = -1;
+                        for (int p = 0; p < g_path_count; ++p) {
+                            for (int i = 0; i < g_paths[p].node_count; ++i) {
+                                g_paths[p].nodes[i].selected = false;
+                            }
+                        }
+                        InvalidateRect(hwnd, NULL, FALSE);
+                        update_status_bar();
+                        return 0;
+                    }
+                }
             }
 
             if (wParam == VK_F1) {
@@ -6827,6 +7135,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     return 0;
                 }
                 if (wParam == VK_DELETE || wParam == VK_BACK) {
+                    undo_ensure_baseline();
                     if (shift_down || ctrl_down) {
                         /* Delete entire path(s) that contain selected node(s), or active path */
                         bool deleted_any = false;
@@ -6886,6 +7195,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     return 0;
                 }
                 if (wParam == VK_LEFT || wParam == VK_RIGHT || wParam == VK_UP || wParam == VK_DOWN) {
+                    undo_ensure_baseline();
                     /* Nudge coordinates: 1 pixel per keypress */
                     float dx = 0.0f;
                     float dy = 0.0f;
@@ -6963,6 +7273,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     }
                 }
                 if (!ctrl_down && (wParam == 'C' || wParam == 'c')) {
+                    undo_ensure_baseline();
                     /* Convert selected nodes to Sharp Corner (retract handles) */
                     int cnt = 0;
                     for (int p = 0; p < g_path_count; ++p) {
@@ -6995,6 +7306,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     return 0;
                 }
                 if (!ctrl_down && (wParam == 'S' || wParam == 's')) {
+                    undo_ensure_baseline();
                     /* Convert selected nodes to Auto Smooth with collinear tangent */
                     int cnt = 0;
                     for (int p = 0; p < g_path_count; ++p) {
@@ -7027,6 +7339,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     return 0;
                 }
                 if (!ctrl_down && (wParam == 'R' || wParam == 'r')) {
+                    undo_ensure_baseline();
                     /* Reverse active path direction and swap handles */
                     if (g_active_path_idx >= 0 && g_active_path_idx < g_path_count) {
                         bezier_path_reverse(&g_paths[g_active_path_idx]);
@@ -7053,6 +7366,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                                 show_path_limit_warning(hwnd);
                                 return 0;
                             }
+                            undo_ensure_baseline();
                             BezierPath *new_path = &g_paths[g_path_count];
                             const char *base = g_canvas_name[0] ? g_canvas_name : "curve";
                             char new_name[64];
@@ -7088,6 +7402,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                         }
                     }
                     if (sel_cnt == 2) {
+                        undo_ensure_baseline();
                         if (sel_ends[0].p == sel_ends[1].p) {
                             /* Same path: close loop */
                             BezierPath *bp = &g_paths[sel_ends[0].p];
@@ -7110,6 +7425,54 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                                 undo_snapshot_capture("Join Paths");
                                 InvalidateRect(hwnd, NULL, FALSE);
                                 update_status_bar();
+                            }
+                        }
+                    }
+                    return 0;
+                }
+                if (wParam == VK_INSERT) {
+                    /* Subdivide segment between selected node and PREVIOUS node on path at midpoint (t = 0.5) */
+                    if (g_active_path_idx >= 0 && g_active_path_idx < g_path_count) {
+                        BezierPath *bp = &g_paths[g_active_path_idx];
+                        if (bp->node_count >= 2) {
+                            int sel_k = g_active_node_idx;
+                            if (sel_k < 0 || sel_k >= bp->node_count || !bp->nodes[sel_k].selected) {
+                                sel_k = -1;
+                                for (int i = 0; i < bp->node_count; ++i) {
+                                    if (bp->nodes[i].selected) {
+                                        sel_k = i;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (sel_k < 0) {
+                                /* If no node explicitly selected, default to the last node on the path */
+                                sel_k = bp->node_count - 1;
+                            }
+
+                            int target_seg = -1;
+                            if (sel_k > 0) {
+                                /* Divide between selected node (sel_k) and previous node on path (sel_k - 1) */
+                                target_seg = sel_k - 1;
+                            } else if (sel_k == 0 && bp->is_closed) {
+                                /* In closed loop, node before node 0 is the last node */
+                                target_seg = bp->node_count - 1;
+                            }
+
+                            if (target_seg >= 0) {
+                                undo_ensure_baseline();
+                                if (bezier_path_split_segment(bp, target_seg, 0.5f)) {
+                                    int new_node_idx = target_seg + 1;
+                                    g_active_node_idx = new_node_idx;
+                                    for (int p = 0; p < g_path_count; ++p) {
+                                        for (int i = 0; i < g_paths[p].node_count; ++i) {
+                                            g_paths[p].nodes[i].selected = (p == g_active_path_idx && i == new_node_idx);
+                                        }
+                                    }
+                                    undo_snapshot_capture("Insert Curve Node");
+                                    InvalidateRect(hwnd, NULL, FALSE);
+                                    update_status_bar();
+                                }
                             }
                         }
                     }
@@ -7278,6 +7641,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 if (wParam == VK_DELETE || wParam == VK_BACK) {
                     int sel_count = get_selected_object_count();
                     if (sel_count > 0) {
+                        undo_ensure_baseline();
                         bool any_deleted = false;
                         if (g_mode_overlay) {
                             bool co_deleted = false;
@@ -7363,6 +7727,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 if (wParam == VK_LEFT || wParam == VK_RIGHT || wParam == VK_UP || wParam == VK_DOWN) {
                     int sel_count = get_selected_object_count();
                     if (sel_count > 0) {
+                        undo_ensure_baseline();
                         int dx = 0, dy = 0;
                         if (wParam == VK_LEFT)  dx = -1;
                         if (wParam == VK_RIGHT) dx =  1;

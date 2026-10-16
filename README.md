@@ -1,6 +1,6 @@
-# ZuPather (v0.1.1.1)
+# ZuPather (v0.1.2)
 
-> **Version:** 0.1.1.1 (Maintenance Patch)  
+> **Version:** 0.1.2 (Curve Subdivide, Stacked Overlay Cycling & Build System Release)  
 > **Target Game:** *Zuma Deluxe* v1.0.0.1 & *ZuCompleluxe* Multi-Curve Framework  
 > **Project Scope:** High-Precision Vector Path Editor, Asset Composer & Direct-to-Engine Exporter  
 > **Core Language:** Pure C (C99 / Win32 API)  
@@ -159,6 +159,35 @@ The starting coordinate $(x_0, y_0)$ is reconstructed from the first delta recor
 $$x_0 = \frac{\Delta x_0}{100.0}, \quad y_0 = \frac{\Delta y_0}{100.0}$$
 Subsequent coordinates are calculated iteratively:
 $$x_i = x_{i-1} + \frac{\Delta x_i}{100.0}, \quad y_i = y_{i-1} + \frac{\Delta y_i}{100.0}$$
+
+---
+
+## Build Instructions
+
+ZuPather can be built on Windows using either the native automated batch script or cross-toolchain CMake.
+
+### 1. Automated Script (`build.bat`)
+Run the self-contained build script which automatically scans for available GCC, Clang, or MSVC toolchains and embeds resources:
+```cmd
+build.bat
+```
+*(Append `--no-pause` for CI/unattended script execution).*
+
+### 2. CMake Build (Visual Studio / MSVC)
+```cmd
+mkdir build
+cd build
+cmake -G "Visual Studio 17 2022" -A x64 ..
+cmake --build . --config Release
+```
+
+### 3. CMake Build (MinGW / MSYS2)
+```bash
+mkdir build
+cd build
+cmake -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release ..
+cmake --build . --config Release
+```
 
 ---
 

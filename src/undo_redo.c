@@ -21,6 +21,9 @@ extern void bgalpha_generate_masks(LevelBackgroundAlpha *ba);
 extern bool resolve_cutout_image_in_folder(const char *folder, const char *image_name, CanvasImage *out_img);
 extern bool resolve_sprite_image_in_folder(const char *folder, const char *image_name, CanvasImage *out_img);
 extern bool resolve_bgalpha_image_in_folder(const char *folder, const char *image_name, CanvasImage *out_img);
+extern void sync_cutout_image_names(void);
+extern void sync_sprite_image_names(void);
+extern void sync_bgalpha_image_names(void);
 extern HWND g_hwnd_main;
 
 /* Snapshot data structures in RAM (zero disk cache) */
@@ -41,6 +44,7 @@ typedef struct {
     int  pri;
     char image_name[64];
     char source_filepath[MAX_PATH];
+    bool selected;
 } UndoCutoutSnapshot;
 
 typedef struct {
@@ -49,6 +53,7 @@ typedef struct {
     int  pri;
     char image_name[64];
     char source_filepath[MAX_PATH];
+    bool selected;
 } UndoSpriteSnapshot;
 
 typedef struct {
@@ -59,6 +64,7 @@ typedef struct {
     int  vy;
     char image_name[64];
     char source_filepath[MAX_PATH];
+    bool selected;
 } UndoBgAlphaSnapshot;
 
 typedef struct {
@@ -87,6 +93,7 @@ typedef struct {
     bool has_frog;
     int  frog_gx;
     int  frog_gy;
+    bool frog_selected;
 
     /* Coins (Treasure Points) */
     int  treasure_point_count;
@@ -99,6 +106,11 @@ typedef struct {
     UndoSpriteSnapshot sprites[MAX_SPRITES];
     int  bg_alpha_count;
     UndoBgAlphaSnapshot bg_alphas[MAX_BG_ALPHAS];
+    int  selected_cutout_idx;
+    int  selected_sprite_idx;
+    int  selected_bgalpha_idx;
+    int  overlay_active_tab;
+    int  overlay_current_prio;
 
     /* Bezier Paths */
     int  path_count;
@@ -158,6 +170,7 @@ static void capture_current_state(UndoMemorySnapshot *snap, const char *action_n
     snap->has_frog = g_has_frog;
     snap->frog_gx  = g_frog_gx;
     snap->frog_gy  = g_frog_gy;
+    snap->frog_selected = g_frog_selected;
 
     /* 4. Coins (Treasure Points) */
     snap->treasure_point_count = g_treasure_point_count;
@@ -171,6 +184,7 @@ static void capture_current_state(UndoMemorySnapshot *snap, const char *action_n
         snap->cutouts[i].x = g_cutouts[i].x;
         snap->cutouts[i].y = g_cutouts[i].y;
         snap->cutouts[i].pri = g_cutouts[i].pri;
+        snap->cutouts[i].selected = g_cutouts[i].selected;
         strncpy(snap->cutouts[i].image_name, g_cutouts[i].image_name, sizeof(snap->cutouts[i].image_name) - 1);
         strncpy(snap->cutouts[i].source_filepath, g_cutouts[i].source_filepath, sizeof(snap->cutouts[i].source_filepath) - 1);
     }
@@ -181,6 +195,7 @@ static void capture_current_state(UndoMemorySnapshot *snap, const char *action_n
         snap->sprites[i].x = g_sprites[i].x;
         snap->sprites[i].y = g_sprites[i].y;
         snap->sprites[i].pri = g_sprites[i].pri;
+        snap->sprites[i].selected = g_sprites[i].selected;
         strncpy(snap->sprites[i].image_name, g_sprites[i].image_name, sizeof(snap->sprites[i].image_name) - 1);
         strncpy(snap->sprites[i].source_filepath, g_sprites[i].source_filepath, sizeof(snap->sprites[i].source_filepath) - 1);
     }
@@ -193,9 +208,17 @@ static void capture_current_state(UndoMemorySnapshot *snap, const char *action_n
         snap->bg_alphas[i].pri = g_bg_alphas[i].pri;
         snap->bg_alphas[i].vx = g_bg_alphas[i].vx;
         snap->bg_alphas[i].vy = g_bg_alphas[i].vy;
+        snap->bg_alphas[i].selected = g_bg_alphas[i].selected;
         strncpy(snap->bg_alphas[i].image_name, g_bg_alphas[i].image_name, sizeof(snap->bg_alphas[i].image_name) - 1);
         strncpy(snap->bg_alphas[i].source_filepath, g_bg_alphas[i].source_filepath, sizeof(snap->bg_alphas[i].source_filepath) - 1);
     }
+
+    /* Overlay Editor State */
+    snap->selected_cutout_idx  = g_selected_cutout_idx;
+    snap->selected_sprite_idx  = g_selected_sprite_idx;
+    snap->selected_bgalpha_idx = g_selected_bgalpha_idx;
+    snap->overlay_active_tab   = g_overlay_active_tab;
+    snap->overlay_current_prio = g_overlay_current_prio;
 
     /* 8. Bezier Paths and Nodes (Deep Copy) */
     snap->path_count = g_path_count;
@@ -239,6 +262,39 @@ static void capture_current_state(UndoMemorySnapshot *snap, const char *action_n
 static void restore_state(const UndoMemorySnapshot *snap, HWND hwnd_main) {
     if (!snap) return;
 
+    /* 0. Release capture and cancel any in-progress interactive drags/modes */
+    if (hwnd_main && GetCapture() == hwnd_main) ReleaseCapture();
+    g_pen_drag_state = PEN_DRAG_NONE;
+    g_obj_drag_state = OBJ_DRAG_NONE;
+    g_var_dragging = false;
+    g_drag_canvas_handle = CANVAS_HANDLE_NONE;
+    g_adjusting_overlay_priority = false;
+    g_placing_bgalpha_vector = false;
+    g_editing_bgalpha_idx = -1;
+    g_editing_prio_idx = -1;
+    g_hovered_cutout_idx = -1;
+    g_hovered_sprite_idx = -1;
+    g_hovered_bgalpha_idx = -1;
+    g_hovered_coin_idx = -1;
+    g_frog_hovered = false;
+
+    /* Clean up any in-progress placements or pick-ups */
+    g_placing_frog = false;
+    g_placing_coin = false;
+    g_placing_cutout = false;
+    g_placing_sprite = false;
+    g_placing_bgalpha = false;
+    g_picked_up_cutout = false;
+    g_picked_up_sprite = false;
+    g_picked_up_bgalpha = false;
+    g_picked_up_coin = false;
+    free_pending_cutout();
+    free_pending_sprite();
+    free_pending_bgalpha();
+    if (g_btn_frog && IsWindow(g_btn_frog)) InvalidateRect(g_btn_frog, NULL, TRUE);
+    if (g_btn_coin && IsWindow(g_btn_coin)) InvalidateRect(g_btn_coin, NULL, TRUE);
+    if (g_btn_overlay && IsWindow(g_btn_overlay)) InvalidateRect(g_btn_overlay, NULL, TRUE);
+
     /* 1. Restore Canvas Settings */
     g_has_canvas = snap->has_canvas;
     strncpy(g_canvas_name, snap->canvas_name, sizeof(g_canvas_name) - 1);
@@ -281,6 +337,7 @@ static void restore_state(const UndoMemorySnapshot *snap, HWND hwnd_main) {
     g_has_frog = snap->has_frog;
     g_frog_gx  = snap->frog_gx;
     g_frog_gy  = snap->frog_gy;
+    g_frog_selected = snap->frog_selected;
     if (g_has_frog && !g_has_frog_img) {
         load_frog_sprite();
     }
@@ -303,6 +360,7 @@ static void restore_state(const UndoMemorySnapshot *snap, HWND hwnd_main) {
         co->x = snap->cutouts[i].x;
         co->y = snap->cutouts[i].y;
         co->pri = snap->cutouts[i].pri;
+        co->selected = snap->cutouts[i].selected;
         strncpy(co->image_name, snap->cutouts[i].image_name, sizeof(co->image_name) - 1);
         strncpy(co->source_filepath, snap->cutouts[i].source_filepath, sizeof(co->source_filepath) - 1);
         if (co->source_filepath[0] && GetFileAttributesA(co->source_filepath) != INVALID_FILE_ATTRIBUTES) {
@@ -322,6 +380,7 @@ static void restore_state(const UndoMemorySnapshot *snap, HWND hwnd_main) {
         sp->x = snap->sprites[i].x;
         sp->y = snap->sprites[i].y;
         sp->pri = snap->sprites[i].pri;
+        sp->selected = snap->sprites[i].selected;
         strncpy(sp->image_name, snap->sprites[i].image_name, sizeof(sp->image_name) - 1);
         strncpy(sp->source_filepath, snap->sprites[i].source_filepath, sizeof(sp->source_filepath) - 1);
         if (sp->source_filepath[0] && GetFileAttributesA(sp->source_filepath) != INVALID_FILE_ATTRIBUTES) {
@@ -342,6 +401,7 @@ static void restore_state(const UndoMemorySnapshot *snap, HWND hwnd_main) {
         ba->pri = snap->bg_alphas[i].pri;
         ba->vx = snap->bg_alphas[i].vx;
         ba->vy = snap->bg_alphas[i].vy;
+        ba->selected = snap->bg_alphas[i].selected;
         strncpy(ba->image_name, snap->bg_alphas[i].image_name, sizeof(ba->image_name) - 1);
         strncpy(ba->source_filepath, snap->bg_alphas[i].source_filepath, sizeof(ba->source_filepath) - 1);
         if (ba->source_filepath[0] && GetFileAttributesA(ba->source_filepath) != INVALID_FILE_ATTRIBUTES) {
@@ -352,6 +412,25 @@ static void restore_state(const UndoMemorySnapshot *snap, HWND hwnd_main) {
         bgalpha_generate_masks(ba);
     }
 
+    /* Restore & Synchronize Overlay Editor State */
+    sync_cutout_image_names();
+    sync_sprite_image_names();
+    sync_bgalpha_image_names();
+
+    g_overlay_active_tab = snap->overlay_active_tab;
+    g_overlay_current_prio = snap->overlay_current_prio;
+    g_selected_cutout_idx = (snap->cutout_count > 0 && snap->selected_cutout_idx >= 0 && snap->selected_cutout_idx < snap->cutout_count) ? snap->selected_cutout_idx : (snap->cutout_count > 0 ? 0 : -1);
+    g_selected_sprite_idx = (snap->sprite_count > 0 && snap->selected_sprite_idx >= 0 && snap->selected_sprite_idx < snap->sprite_count) ? snap->selected_sprite_idx : (snap->sprite_count > 0 ? 0 : -1);
+    g_selected_bgalpha_idx = (snap->bg_alpha_count > 0 && snap->selected_bgalpha_idx >= 0 && snap->selected_bgalpha_idx < snap->bg_alpha_count) ? snap->selected_bgalpha_idx : (snap->bg_alpha_count > 0 ? 0 : -1);
+
+    if (g_edit_prio && IsWindow(g_edit_prio)) {
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%d", g_overlay_current_prio);
+        g_in_prio_update = true;
+        SetWindowTextA(g_edit_prio, buf);
+        g_in_prio_update = false;
+    }
+
     /* 8. Restore Bezier Paths and Nodes */
     for (int p = 0; p < g_path_count; ++p) {
         bezier_path_free(&g_paths[p]);
@@ -360,6 +439,18 @@ static void restore_state(const UndoMemorySnapshot *snap, HWND hwnd_main) {
     g_path_count = snap->path_count;
     g_active_path_idx = snap->active_path_idx;
     g_active_node_idx = snap->active_node_idx;
+    if (g_active_path_idx >= g_path_count) {
+        g_active_path_idx = g_path_count - 1;
+    }
+    if (g_active_path_idx >= 0 && g_active_path_idx < g_path_count) {
+        if (g_active_node_idx >= g_paths[g_active_path_idx].node_count) {
+            g_active_node_idx = g_paths[g_active_path_idx].node_count - 1;
+        }
+    } else {
+        g_active_path_idx = -1;
+        g_active_node_idx = -1;
+    }
+
     for (int p = 0; p < snap->path_count && p < MAX_PATHS; ++p) {
         const UndoPathSnapshot *src = &snap->paths[p];
         BezierPath *dst = &g_paths[p];
@@ -373,6 +464,7 @@ static void restore_state(const UndoMemorySnapshot *snap, HWND hwnd_main) {
             if (dst->nodes) {
                 memcpy(dst->nodes, src->nodes, src->node_count * sizeof(BezierNode));
                 dst->node_count = src->node_count;
+                dst->node_capacity = src->node_count;
             }
         }
         if (src->span_count > 0 && src->spans) {
@@ -380,6 +472,7 @@ static void restore_state(const UndoMemorySnapshot *snap, HWND hwnd_main) {
             if (dst->spans) {
                 memcpy(dst->spans, src->spans, src->span_count * sizeof(CurveSpan));
                 dst->span_count = src->span_count;
+                dst->span_capacity = src->span_count;
             }
         }
         path_cache_invalidate(dst);
@@ -412,6 +505,10 @@ void undo_reset(void) {
     }
     s_undo_count = 0;
     s_current_idx = -1;
+    g_picked_up_cutout = false;
+    g_picked_up_sprite = false;
+    g_picked_up_bgalpha = false;
+    g_picked_up_coin = false;
 
     if (g_hwnd_main && IsWindow(g_hwnd_main)) {
         undo_redo_update_menu(g_hwnd_main);

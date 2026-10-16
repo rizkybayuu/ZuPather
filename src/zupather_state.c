@@ -1,6 +1,7 @@
 #include "zupather_state.h"
 #include "dialog_modals.h"
 #include "svg_path.h"
+#include "undo_redo.h"
 
 /* Global State Variable Definitions */
 /* Font Handles */
@@ -84,6 +85,7 @@ bool        g_has_bg_image     = false;
 TreasurePoint g_treasure_points[MAX_TREASURE_POINTS];
 int           g_treasure_point_count = 0;
 bool          g_placing_coin         = false;
+bool          g_picked_up_coin       = false;
 int           g_hovered_coin_idx     = -1;
 CanvasImage   g_coin_img;
 bool          g_has_coin_img         = false;
@@ -92,6 +94,7 @@ bool          g_has_coin_img         = false;
 LevelBackgroundAlpha g_bg_alphas[MAX_BG_ALPHAS];
 int           g_bg_alpha_count          = 0;
 bool          g_placing_bgalpha         = false;
+bool          g_picked_up_bgalpha       = false;
 bool          g_placing_bgalpha_vector  = false;
 int           g_hovered_bgalpha_idx     = -1;
 int           g_selected_bgalpha_idx    = 0;
@@ -114,6 +117,7 @@ char          g_pending_bgalpha_filepath[MAX_PATH] = "";
 LevelCutout   g_cutouts[MAX_CUTOUTS];
 int           g_cutout_count            = 0;
 bool          g_placing_cutout          = false;
+bool          g_picked_up_cutout        = false;
 int           g_hovered_cutout_idx      = -1;
 int           g_selected_cutout_idx     = 0;
 int           g_pending_cutout_pri      = 1;
@@ -137,6 +141,7 @@ HDC           g_pending_cutout_hdc_dark   = NULL;
 LevelSprite   g_sprites[MAX_SPRITES];
 int           g_sprite_count            = 0;
 bool          g_placing_sprite          = false;
+bool          g_picked_up_sprite        = false;
 int           g_hovered_sprite_idx      = -1;
 int           g_selected_sprite_idx     = 0;
 int           g_pending_sprite_pri      = 1;
@@ -209,6 +214,12 @@ float        g_var_hover_x             = 0.0f;
 float        g_var_hover_y             = 0.0f;
 uint8_t      g_var_hover_tun           = 0;
 uint8_t      g_var_hover_prio          = 1;
+
+int          g_hovered_curve_seg_path  = -1;
+int          g_hovered_curve_seg_idx   = -1;
+float        g_hovered_curve_seg_t     = 0.0f;
+float        g_hovered_curve_seg_cx    = 0.0f;
+float        g_hovered_curve_seg_cy    = 0.0f;
 
 PenDragState g_pen_drag_state       = PEN_DRAG_NONE;
 int          g_drag_path_idx        = -1;
@@ -548,6 +559,10 @@ void start_overlay_priority_adjustment(HWND hwnd, int type, int idx) {
 
 void confirm_overlay_priority_adjustment(HWND hwnd) {
     if (!g_adjusting_overlay_priority) return;
+    bool changed = (g_pending_overlay_priority != g_orig_overlay_priority);
+    if (changed) {
+        undo_ensure_baseline();
+    }
     if (g_editing_prio_type == 0 && g_editing_prio_idx >= 0 && g_editing_prio_idx < g_cutout_count) {
         g_cutouts[g_editing_prio_idx].pri = g_pending_overlay_priority;
     } else if (g_editing_prio_type == 1 && g_editing_prio_idx >= 0 && g_editing_prio_idx < g_sprite_count) {
@@ -559,8 +574,125 @@ void confirm_overlay_priority_adjustment(HWND hwnd) {
     g_hovered_cutout_idx = -1;
     g_hovered_sprite_idx = -1;
     g_hovered_bgalpha_idx = -1;
+    if (changed) {
+        undo_snapshot_capture("Adjust Overlay Priority");
+    }
     InvalidateRect(hwnd, NULL, FALSE);
     update_status_bar();
+}
+
+typedef struct {
+    int type; /* 0 = Cutout, 1 = Sprite, 2 = BgAlpha */
+    int idx;
+} OverlayHitItem;
+
+bool cycle_overlay_selection_at(HWND hwnd, float cx, float cy) {
+    if (!g_mode_overlay || !g_has_canvas) return false;
+
+    OverlayHitItem hits[MAX_CUTOUTS + MAX_SPRITES + MAX_BG_ALPHAS];
+    int hit_count = 0;
+
+    /* 1. Check Cutouts in top-to-bottom visual rendering order (highest index to lowest) */
+    for (int i = g_cutout_count - 1; i >= 0; --i) {
+        int cw = g_cutouts[i].has_img ? g_cutouts[i].img.width : (g_has_default_cutout_img ? g_default_cutout_img.width : 160);
+        int ch = g_cutouts[i].has_img ? g_cutouts[i].img.height : (g_has_default_cutout_img ? g_default_cutout_img.height : 140);
+        if (cx >= (float)g_cutouts[i].x && cx <= (float)(g_cutouts[i].x + cw) &&
+            cy >= (float)g_cutouts[i].y && cy <= (float)(g_cutouts[i].y + ch)) {
+            hits[hit_count].type = 0;
+            hits[hit_count].idx = i;
+            hit_count++;
+        }
+    }
+
+    /* 2. Check Sprites in top-to-bottom visual rendering order */
+    for (int i = g_sprite_count - 1; i >= 0; --i) {
+        int sw = g_sprites[i].has_img ? g_sprites[i].img.width : (g_has_default_sprite_img ? g_default_sprite_img.width : 120);
+        int sh = g_sprites[i].has_img ? g_sprites[i].img.height : (g_has_default_sprite_img ? g_default_sprite_img.height : 120);
+        if (cx >= (float)g_sprites[i].x && cx <= (float)(g_sprites[i].x + sw) &&
+            cy >= (float)g_sprites[i].y && cy <= (float)(g_sprites[i].y + sh)) {
+            hits[hit_count].type = 1;
+            hits[hit_count].idx = i;
+            hit_count++;
+        }
+    }
+
+    /* 3. Check Background Alphas in top-to-bottom visual rendering order */
+    for (int i = g_bg_alpha_count - 1; i >= 0; --i) {
+        int bw = g_bg_alphas[i].has_img ? g_bg_alphas[i].img.width : (g_has_default_bgalpha_img ? g_default_bgalpha_img.width : 160);
+        int bh = g_bg_alphas[i].has_img ? g_bg_alphas[i].img.height : (g_has_default_bgalpha_img ? g_default_bgalpha_img.height : 140);
+        if (cx >= (float)g_bg_alphas[i].x && cx <= (float)(g_bg_alphas[i].x + bw) &&
+            cy >= (float)g_bg_alphas[i].y && cy <= (float)(g_bg_alphas[i].y + bh)) {
+            hits[hit_count].type = 2;
+            hits[hit_count].idx = i;
+            hit_count++;
+        }
+    }
+
+    if (hit_count == 0) {
+        deselect_all_objects();
+        if (hwnd && IsWindow(hwnd)) InvalidateRect(hwnd, NULL, FALSE);
+        update_status_bar();
+        return false;
+    }
+
+    /* Find currently selected item among hits under cursor */
+    int cur_hit_idx = -1;
+    for (int h = 0; h < hit_count; ++h) {
+        bool is_sel = false;
+        if (hits[h].type == 0 && g_cutouts[hits[h].idx].selected) is_sel = true;
+        else if (hits[h].type == 1 && g_sprites[hits[h].idx].selected) is_sel = true;
+        else if (hits[h].type == 2 && g_bg_alphas[hits[h].idx].selected) is_sel = true;
+        if (is_sel) {
+            cur_hit_idx = h;
+            break;
+        }
+    }
+
+    /* Select topmost (layer 5) if none selected, or cycle to next layer underneath (wraps to top) */
+    int target_h = (cur_hit_idx == -1) ? 0 : ((cur_hit_idx + 1) % hit_count);
+
+    deselect_all_objects();
+
+    int t = hits[target_h].type;
+    int idx = hits[target_h].idx;
+
+    if (t == 0) {
+        g_cutouts[idx].selected = true;
+        g_selected_cutout_idx = idx;
+        g_overlay_active_tab = 0;
+        g_overlay_current_prio = g_cutouts[idx].pri;
+        g_hovered_cutout_idx = idx;
+        g_hovered_sprite_idx = -1;
+        g_hovered_bgalpha_idx = -1;
+    } else if (t == 1) {
+        g_sprites[idx].selected = true;
+        g_selected_sprite_idx = idx;
+        g_overlay_active_tab = 1;
+        g_overlay_current_prio = g_sprites[idx].pri;
+        g_hovered_sprite_idx = idx;
+        g_hovered_cutout_idx = -1;
+        g_hovered_bgalpha_idx = -1;
+    } else if (t == 2) {
+        g_bg_alphas[idx].selected = true;
+        g_selected_bgalpha_idx = idx;
+        g_overlay_active_tab = 2;
+        g_overlay_current_prio = g_bg_alphas[idx].pri;
+        g_hovered_bgalpha_idx = idx;
+        g_hovered_cutout_idx = -1;
+        g_hovered_sprite_idx = -1;
+    }
+
+    if (g_edit_prio && IsWindow(g_edit_prio)) {
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%d", g_overlay_current_prio);
+        g_in_prio_update = true;
+        SetWindowTextA(g_edit_prio, buf);
+        g_in_prio_update = false;
+    }
+
+    if (hwnd && IsWindow(hwnd)) InvalidateRect(hwnd, NULL, FALSE);
+    update_status_bar();
+    return true;
 }
 
 void cancel_overlay_priority_adjustment(HWND hwnd) {
@@ -1289,6 +1421,10 @@ void enter_preview_mode(HWND hwnd) {
     g_placing_sprite = false;
     g_placing_bgalpha = false;
     g_placing_bgalpha_vector = false;
+    g_picked_up_cutout = false;
+    g_picked_up_sprite = false;
+    g_picked_up_bgalpha = false;
+    g_picked_up_coin = false;
     g_adjusting_overlay_priority = false;
 
     if (g_edit_cv_w) ShowWindow(g_edit_cv_w, SW_HIDE);
@@ -1500,8 +1636,13 @@ void trigger_add_cutout(HWND hwnd) {
         return;
     }
     if (g_placing_cutout) {
+        bool was_picked = g_picked_up_cutout;
+        g_picked_up_cutout = false;
         g_placing_cutout = false;
         free_pending_cutout();
+        if (was_picked) {
+            undo_snapshot_capture("Delete Cutout");
+        }
         InvalidateRect(hwnd, NULL, FALSE);
         update_status_bar();
         return;
@@ -1582,6 +1723,7 @@ void trigger_add_cutout(HWND hwnd) {
     );
 
     g_placing_cutout = true;
+    g_picked_up_cutout = false;
     g_hovered_cutout_idx = -1;
 
     POINT pt;
@@ -1602,8 +1744,13 @@ void trigger_add_sprite(HWND hwnd) {
         return;
     }
     if (g_placing_sprite) {
+        bool was_picked = g_picked_up_sprite;
+        g_picked_up_sprite = false;
         g_placing_sprite = false;
         free_pending_sprite();
+        if (was_picked) {
+            undo_snapshot_capture("Delete Sprite");
+        }
         InvalidateRect(hwnd, NULL, FALSE);
         update_status_bar();
         return;
@@ -1678,6 +1825,7 @@ void trigger_add_sprite(HWND hwnd) {
     strncpy(g_pending_sprite_filepath, filepath, sizeof(g_pending_sprite_filepath) - 1);
 
     g_placing_sprite = true;
+    g_picked_up_sprite = false;
     g_hovered_sprite_idx = -1;
 
     POINT pt;
@@ -1698,10 +1846,15 @@ void trigger_add_bgalpha(HWND hwnd) {
         return;
     }
     if (g_placing_bgalpha) {
+        bool was_picked = g_picked_up_bgalpha;
+        g_picked_up_bgalpha = false;
         g_placing_bgalpha = false;
         g_placing_bgalpha_vector = false;
         g_editing_bgalpha_idx = -1;
         free_pending_bgalpha();
+        if (was_picked) {
+            undo_snapshot_capture("Delete Background Alpha");
+        }
         InvalidateRect(hwnd, NULL, FALSE);
         update_status_bar();
         return;
@@ -1774,6 +1927,7 @@ void trigger_add_bgalpha(HWND hwnd) {
     strncpy(g_pending_bgalpha_filepath, filepath, sizeof(g_pending_bgalpha_filepath) - 1);
 
     g_placing_bgalpha = true;
+    g_picked_up_bgalpha = false;
     g_placing_bgalpha_vector = false;
     g_editing_bgalpha_idx = -1;
     g_hovered_bgalpha_idx = -1;
@@ -1917,15 +2071,24 @@ void update_status_bar(void) {
                 if (g_paths[p].nodes[i].selected) sel_node_cnt++;
             }
         }
-        if (sel_node_cnt > 0) {
+        if (g_curve_submode == CURVE_SUBMODE_DRAW && g_hovered_curve_seg_path >= 0 && g_hovered_curve_seg_path < g_path_count) {
+            snprintf(buf_info, sizeof(buf_info),
+                     "Curve [Draw Mode] | Path #%d (Segment %d-%d) | Alt+LMB: Insert Node Between Points | Drag: Adjust",
+                     g_hovered_curve_seg_path + 1, g_hovered_curve_seg_idx + 1, g_hovered_curve_seg_idx + 2);
+        } else if (sel_node_cnt > 0) {
             snprintf(buf_info, sizeof(buf_info),
                      "Curve [%s] | %d Selected Node%s | Delete: Remove | Arrows: Nudge 1px | Ctrl+D: Deselect",
                      sub_name, sel_node_cnt, sel_node_cnt > 1 ? "s" : "");
         } else if (g_active_path_idx >= 0 && g_active_path_idx < g_path_count) {
-            snprintf(buf_info, sizeof(buf_info),
-                     "Curve [%s] | Path #%d [%s]: %d nodes | LMB: %s | Ctrl+Click: Select Point",
-                     sub_name, g_active_path_idx + 1, g_paths[g_active_path_idx].name, g_paths[g_active_path_idx].node_count,
-                     (g_curve_submode == CURVE_SUBMODE_DRAW) ? "Continue Path" : "Paint Attribute Span");
+            if (g_curve_submode == CURVE_SUBMODE_DRAW) {
+                snprintf(buf_info, sizeof(buf_info),
+                         "Curve [%s] | Path #%d [%s]: %d nodes | LMB: Continue Path | RMB: Finish Curve | Ctrl+Click: Select Point",
+                         sub_name, g_active_path_idx + 1, g_paths[g_active_path_idx].name, g_paths[g_active_path_idx].node_count);
+            } else {
+                snprintf(buf_info, sizeof(buf_info),
+                         "Curve [%s] | Path #%d [%s]: %d nodes | LMB: Paint Attribute Span | Ctrl+Click: Select Point",
+                         sub_name, g_active_path_idx + 1, g_paths[g_active_path_idx].name, g_paths[g_active_path_idx].node_count);
+            }
         } else {
             snprintf(buf_info, sizeof(buf_info),
                      "Curve [%s] | No active path | LMB: New Path #%d",

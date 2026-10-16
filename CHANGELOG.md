@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.2] - 2026-10-17
+
+Major feature and stability release introducing cross-toolchain CMake and GitHub Actions CI, curve segment subdivision and node insertion in Draw Mode, stacked overlay layer cycling, and complete Undo/Redo hardening across all editor modules.
+
+### Added
+- **CMake Build System & GitHub Actions CI**:
+  - Added root `CMakeLists.txt` and explicit source manifest `cmake/sources.cmake` supporting cross-toolchain compilation with MSVC (Visual Studio 2022) and MinGW-w64 (MSYS2 / GCC).
+  - Added multi-platform GitHub Actions CI workflow (`.github/workflows/build.yml`) with matrix testing for MSVC (x64) and MinGW (x64) and automatic binary artifact publishing.
+  - Embedded Windows PE resource script (`res/zupather.rc`) automatically across both MSVC (`rc.exe`) and MinGW (`windres.exe`).
+  - Added comprehensive build instructions in `README.md` covering automated `build.bat` and CMake commands.
+- **Draw Mode Bézier Segment Subdivision & Insertion**:
+  - Added segment insertion: split any curve segment at arbitrary parameter $t$ using De Casteljau subdivision while mathematically preserving 100% of the curve's curvature geometry.
+  - Enforced strict modifier condition: holding <kbd>Alt</kbd> (or <kbd>Ctrl</kbd>+<kbd>Alt</kbd>) over a curve segment displays an interactive cyan target reticle and floating badge `+Insert Node (Alt+LMB) [X, Y]`.
+  - Pure Left Click (LMB) remains strictly reserved for drawing curves and adding new anchor nodes without any interruption or hijacking.
+  - Enforced strict <kbd>Ctrl</kbd> requirement for selecting anchor nodes (`Ctrl + Click` / `Ctrl + Drag Marquee`).
+  - Added <kbd>Insert</kbd> keyboard shortcut to subdivide the segment between the active selected node ($k$) and the previous node on the path ($k-1$) at midpoint ($t = 0.5$).
+- **Overlay Mode Stacked Layer Cycling**:
+  - Added <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+Left Click to cycle selections through overlapping/stacked overlay objects (Cutouts, Sprites, Alpha Masks) from top layer to bottom layer with circular wrap-around.
+
+### Fixed
+- **Comprehensive Undo / Redo Hardening**:
+  - Implemented `undo_ensure_baseline()` across all editing operations to guarantee an initial reference snapshot before the first mutation.
+  - Fixed Cutout and Sprite deletion undo: deleting an overlay cutout now cleanly records an undo snapshot and restores properly on <kbd>Ctrl</kbd>+<kbd>Z</kbd>.
+  - Fixed Coin deletion and Frog position edit undo tracking.
+  - Fixed Canvas resize undo capture upon drag handle release.
+  - Fully integrated curve node insertion into the undo/redo stack (`"Insert Curve Node"`).
+
+### Changed
+- **Version & Metadata Alignment**:
+  - Updated in-app splash screen version indicator badge to `v0.1.2`.
+  - Updated Windows PE resource metadata to File Version `0.1.2.0` and Product Version `0.1.2`.
+
+---
+
 ## [0.1.1.1] - 2026-10-16
 
 Minor maintenance patch resolving layout clipping in the Attribute Mode guide panel and updating the splash screen version badge.

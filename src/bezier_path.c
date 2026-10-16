@@ -112,6 +112,9 @@ bool bezier_path_add_node(BezierPath *path, const BezierNode *node) {
     if (!path || !node) return false;
     if (path->node_count >= path->node_capacity) {
         int new_cap = path->node_capacity == 0 ? 16 : path->node_capacity * 2;
+        while (new_cap <= path->node_count) {
+            new_cap *= 2;
+        }
         BezierNode *new_arr = (BezierNode*)realloc(path->nodes, new_cap * sizeof(BezierNode));
         if (!new_arr) return false;
         path->nodes = new_arr;
@@ -133,6 +136,9 @@ bool bezier_path_insert_node(BezierPath *path, int index, const BezierNode *node
     if (!path || !node || index < 0 || index > path->node_count) return false;
     if (path->node_count >= path->node_capacity) {
         int new_cap = path->node_capacity == 0 ? 16 : path->node_capacity * 2;
+        while (new_cap <= path->node_count) {
+            new_cap *= 2;
+        }
         BezierNode *new_arr = (BezierNode*)realloc(path->nodes, new_cap * sizeof(BezierNode));
         if (!new_arr) return false;
         path->nodes = new_arr;
@@ -210,11 +216,14 @@ bool bezier_path_remove_node(BezierPath *path, int index) {
 
 /* Split bezier segment seg_idx at parameter t using De Casteljau subdivision */
 bool bezier_path_split_segment(BezierPath *path, int seg_idx, float t) {
-    if (!path || seg_idx < 0 || seg_idx >= path->node_count - 1) return false;
+    if (!path || seg_idx < 0) return false;
+    int max_seg = path->is_closed ? path->node_count : (path->node_count - 1);
+    if (seg_idx >= max_seg) return false;
     if (t <= 0.001f || t >= 0.999f) return false;
 
+    bool is_closing_seg = (path->is_closed && seg_idx == path->node_count - 1);
     BezierNode *n0 = &path->nodes[seg_idx];
-    BezierNode *n1 = &path->nodes[seg_idx + 1];
+    BezierNode *n1 = is_closing_seg ? &path->nodes[0] : &path->nodes[seg_idx + 1];
 
     float p0x = n0->x;
     float p0y = n0->y;
@@ -261,9 +270,14 @@ bool bezier_path_split_segment(BezierPath *path, int seg_idx, float t) {
         return false;
     }
 
-    /* Update succeeding node incoming handle (now at seg_idx + 2) */
-    path->nodes[seg_idx + 2].hin_x = p23_x - p3x;
-    path->nodes[seg_idx + 2].hin_y = p23_y - p3y;
+    /* Update succeeding node incoming handle */
+    if (is_closing_seg) {
+        path->nodes[0].hin_x = p23_x - p3x;
+        path->nodes[0].hin_y = p23_y - p3y;
+    } else {
+        path->nodes[seg_idx + 2].hin_x = p23_x - p3x;
+        path->nodes[seg_idx + 2].hin_y = p23_y - p3y;
+    }
 
     path_cache_invalidate(path);
     return true;
@@ -542,6 +556,9 @@ bool bezier_path_add_span(BezierPath *path, const CurveSpan *span) {
     if (!path || !span) return false;
     if (path->span_count >= path->span_capacity) {
         int new_cap = path->span_capacity == 0 ? 8 : path->span_capacity * 2;
+        while (new_cap <= path->span_count) {
+            new_cap *= 2;
+        }
         CurveSpan *new_arr = (CurveSpan*)realloc(path->spans, new_cap * sizeof(CurveSpan));
         if (!new_arr) return false;
         path->spans = new_arr;
