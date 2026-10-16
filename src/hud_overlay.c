@@ -1,8 +1,85 @@
 #include "hud_overlay.h"
 
+typedef struct {
+    const char *key;
+    const char *desc;
+    bool is_primary;
+} GuideRow;
+
+static const GuideRow s_draw_guide[] = {
+    /* Primary Navigation & Control Shortcuts (Highlighted at Top) */
+    { "Tab",             "Toggle Draw / Attribute mode", true },
+    { "Ctrl+Shift+I",    "Import curve path (.dat, .svg)", true },
+    { "Ctrl+Shift+E",    "Export curve paths (.dat, .svg)", true },
+    { "F1",              "Toggle Guide panel",            true },
+    { "F2",              "Toggle Curve Tools panel",      true },
+
+    /* Secondary Tool & Geometry Actions */
+    { "LMB",             "Add node / Drag tangent handles", false },
+    { "Ctrl + LMB",      "Select active node / Drag move", false },
+    { "Ctrl + Drag",     "Marquee replace selection",     false },
+    { "Ctrl+Shift+LMB",  "Add node to selection",         false },
+    { "Ctrl+Shift+Drag", "Marquee add to selection",      false },
+    { "Alt+Shift+LMB",   "Deselect clicked node",         false },
+    { "Alt+Shift+Drag",  "Marquee deselect nodes",        false },
+    { "Ctrl+Alt+Shift",  "Toggle select (click or drag)", false },
+    { "Ctrl+A",          "Select all curve nodes",        false },
+    { "Ctrl+I",          "Invert selection",              false },
+    { "Ctrl+D",          "Deselect all curve nodes",      false },
+    { "Alt + Drag",      "Break handle into sharp cusp",  false },
+    { "S",               "Smooth handles (collinear)",    false },
+    { "C",               "Sharp corner (retract handles)", false },
+    { "Arrows",          "Nudge selected node(s) 1px",    false },
+    { "Shift + Arrows",  "Nudge selected path 1px",       false },
+    { "Delete",          "Delete selected anchor point(s)", false },
+    { "Shift + Del",     "Delete path of selected node",  false },
+    { "Shift + RMB",     "Delete clicked path directly",  false },
+    { "RMB Anchor",      "Quick delete clicked anchor",   false },
+    { "RMB Handle",      "Quick retract clicked handle",  false },
+    { "X",               "Split track at interior node",  false },
+    { "R",               "Reverse track flow direction",  false },
+    { "J",               "Join 2 endpoints (auto-flow)",  false },
+    { "[",               "Select previous track",         false },
+    { "]",               "Select next track",             false },
+    { "N",               "Finish track / Start new track", false }
+};
+
+static const GuideRow s_attr_guide[] = {
+    /* Primary Navigation & Control Shortcuts (Highlighted at Top) */
+    { "Tab",             "Toggle Draw / Attribute mode",  true },
+    { "Ctrl+Shift+I",    "Import curve path (.dat, .svg)", true },
+    { "Ctrl+Shift+E",    "Export curve paths (.dat, .svg)", true },
+    { "F1",              "Toggle Guide panel",            true },
+    { "F2",              "Toggle Curve Tools panel",      true },
+
+    /* Attribute Spans Painting & Quick Controls */
+    { "LMB Drag",        "Paint attribute span on track", false },
+    { "RMB Click",       "Toggle Unhittable (or press U)", false },
+    { "Mouse Wheel",     "Scroll canvas: Priority +/- (min 0)", false },
+    { "Ctrl + LMB",      "Switch active path under cursor", false },
+    { "Ctrl+A",          "Select all curve nodes",        false },
+    { "Ctrl+I",          "Invert selection",              false },
+    { "Ctrl+D",          "Deselect all curve nodes",      false },
+    { "Hover Track",     "Inspect Unhittable & Priority badge", false }
+};
+
 int get_guide_content_height(void) {
     if (g_hud_shortcuts_collapsed) return 26;
-    return (g_curve_submode == CURVE_SUBMODE_DRAW) ? 684 : 248;
+
+    const GuideRow *cur_guide = (g_curve_submode == CURVE_SUBMODE_DRAW) ? s_draw_guide : s_attr_guide;
+    int count = (g_curve_submode == CURVE_SUBMODE_DRAW) ?
+        (int)(sizeof(s_draw_guide) / sizeof(s_draw_guide[0])) :
+        (int)(sizeof(s_attr_guide) / sizeof(s_attr_guide[0]));
+
+    int total_h = 28; /* Header & top title bar */
+    for (int i = 0; i < count; ++i) {
+        total_h += 20; /* item_h */
+        if (cur_guide[i].is_primary && (i + 1 < count) && !cur_guide[i + 1].is_primary) {
+            total_h += 8; /* divider spacing between primary and secondary */
+        }
+    }
+    total_h += 8; /* bottom margin */
+    return total_h;
 }
 
 int get_guide_hud_max_scroll(int work_h) {
@@ -591,80 +668,13 @@ void render_curve_submode_huds(HDC mem_dc, int client_w, int work_h, const Theme
         HRGN clip_tl = CreateRectRgn(1, 25, tl_w - 1, tl_h - 1);
         SelectClipRgn(dc_tl, clip_tl);
 
-        typedef struct {
-            const char *key;
-            const char *desc;
-            bool is_primary;
-        } GuideRow;
-
         int cur_y = 28 - g_hud_guide_scroll_y;
         int item_h = 20;
 
-        const GuideRow *cur_guide = NULL;
-        int count = 0;
-
-        if (g_curve_submode == CURVE_SUBMODE_DRAW) {
-            static const GuideRow draw_guide[] = {
-                /* Primary Navigation & Control Shortcuts (Highlighted at Top) */
-                { "Tab",             "Toggle Draw / Attribute mode", true },
-                { "Ctrl+Shift+I",    "Import curve path (.dat, .svg)", true },
-                { "Ctrl+Shift+E",    "Export curve paths (.dat, .svg)", true },
-                { "F1",              "Toggle Guide panel",            true },
-                { "F2",              "Toggle Curve Tools panel",      true },
-
-                /* Secondary Tool & Geometry Actions */
-                { "LMB",             "Add node / Drag tangent handles", false },
-                { "Ctrl + LMB",      "Select active node / Drag move", false },
-                { "Ctrl + Drag",     "Marquee replace selection",     false },
-                { "Ctrl+Shift+LMB",  "Add node to selection",         false },
-                { "Ctrl+Shift+Drag", "Marquee add to selection",      false },
-                { "Alt+Shift+LMB",   "Deselect clicked node",         false },
-                { "Alt+Shift+Drag",  "Marquee deselect nodes",        false },
-                { "Ctrl+Alt+Shift",  "Toggle select (click or drag)", false },
-                { "Ctrl+A",          "Select all curve nodes",        false },
-                { "Ctrl+I",          "Invert selection",              false },
-                { "Ctrl+D",          "Deselect all curve nodes",      false },
-                { "Alt + Drag",      "Break handle into sharp cusp",  false },
-                { "S",               "Smooth handles (collinear)",    false },
-                { "C",               "Sharp corner (retract handles)", false },
-                { "Arrows",          "Nudge selected node(s) 1px",    false },
-                { "Shift + Arrows",  "Nudge selected path 1px",       false },
-                { "Delete",          "Delete selected anchor point(s)", false },
-                { "Shift + Del",     "Delete path of selected node",  false },
-                { "Shift + RMB",     "Delete clicked path directly",  false },
-                { "RMB Anchor",      "Quick delete clicked anchor",   false },
-                { "RMB Handle",      "Quick retract clicked handle",  false },
-                { "X",               "Split track at interior node",  false },
-                { "R",               "Reverse track flow direction",  false },
-                { "J",               "Join 2 endpoints (auto-flow)",  false },
-                { "[",               "Select previous track",         false },
-                { "]",               "Select next track",             false },
-                { "N",               "Finish track / Start new track", false }
-            };
-            cur_guide = draw_guide;
-            count = (int)(sizeof(draw_guide) / sizeof(draw_guide[0]));
-        } else {
-            static const GuideRow attr_guide[] = {
-                /* Primary Navigation & Control Shortcuts (Highlighted at Top) */
-                { "Tab",             "Toggle Draw / Attribute mode",  true },
-                { "Ctrl+Shift+I",    "Import curve path (.dat, .svg)", true },
-                { "Ctrl+Shift+E",    "Export curve paths (.dat, .svg)", true },
-                { "F1",              "Toggle Guide panel",            true },
-                { "F2",              "Toggle Curve Tools panel",      true },
-
-                /* Attribute Spans Painting & Quick Controls */
-                { "LMB Drag",        "Paint attribute span on track", false },
-                { "RMB Click",       "Toggle Unhittable (or press U)", false },
-                { "Mouse Wheel",     "Scroll canvas: Priority +/- (min 0)", false },
-                { "Ctrl + LMB",      "Switch active path under cursor", false },
-                { "Ctrl+A",          "Select all curve nodes",        false },
-                { "Ctrl+I",          "Invert selection",              false },
-                { "Ctrl+D",          "Deselect all curve nodes",      false },
-                { "Hover Track",     "Inspect Unhittable & Priority badge", false }
-            };
-            cur_guide = attr_guide;
-            count = (int)(sizeof(attr_guide) / sizeof(attr_guide[0]));
-        }
+        const GuideRow *cur_guide = (g_curve_submode == CURVE_SUBMODE_DRAW) ? s_draw_guide : s_attr_guide;
+        int count = (g_curve_submode == CURVE_SUBMODE_DRAW) ?
+            (int)(sizeof(s_draw_guide) / sizeof(s_draw_guide[0])) :
+            (int)(sizeof(s_attr_guide) / sizeof(s_attr_guide[0]));
 
         for (int i = 0; i < count; ++i) {
             if (cur_guide[i].is_primary) {

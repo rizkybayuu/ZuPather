@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.1.1] - 2026-10-16
+
+Hotfix release resolving text truncation in the Attribute Mode HUD guide and introducing adaptive theme styling for the in-app splash screen version badge.
+
+### Fixed
+- **HUD Guide Attribute Mode Layout & Geometry**:
+  - Resolved an issue where shortcut rows in Attribute Mode (including `Ctrl+I`, `Ctrl+D`, and `Hover Track`) were truncated at the bottom of the floating guide panel.
+  - Upgraded `get_guide_content_height()` to dynamically compute exact panel dimensions from file-scope shortcut row definitions (`304 px` for Attribute Mode, `684 px` for Draw Mode), guaranteeing full visibility with proper margins across all screen resolutions.
+  - Synchronized scrollbar geometry to accurately reflect true content height, ensuring smooth scrolling whenever viewport height is constrained.
+
+### Changed
+- **Adaptive Splash Screen Version Badge**:
+  - Updated in-app splash screen build indicator badge to `v0.1.1.1`.
+  - Made the version pill badge adaptive to theme preferences: renders dark with silver lettering in Dark Mode, and crisp white with dark contrast lettering in Light Mode.
+
+---
+
 ## [0.1.1] - 2026-10-16
 
 Comprehensive portability update embedding all typography fonts and gameplay sprites directly into the unified executable, alongside Space Arena attribute safeguards and dialog interaction fixes.

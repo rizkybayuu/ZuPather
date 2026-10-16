@@ -243,7 +243,7 @@ typedef void(WINAPI *pfnFlushMenuThemes)(void);
 
 #define RIGHT_PANEL_WIDTH         254
 #define TOOLBAR_NEEDED_WIDTH      620
-#define ZUPATHER_VERSION_STR      "v0.1.1"
+#define ZUPATHER_VERSION_STR      "v0.1.1.1"
 
 /* Embedded Resource IDs */
 #define IDR_SPLASH_JPG              101

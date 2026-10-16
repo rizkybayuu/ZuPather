@@ -2167,6 +2167,8 @@ void render_splash_elements(HDC mem_dc, int view_w, int view_h, const ThemeColor
     int start_y = offset_y + (view_h - total_splash_h) / 2;
     if (start_y < offset_y + 12) start_y = offset_y + 12;
 
+    bool is_dark = (g_current_theme == THEME_DARK);
+
     /* 1. Splash Banner Image (ZuSPLASHscreen.jpg) */
     int banner_x = (view_w - banner_w) / 2;
     int banner_y = start_y;
@@ -2185,15 +2187,19 @@ void render_splash_elements(HDC mem_dc, int view_w, int view_h, const ThemeColor
         SelectObject(mem_dc, old_pen);
         DeleteObject(img_pen);
 
-        /* Version badge "v0.1.1" at bottom-right corner of splash banner image */
-        int ver_w = 56;
+        /* Version badge "v0.1.1.1" at bottom-right corner of splash banner image (Adaptive Dark/Light) */
+        int ver_w = 68;
         int ver_h = 20;
         int ver_x = banner_x + banner_w - ver_w - 8;
         int ver_y = banner_y + banner_h - ver_h - 8;
         RECT rc_ver = { ver_x, ver_y, ver_x + ver_w, ver_y + ver_h };
 
-        HBRUSH br_ver = CreateSolidBrush(RGB(18, 20, 26));
-        HPEN pen_ver = CreatePen(PS_SOLID, 1, RGB(70, 76, 88));
+        COLORREF ver_bg  = is_dark ? RGB(18, 20, 26) : RGB(255, 255, 255);
+        COLORREF ver_bdr = is_dark ? RGB(70, 76, 88) : RGB(180, 188, 202);
+        COLORREF ver_fg  = is_dark ? RGB(245, 248, 252) : RGB(30, 36, 48);
+
+        HBRUSH br_ver = CreateSolidBrush(ver_bg);
+        HPEN pen_ver = CreatePen(PS_SOLID, 1, ver_bdr);
         HPEN old_p_ver = (HPEN)SelectObject(mem_dc, pen_ver);
         HBRUSH old_b_ver = (HBRUSH)SelectObject(mem_dc, br_ver);
         RoundRect(mem_dc, rc_ver.left, rc_ver.top, rc_ver.right, rc_ver.bottom, 6, 6);
@@ -2204,7 +2210,7 @@ void render_splash_elements(HDC mem_dc, int view_w, int view_h, const ThemeColor
 
         SetBkMode(mem_dc, TRANSPARENT);
         SelectObject(mem_dc, g_font_mono_bold ? g_font_mono_bold : g_font_primary_bold);
-        SetTextColor(mem_dc, RGB(245, 248, 252));
+        SetTextColor(mem_dc, ver_fg);
         DrawTextA(mem_dc, ZUPATHER_VERSION_STR, -1, &rc_ver, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
     }
 
@@ -2214,8 +2220,6 @@ void render_splash_elements(HDC mem_dc, int view_w, int view_h, const ThemeColor
 
     RECT rc_pill = { pill_x, pill_y, pill_x + pill_w, pill_y + pill_h };
     g_splash_rc_github = rc_pill;
-
-    bool is_dark = (g_current_theme == THEME_DARK);
 
     bool is_gh_hover = (g_splash_hover_item == 1);
     COLORREF gh_bg = is_gh_hover ? (is_dark ? RGB(45, 52, 64) : RGB(225, 234, 246))
