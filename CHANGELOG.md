@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.0.1] - 2026-10-16
+
+Maintenance update establishing pure portable configuration isolation and visual splash version alignment.
+
+### Changed
+- **Pure Portable Architecture & Config Isolation**:
+  - Eliminated Windows Registry fallback (`HKCU\Software\ZuPather`) in favor of strict, isolated file persistence via `canvas/zupathconf.inf`.
+  - Deleting `zupathconf.inf` now completely and reliably resets ZuPather to a clean factory state with zero residual path caches.
+  - Updated in-app splash screen version indicator badge to `v0.1.0.1`.
+
+---
+
 ## [0.1.0] - 2026-10-16
 
 Initial milestone release establishing the complete, standalone vector path editor, level asset composer, and binary curve compiler for *Zuma Deluxe* and the *ZuCompleluxe* engine.

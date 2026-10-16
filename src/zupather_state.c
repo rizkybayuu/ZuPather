@@ -2567,17 +2567,6 @@ void load_zuma_config(void) {
     char buf[MAX_PATH] = {0};
     GetPrivateProfileStringA("Zuma", "LevelsDir", "", buf, sizeof(buf), ini_path);
 
-    /* If not found in inf yet, check registry fallback from previous session */
-    if (buf[0] == '\0') {
-        HKEY hkey;
-        if (RegOpenKeyExA(HKEY_CURRENT_USER, "Software\\ZuPather", 0, KEY_READ, &hkey) == ERROR_SUCCESS) {
-            DWORD sz = sizeof(buf);
-            DWORD type = REG_SZ;
-            RegQueryValueExA(hkey, "LevelsDir", NULL, &type, (LPBYTE)buf, &sz);
-            RegCloseKey(hkey);
-        }
-    }
-
     if (buf[0] != '\0') {
         char xml_check[MAX_PATH];
         snprintf(xml_check, sizeof(xml_check), "%s\\levels.xml", buf);

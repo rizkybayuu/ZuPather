@@ -2185,8 +2185,8 @@ void render_splash_elements(HDC mem_dc, int view_w, int view_h, const ThemeColor
         SelectObject(mem_dc, old_pen);
         DeleteObject(img_pen);
 
-        /* Version badge "v0.1" at bottom-right corner of splash banner image */
-        int ver_w = 46;
+        /* Version badge "v0.1.0.1" at bottom-right corner of splash banner image */
+        int ver_w = 66;
         int ver_h = 20;
         int ver_x = banner_x + banner_w - ver_w - 8;
         int ver_y = banner_y + banner_h - ver_h - 8;
@@ -2205,7 +2205,7 @@ void render_splash_elements(HDC mem_dc, int view_w, int view_h, const ThemeColor
         SetBkMode(mem_dc, TRANSPARENT);
         SelectObject(mem_dc, g_font_mono_bold ? g_font_mono_bold : g_font_primary_bold);
         SetTextColor(mem_dc, RGB(245, 248, 252));
-        DrawTextA(mem_dc, "v0.1", -1, &rc_ver, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
+        DrawTextA(mem_dc, "v0.1.0.1", -1, &rc_ver, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
     }
 
     /* 2. GitHub Link Pill Button ("Developed by Rizky Bayuu" -> GitHub ↗) */
