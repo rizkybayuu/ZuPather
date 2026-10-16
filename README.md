@@ -106,7 +106,6 @@ ZuPather/
 │   ├── undo_redo.c / .h          # Transactional history & undo/redo command stack
 │   ├── zupather_state.c / .h     # Global application state management & configuration
 │   └── zupather_ui.c             # Win32 window procedure, message dispatcher & CLI entry point
-├── tests/                        # Local unit tests & verification suites (git-ignored)
 ├── .gitignore                    # Comprehensive Git exclusion rules
 ├── build.bat                     # Unified 1-click build script
 ├── CHANGELOG.md                  # Detailed version release notes

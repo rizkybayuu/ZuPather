@@ -2,7 +2,7 @@
 ## Architectural Design & Technical Specification (Revision 2 - Production Aligned)
 
 > **Document Version**: 2.0.0  
-> **Target Subsystems**: `src/bezier_path.h`, `src/bezier_path.c`, `src/zupather_ui.c`, `tests/`  
+> **Target Subsystems**: `src/bezier_path.h`, `src/bezier_path.c`, `src/zupather_ui.c`  
 > **Status**: Approved Architectural Blueprint Aligned with Retail Reverse Engineering Benchmarks
 
 ---
@@ -383,13 +383,13 @@ On file load, anchor indices are mapped to stable memory IDs automatically.
    - Implement unified `PathCache` (tolerance 0.05 px, `S[]`, `node_s[]`, `BakedSpan[]`).
    - Implement `path_cache_update()`, `attrs_at()`, and `project_s_window()`.
    - Implement symmetrical re-anchoring on node removal and De Casteljau split on node insertion.
-2. **Step 2: Automated Console Regression Test (`tests/test_spans_and_cache.c`)**:
-   - Test stable node ID tracking.
-   - Test De Casteljau node insertion without span shift.
-   - Test symmetrical re-anchoring on anchor deletion.
-   - Test temporary collapse during anchor drag vs mouse-up permanent prune.
-   - Test nested span inheritance (painter's algorithm).
-   - Test round-trip `.dat` and `.zupath` v1.1 serialization.
+2. **Step 2: Attribute Regression Verification**:
+   - Verify stable node ID tracking.
+   - Verify De Casteljau node insertion without span shift.
+   - Verify symmetrical re-anchoring on anchor deletion.
+   - Verify temporary collapse during anchor drag vs mouse-up permanent prune.
+   - Verify nested span inheritance (painter's algorithm).
+   - Verify round-trip `.dat` and `.zupath` v1.1 serialization.
 3. **Step 3: Win32 GUI Integration (`src/zupather_ui.c`)**:
    - Wire unified `PathCache` into curve rendering.
    - Add Top-Right Mode Switcher HUD & Top-Left Shortcut HUD (50%/100% opacity).
