@@ -1,0 +1,58 @@
+# =========================================================================
+# ZuPather - Git Exclusion Rules
+# =========================================================================
+
+# Build Outputs & Compiled Executables
+ZuPather.exe
+*.exe
+*.o
+*.obj
+*.res.o
+*.dll
+*.lib
+*.a
+*.exp
+
+# Intermediate Build Artifacts & Logs
+build.log
+*.log
+*.tmp
+*.bak
+*.orig
+levels.xml.bak
+
+# Local User Canvas Projects & Working Directory (completely ignored)
+canvas/
+
+# Local Unit Tests, Verification Captures & Scratches (git-ignored)
+tests/
+*.bmp
+__pycache__/
+*.pyc
+*.pyo
+
+# Graphic Design Suite Projects, Locks & Autosaves
+*.af
+*.afdesign
+*.afphoto
+*.afpub
+*.~lock~
+*.af~lock~
+*.~*
+
+# Operating System Metadata
+Thumbs.db
+desktop.ini
+.DS_Store
+ehthumbs.db
+
+# IDE & Editor Working State
+.vscode/
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.swp
+*.swo
+*~

@@ -1,0 +1,53 @@
+# Changelog
+
+All notable changes to the **ZuPather** level design suite will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [0.1.0] - 2026-10-16
+
+Initial milestone release establishing the complete, standalone vector path editor, level asset composer, and binary curve compiler for *Zuma Deluxe* and the *ZuCompleluxe* engine.
+
+### Added
+
+- **Vector Bézier Core & Arc-Length Parameterization**:
+  - High-precision cubic Bézier curve calculation with analytical tangent and curvature derivatives.
+  - Numerical arc-length integration with uniform equidistant resampling ($\Delta s = 1.0\text{ pixel}$) guaranteeing uniform ball rolling speed in-game.
+  - Drift-free delta quantization tracking cumulative fractional sub-pixel errors to eliminate positional drift across thousands of path waypoints.
+  - Multi-track curve architecture supporting from 1 path up to 10 independent active curves per level (`curve` through `curve10`), fully compatible with the *ZuCompleluxe* multi-curve engine.
+
+- **Visual Win32 WYSIWYG Editor**:
+  - Standalone single-binary Win32 architecture with zero external runtime DLL dependencies.
+  - Real-time double-buffered GDI canvas supporting smooth panning, zooming, coordinate grids, and pixel-precise layout measurements.
+  - Adaptive Dark and Light theme engine with instant runtime switching, custom owner-drawn menus, title bar integration, and cohesive high-contrast UI palettes.
+
+- **Interactive Level Authoring Tools**:
+  - **Pen Tool**: Dynamic vector point addition, continuous tangent control handle manipulation, anchor node insertion, and path closing.
+  - **Selection & Node Editing**: Click-and-drag node translation, tangent handle modification, snapping guides, and multi-node inspection.
+  - **Frog Shooter Placement**: Interactive frog anchor placement (`gx`, `gy`) with real-time visual pad rendering and coordinate synchronization.
+  - **Treasure Point Coin Placer**: Interactive coin waypoint positioning with automatic curve proximity indexing.
+  - **Attribute Spans Subsystem**: Interactive segment tagging for In-Tunnel flags, speed/acceleration modifiers, and rendering priority layers (`0..4`).
+  - **Cutout, Sprite & Alpha Mask Orchestrator**: Multi-layer visual composition previewing under-track and over-track geometry with transparency.
+
+- **Live Physics & Ball Roll Simulation**:
+  - Real-time interactive ball train simulation executing at authentic Zuma Deluxe physical speed.
+  - Dynamic 11-color ball visualization with correct spacing, tunnel occlusion, and skull terminus deceleration.
+
+- **Zuma Deluxe Map Manager & Direct Engine Exporter**:
+  - Dual-pane level manager displaying local ZuPather Canvas Projects alongside detected Zuma Deluxe Game Maps.
+  - Tri-state color-coded map classification:
+    - **White**: Protected vanilla Zuma Deluxe original maps registered in official `StageProgression`. Modification, deletion, or overwriting is strictly blocked.
+    - **Orange**: Unregistered / Misc maps present in `levels.xml` but unassigned in progression (rename and delete enabled).
+    - **Green**: Custom ZuPather maps utilizing extended progression formats (rename and delete enabled).
+  - Safe direct-to-engine exporter: automatically updates `<Graphics>` definitions, writes track `.dat` files, configures progression IDs (`zupath[n]-[diff]`), and creates automatic timestamped safety backups (`levels.xml.bak`).
+
+- **Vector Exchange & Headless CLI Tooling**:
+  - Bi-directional SVG vector import/export compatible with professional design suites (Affinity Designer, Canva, Adobe Illustrator).
+  - Integrated command-line interface for batch conversion and headless pipelines (`svg2dat`, `dat2svg`, `genxml`, `info`).
+
+- **Automated Build Pipeline**:
+  - Unified one-click master builder (`build.bat`) supporting MinGW-w64 (GCC), Clang, and MSVC toolchains.
+  - Automatic Windows resource compilation embedding icons, fonts, and manifest data.
