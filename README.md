@@ -1,6 +1,6 @@
 # ZuPather (v0.1.1.1)
 
-> **Version:** 0.1.1.1 (HUD Guide Layout & Splash Theme Adaptation Patch)  
+> **Version:** 0.1.1.1 (Maintenance Patch)  
 > **Target Game:** *Zuma Deluxe* v1.0.0.1 & *ZuCompleluxe* Multi-Curve Framework  
 > **Project Scope:** High-Precision Vector Path Editor, Asset Composer & Direct-to-Engine Exporter  
 > **Core Language:** Pure C (C99 / Win32 API)  
