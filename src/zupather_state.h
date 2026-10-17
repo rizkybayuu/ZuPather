@@ -12,6 +12,7 @@
 #include <uxtheme.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <stdbool.h>
 #include <stdint.h>
 #ifndef _USE_MATH_DEFINES
@@ -25,6 +26,8 @@
 
 #ifdef _MSC_VER
 #define MAYBE_UNUSED
+#define strncasecmp _strnicmp
+#define strcasecmp  _stricmp
 #else
 #define MAYBE_UNUSED __attribute__((unused))
 #endif
