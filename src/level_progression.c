@@ -1,6 +1,5 @@
 #include "level_progression.h"
 #include <string.h>
-#include <strings.h>
 #include <math.h>
 
 LevelDifficulty g_level_difficulty = LEVEL_DIFF_MEDIUM;

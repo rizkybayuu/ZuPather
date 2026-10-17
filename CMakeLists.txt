@@ -77,6 +77,10 @@ endif()
 
 # Compiler & Linker Flag Optimizations
 if(MSVC)
+    target_compile_definitions(ZuPather PRIVATE
+        _CRT_SECURE_NO_WARNINGS
+        _USE_MATH_DEFINES
+    )
     target_compile_options(ZuPather PRIVATE
         /O2
         /W3

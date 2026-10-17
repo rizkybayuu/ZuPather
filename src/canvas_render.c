@@ -625,7 +625,7 @@ static void rgb_to_hsv(COLORREF col, float *out_h, float *out_s, float *out_v) {
 }
 
 /* Convert HSV back to RGB COLORREF */
-static __attribute__((unused)) COLORREF hsv_to_rgb(float h, float s, float v) {
+static MAYBE_UNUSED COLORREF hsv_to_rgb(float h, float s, float v) {
     while (h < 0.0f) h += 360.0f;
     while (h >= 360.0f) h -= 360.0f;
 
