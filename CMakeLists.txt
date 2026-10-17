@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(ZuPather VERSION 0.1.2 LANGUAGES C RC)
+project(ZuPather VERSION 0.1.3 LANGUAGES C RC)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)

@@ -1,6 +1,6 @@
-# ZuPather (v0.1.2)
+# ZuPather (v0.1.3)
 
-> **Version:** 0.1.2 (Curve Subdivide, Stacked Overlay Cycling & Build System Release)  
+> **Version:** 0.1.3 (Canvas Affect Transform & Non-Destructive Resampling Release)  
 > **Target Game:** *Zuma Deluxe* v1.0.0.1 & *ZuCompleluxe* Multi-Curve Framework  
 > **Project Scope:** High-Precision Vector Path Editor, Asset Composer & Direct-to-Engine Exporter  
 > **Core Language:** Pure C (C99 / Win32 API)  
@@ -50,6 +50,7 @@ In the *Zuma Deluxe* engine, rolling balls must traverse paths at a strictly uni
   - Multi-curve architecture supporting up to 10 independent active tracks per level (`curve` through `curve10`) for *ZuCompleluxe*.
 - **Interactive WYSIWYG Level Authoring Suite**:
   - **Vector Pen Tool**: Dynamic Bézier node placement, continuous tangent handle manipulation, node translation, and path closing.
+  - **Canvas Affect Transform**: Selectively scale or shift Frog/Coins, Paths & Curve Attributes, and Cutout/Sprite/Alpha Overlays proportionally with non-destructive bilinear resampling from pristine original buffers (`orig_bits`).
   - **Frog Shooter Placement**: Interactive positioning of the central frog anchor (`gx`, `gy`) with real-time pad visualization.
   - **Treasure Point Coin Placer**: Interactive coin waypoint positioning with automatic curve proximity indexing.
   - **Attribute Spans Subsystem**: Tag curve segments with in-tunnel occlusion flags, speed modifiers, and depth priority tiers (`0..4`).

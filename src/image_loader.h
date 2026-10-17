@@ -56,6 +56,11 @@ typedef struct {
     HBITMAP   first_frame_hbm;
     HDC       first_frame_hdc;
     void     *first_frame_bits;
+
+    /* Pristine unscaled 32-bit PBGRA pixels for non-destructive resizing */
+    void     *orig_bits;
+    int       orig_width;
+    int       orig_height;
 } CanvasImage;
 
 typedef enum {
@@ -120,6 +125,9 @@ bool image_advance_animation(CanvasImage *img);
 
 /* Free image and media playback resources */
 void image_free(CanvasImage *img);
+
+/* Resize image in-place by resampling pristine orig_bits into a new DIBSection */
+bool image_resize_in_place(CanvasImage *img, int new_w, int new_h);
 
 /* Extract filename without extension */
 void image_get_basename_no_ext(const char *filepath, char *out_basename, size_t max_len);

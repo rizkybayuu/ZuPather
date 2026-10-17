@@ -159,6 +159,9 @@ CanvasFitMode g_canvas_fit_mode         = CANVAS_FIT_ORIGINAL;
 CanvasAlignment g_canvas_alignment      = CANVAS_ALIGN_TOP_LEFT;
 bool          g_hud_canvas_collapsed    = false;
 bool          g_hud_canvas_guide_collapsed = false;
+bool          g_cv_affect_element       = false;
+bool          g_cv_affect_curve         = false;
+bool          g_cv_affect_overlay       = false;
 
 /* Preview Mode & Level Preview Simulation State */
 bool          g_hud_preview_guide_collapsed = false;
@@ -2541,6 +2544,8 @@ void shift_all_canvas_objects(int dx, int dy) {
 }
 
 void snapshot_canvas_drag_state(void) {
+    g_canvas_drag_snap.canvas_w = g_canvas_w;
+    g_canvas_drag_snap.canvas_h = g_canvas_h;
     g_canvas_drag_snap.frog_x = g_frog_gx;
     g_canvas_drag_snap.frog_y = g_frog_gy;
     for (int i = 0; i < g_treasure_point_count; ++i) {
@@ -2550,14 +2555,20 @@ void snapshot_canvas_drag_state(void) {
     for (int i = 0; i < g_cutout_count; ++i) {
         g_canvas_drag_snap.cutout_x[i] = g_cutouts[i].x;
         g_canvas_drag_snap.cutout_y[i] = g_cutouts[i].y;
+        g_canvas_drag_snap.cutout_w[i] = g_cutouts[i].has_img ? g_cutouts[i].img.width : 0;
+        g_canvas_drag_snap.cutout_h[i] = g_cutouts[i].has_img ? g_cutouts[i].img.height : 0;
     }
     for (int i = 0; i < g_sprite_count; ++i) {
         g_canvas_drag_snap.sprite_x[i] = g_sprites[i].x;
         g_canvas_drag_snap.sprite_y[i] = g_sprites[i].y;
+        g_canvas_drag_snap.sprite_w[i] = g_sprites[i].has_img ? g_sprites[i].img.width : 0;
+        g_canvas_drag_snap.sprite_h[i] = g_sprites[i].has_img ? g_sprites[i].img.height : 0;
     }
     for (int i = 0; i < g_bg_alpha_count; ++i) {
         g_canvas_drag_snap.bgalpha_x[i] = g_bg_alphas[i].x;
         g_canvas_drag_snap.bgalpha_y[i] = g_bg_alphas[i].y;
+        g_canvas_drag_snap.bgalpha_w[i] = g_bg_alphas[i].has_img ? g_bg_alphas[i].img.width : 0;
+        g_canvas_drag_snap.bgalpha_h[i] = g_bg_alphas[i].has_img ? g_bg_alphas[i].img.height : 0;
     }
     g_canvas_drag_snap.pan_x = g_pan_x;
     g_canvas_drag_snap.pan_y = g_pan_y;
@@ -2565,44 +2576,205 @@ void snapshot_canvas_drag_state(void) {
     if (pc > MAX_PATHS) pc = MAX_PATHS;
     g_canvas_drag_snap.path_count = pc;
     for (int p = 0; p < pc; ++p) {
+        path_cache_update(&g_paths[p]);
         int nc = g_paths[p].node_count;
         if (nc > MAX_BEZIER_NODES) nc = MAX_BEZIER_NODES;
         g_canvas_drag_snap.paths[p].node_count = nc;
         for (int n = 0; n < nc; ++n) {
             g_canvas_drag_snap.paths[p].node_x[n] = g_paths[p].nodes[n].x;
             g_canvas_drag_snap.paths[p].node_y[n] = g_paths[p].nodes[n].y;
+            g_canvas_drag_snap.paths[p].hin_x[n] = g_paths[p].nodes[n].hin_x;
+            g_canvas_drag_snap.paths[p].hin_y[n] = g_paths[p].nodes[n].hin_y;
+            g_canvas_drag_snap.paths[p].hout_x[n] = g_paths[p].nodes[n].hout_x;
+            g_canvas_drag_snap.paths[p].hout_y[n] = g_paths[p].nodes[n].hout_y;
+            if (g_paths[p].cache.node_s) {
+                g_canvas_drag_snap.paths[p].node_s[n] = g_paths[p].cache.node_s[n];
+            } else {
+                g_canvas_drag_snap.paths[p].node_s[n] = 0.0;
+            }
+        }
+        int sc = g_paths[p].span_count;
+        if (sc > 256) sc = 256;
+        g_canvas_drag_snap.paths[p].span_count = sc;
+        for (int s = 0; s < sc; ++s) {
+            g_canvas_drag_snap.paths[p].span_off_c[s] = g_paths[p].spans[s].off_c;
+            g_canvas_drag_snap.paths[p].span_off_d[s] = g_paths[p].spans[s].off_d;
+        }
+    }
+}
+
+void apply_canvas_transform(int old_w, int old_h, int new_w, int new_h, float unchk_shift_x, float unchk_shift_y, bool is_resize) {
+    float sx = 1.0f, sy = 1.0f;
+    if (is_resize && old_w > 0 && old_h > 0) {
+        sx = (float)new_w / (float)old_w;
+        sy = (float)new_h / (float)old_h;
+    }
+
+    /* 1. Elements (Frog & Coins) */
+    if (g_cv_affect_element) {
+        if (g_has_frog) {
+            g_frog_gx = (int)roundf((float)g_canvas_drag_snap.frog_x * sx);
+            g_frog_gy = (int)roundf((float)g_canvas_drag_snap.frog_y * sy);
+        }
+        for (int i = 0; i < g_treasure_point_count; ++i) {
+            g_treasure_points[i].x = (int)roundf((float)g_canvas_drag_snap.coin_x[i] * sx);
+            g_treasure_points[i].y = (int)roundf((float)g_canvas_drag_snap.coin_y[i] * sy);
+        }
+    } else {
+        if (g_has_frog) {
+            g_frog_gx = (int)roundf((float)g_canvas_drag_snap.frog_x + unchk_shift_x);
+            g_frog_gy = (int)roundf((float)g_canvas_drag_snap.frog_y + unchk_shift_y);
+        }
+        for (int i = 0; i < g_treasure_point_count; ++i) {
+            g_treasure_points[i].x = (int)roundf((float)g_canvas_drag_snap.coin_x[i] + unchk_shift_x);
+            g_treasure_points[i].y = (int)roundf((float)g_canvas_drag_snap.coin_y[i] + unchk_shift_y);
+        }
+    }
+
+    /* 2. Curves (Paths, Handles, Attributes) */
+    if (g_cv_affect_curve) {
+        for (int p = 0; p < g_path_count && p < g_canvas_drag_snap.path_count; ++p) {
+            for (int n = 0; n < g_paths[p].node_count && n < g_canvas_drag_snap.paths[p].node_count; ++n) {
+                g_paths[p].nodes[n].x = g_canvas_drag_snap.paths[p].node_x[n] * sx;
+                g_paths[p].nodes[n].y = g_canvas_drag_snap.paths[p].node_y[n] * sy;
+                g_paths[p].nodes[n].hin_x = g_canvas_drag_snap.paths[p].hin_x[n] * sx;
+                g_paths[p].nodes[n].hin_y = g_canvas_drag_snap.paths[p].hin_y[n] * sy;
+                g_paths[p].nodes[n].hout_x = g_canvas_drag_snap.paths[p].hout_x[n] * sx;
+                g_paths[p].nodes[n].hout_y = g_canvas_drag_snap.paths[p].hout_y[n] * sy;
+            }
+            path_cache_invalidate(&g_paths[p]);
+
+            if (is_resize && g_paths[p].span_count > 0 && g_canvas_drag_snap.paths[p].span_count > 0) {
+                path_cache_update(&g_paths[p]);
+                for (int s = 0; s < g_paths[p].span_count && s < g_canvas_drag_snap.paths[p].span_count; ++s) {
+                    uint32_t cid = g_paths[p].spans[s].node_c_id;
+                    uint32_t did = g_paths[p].spans[s].node_d_id;
+                    int ic = bezier_path_find_node_by_id(&g_paths[p], cid);
+                    int id = bezier_path_find_node_by_id(&g_paths[p], did);
+                    if (ic >= 0 && id >= 0 && ic < g_canvas_drag_snap.paths[p].node_count && id < g_canvas_drag_snap.paths[p].node_count) {
+                        double ds_old = g_canvas_drag_snap.paths[p].node_s[id] - g_canvas_drag_snap.paths[p].node_s[ic];
+                        double ds_new = 0.0;
+                        if (g_paths[p].cache.node_s) {
+                            ds_new = g_paths[p].cache.node_s[id] - g_paths[p].cache.node_s[ic];
+                        }
+                        if (ds_old > 1e-4 && ds_new > 1e-4) {
+                            float r = (float)(ds_new / ds_old);
+                            g_paths[p].spans[s].off_c = g_canvas_drag_snap.paths[p].span_off_c[s] * r;
+                            g_paths[p].spans[s].off_d = g_canvas_drag_snap.paths[p].span_off_d[s] * r;
+                        }
+                    }
+                }
+                path_cache_invalidate(&g_paths[p]);
+            }
+        }
+    } else {
+        for (int p = 0; p < g_path_count && p < g_canvas_drag_snap.path_count; ++p) {
+            for (int n = 0; n < g_paths[p].node_count && n < g_canvas_drag_snap.paths[p].node_count; ++n) {
+                g_paths[p].nodes[n].x = g_canvas_drag_snap.paths[p].node_x[n] + unchk_shift_x;
+                g_paths[p].nodes[n].y = g_canvas_drag_snap.paths[p].node_y[n] + unchk_shift_y;
+                g_paths[p].nodes[n].hin_x = g_canvas_drag_snap.paths[p].hin_x[n];
+                g_paths[p].nodes[n].hin_y = g_canvas_drag_snap.paths[p].hin_y[n];
+                g_paths[p].nodes[n].hout_x = g_canvas_drag_snap.paths[p].hout_x[n];
+                g_paths[p].nodes[n].hout_y = g_canvas_drag_snap.paths[p].hout_y[n];
+            }
+            for (int s = 0; s < g_paths[p].span_count && s < g_canvas_drag_snap.paths[p].span_count; ++s) {
+                g_paths[p].spans[s].off_c = g_canvas_drag_snap.paths[p].span_off_c[s];
+                g_paths[p].spans[s].off_d = g_canvas_drag_snap.paths[p].span_off_d[s];
+            }
+            path_cache_invalidate(&g_paths[p]);
+        }
+    }
+
+    /* 3. Overlays (Cutouts, Sprites, BackgroundAlphas) */
+    if (g_cv_affect_overlay) {
+        for (int i = 0; i < g_cutout_count; ++i) {
+            g_cutouts[i].x = (int)roundf((float)g_canvas_drag_snap.cutout_x[i] * sx);
+            g_cutouts[i].y = (int)roundf((float)g_canvas_drag_snap.cutout_y[i] * sy);
+            if (is_resize && g_cutouts[i].has_img && g_canvas_drag_snap.cutout_w[i] > 0 && g_canvas_drag_snap.cutout_h[i] > 0) {
+                int nw = (int)roundf((float)g_canvas_drag_snap.cutout_w[i] * sx);
+                int nh = (int)roundf((float)g_canvas_drag_snap.cutout_h[i] * sy);
+                if (nw < 1) nw = 1;
+                if (nh < 1) nh = 1;
+                if (g_cutouts[i].img.width != nw || g_cutouts[i].img.height != nh) {
+                    image_resize_in_place(&g_cutouts[i].img, nw, nh);
+                    cutout_generate_masks(&g_cutouts[i]);
+                }
+            }
+        }
+        for (int i = 0; i < g_sprite_count; ++i) {
+            g_sprites[i].x = (int)roundf((float)g_canvas_drag_snap.sprite_x[i] * sx);
+            g_sprites[i].y = (int)roundf((float)g_canvas_drag_snap.sprite_y[i] * sy);
+            if (is_resize && g_sprites[i].has_img && g_canvas_drag_snap.sprite_w[i] > 0 && g_canvas_drag_snap.sprite_h[i] > 0) {
+                int nw = (int)roundf((float)g_canvas_drag_snap.sprite_w[i] * sx);
+                int nh = (int)roundf((float)g_canvas_drag_snap.sprite_h[i] * sy);
+                if (nw < 1) nw = 1;
+                if (nh < 1) nh = 1;
+                if (g_sprites[i].img.width != nw || g_sprites[i].img.height != nh) {
+                    image_resize_in_place(&g_sprites[i].img, nw, nh);
+                }
+            }
+        }
+        for (int i = 0; i < g_bg_alpha_count; ++i) {
+            g_bg_alphas[i].x = (int)roundf((float)g_canvas_drag_snap.bgalpha_x[i] * sx);
+            g_bg_alphas[i].y = (int)roundf((float)g_canvas_drag_snap.bgalpha_y[i] * sy);
+            if (is_resize && g_bg_alphas[i].has_img && g_canvas_drag_snap.bgalpha_w[i] > 0 && g_canvas_drag_snap.bgalpha_h[i] > 0) {
+                int nw = (int)roundf((float)g_canvas_drag_snap.bgalpha_w[i] * sx);
+                int nh = (int)roundf((float)g_canvas_drag_snap.bgalpha_h[i] * sy);
+                if (nw < 1) nw = 1;
+                if (nh < 1) nh = 1;
+                if (g_bg_alphas[i].img.width != nw || g_bg_alphas[i].img.height != nh) {
+                    image_resize_in_place(&g_bg_alphas[i].img, nw, nh);
+                    bgalpha_generate_masks(&g_bg_alphas[i]);
+                }
+            }
+        }
+    } else {
+        for (int i = 0; i < g_cutout_count; ++i) {
+            g_cutouts[i].x = (int)roundf((float)g_canvas_drag_snap.cutout_x[i] + unchk_shift_x);
+            g_cutouts[i].y = (int)roundf((float)g_canvas_drag_snap.cutout_y[i] + unchk_shift_y);
+            if (is_resize && g_cutouts[i].has_img && g_canvas_drag_snap.cutout_w[i] > 0 && g_canvas_drag_snap.cutout_h[i] > 0) {
+                if (g_cutouts[i].img.width != g_canvas_drag_snap.cutout_w[i] || g_cutouts[i].img.height != g_canvas_drag_snap.cutout_h[i]) {
+                    image_resize_in_place(&g_cutouts[i].img, g_canvas_drag_snap.cutout_w[i], g_canvas_drag_snap.cutout_h[i]);
+                    cutout_generate_masks(&g_cutouts[i]);
+                }
+            }
+        }
+        for (int i = 0; i < g_sprite_count; ++i) {
+            g_sprites[i].x = (int)roundf((float)g_canvas_drag_snap.sprite_x[i] + unchk_shift_x);
+            g_sprites[i].y = (int)roundf((float)g_canvas_drag_snap.sprite_y[i] + unchk_shift_y);
+            if (is_resize && g_sprites[i].has_img && g_canvas_drag_snap.sprite_w[i] > 0 && g_canvas_drag_snap.sprite_h[i] > 0) {
+                if (g_sprites[i].img.width != g_canvas_drag_snap.sprite_w[i] || g_sprites[i].img.height != g_canvas_drag_snap.sprite_h[i]) {
+                    image_resize_in_place(&g_sprites[i].img, g_canvas_drag_snap.sprite_w[i], g_canvas_drag_snap.sprite_h[i]);
+                }
+            }
+        }
+        for (int i = 0; i < g_bg_alpha_count; ++i) {
+            g_bg_alphas[i].x = (int)roundf((float)g_canvas_drag_snap.bgalpha_x[i] + unchk_shift_x);
+            g_bg_alphas[i].y = (int)roundf((float)g_canvas_drag_snap.bgalpha_y[i] + unchk_shift_y);
+            if (is_resize && g_bg_alphas[i].has_img && g_canvas_drag_snap.bgalpha_w[i] > 0 && g_canvas_drag_snap.bgalpha_h[i] > 0) {
+                if (g_bg_alphas[i].img.width != g_canvas_drag_snap.bgalpha_w[i] || g_bg_alphas[i].img.height != g_canvas_drag_snap.bgalpha_h[i]) {
+                    image_resize_in_place(&g_bg_alphas[i].img, g_canvas_drag_snap.bgalpha_w[i], g_canvas_drag_snap.bgalpha_h[i]);
+                    bgalpha_generate_masks(&g_bg_alphas[i]);
+                }
+            }
         }
     }
 }
 
 void apply_canvas_drag_shift(float shift_x, float shift_y) {
-    if (g_has_frog) {
-        g_frog_gx = (int)roundf((float)g_canvas_drag_snap.frog_x + shift_x);
-        g_frog_gy = (int)roundf((float)g_canvas_drag_snap.frog_y + shift_y);
-    }
-    for (int i = 0; i < g_treasure_point_count; ++i) {
-        g_treasure_points[i].x = (int)roundf((float)g_canvas_drag_snap.coin_x[i] + shift_x);
-        g_treasure_points[i].y = (int)roundf((float)g_canvas_drag_snap.coin_y[i] + shift_y);
-    }
-    for (int i = 0; i < g_cutout_count; ++i) {
-        g_cutouts[i].x = (int)roundf((float)g_canvas_drag_snap.cutout_x[i] + shift_x);
-        g_cutouts[i].y = (int)roundf((float)g_canvas_drag_snap.cutout_y[i] + shift_y);
-    }
-    for (int i = 0; i < g_sprite_count; ++i) {
-        g_sprites[i].x = (int)roundf((float)g_canvas_drag_snap.sprite_x[i] + shift_x);
-        g_sprites[i].y = (int)roundf((float)g_canvas_drag_snap.sprite_y[i] + shift_y);
-    }
-    for (int i = 0; i < g_bg_alpha_count; ++i) {
-        g_bg_alphas[i].x = (int)roundf((float)g_canvas_drag_snap.bgalpha_x[i] + shift_x);
-        g_bg_alphas[i].y = (int)roundf((float)g_canvas_drag_snap.bgalpha_y[i] + shift_y);
-    }
-    for (int p = 0; p < g_path_count && p < g_canvas_drag_snap.path_count; ++p) {
-        for (int n = 0; n < g_paths[p].node_count && n < g_canvas_drag_snap.paths[p].node_count; ++n) {
-            g_paths[p].nodes[n].x = g_canvas_drag_snap.paths[p].node_x[n] + shift_x;
-            g_paths[p].nodes[n].y = g_canvas_drag_snap.paths[p].node_y[n] + shift_y;
-        }
-        path_cache_invalidate(&g_paths[p]);
-    }
+    apply_canvas_transform(g_canvas_w, g_canvas_h, g_canvas_w, g_canvas_h, shift_x, shift_y, false);
+}
+
+void resize_canvas_with_transform(HWND hwnd, int new_w, int new_h) {
+    if (new_w <= 0 || new_h <= 0) return;
+    int old_w = g_canvas_w;
+    int old_h = g_canvas_h;
+    if (old_w == new_w && old_h == new_h) return;
+
+    snapshot_canvas_drag_state();
+    set_canvas_size(hwnd, new_w, new_h);
+    apply_canvas_transform(old_w, old_h, new_w, new_h, 0.0f, 0.0f, true);
+    InvalidateRect(hwnd, NULL, FALSE);
 }
 
 void toggle_canvas_mode(HWND hwnd) {

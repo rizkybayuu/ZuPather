@@ -2478,7 +2478,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                             if (nw != g_canvas_w || nh != g_canvas_h) {
                                 s_in_edit_sync = true;
                                 g_in_canvas_edit_sync = true;
-                                set_canvas_size(hwnd, nw, nh);
+                                resize_canvas_with_transform(hwnd, nw, nh);
                                 g_in_canvas_edit_sync = false;
                                 s_in_edit_sync = false;
                             }
@@ -2497,7 +2497,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     int nh = atoi(buf_h);
                     if (nw > 0 && nh > 0) {
                         undo_ensure_baseline();
-                        set_canvas_size(hwnd, nw, nh);
+                        resize_canvas_with_transform(hwnd, nw, nh);
                         undo_snapshot_capture("Resize Canvas");
                     }
                     SetFocus(hwnd);
@@ -2506,25 +2506,25 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
                 case ID_BTN_CV_PRESET_640:
                     undo_ensure_baseline();
-                    set_canvas_size(hwnd, 640, 480);
+                    resize_canvas_with_transform(hwnd, 640, 480);
                     undo_snapshot_capture("Resize Canvas 640x480");
                     SetFocus(hwnd);
                     break;
                 case ID_BTN_CV_PRESET_800:
                     undo_ensure_baseline();
-                    set_canvas_size(hwnd, 800, 600);
+                    resize_canvas_with_transform(hwnd, 800, 600);
                     undo_snapshot_capture("Resize Canvas 800x600");
                     SetFocus(hwnd);
                     break;
                 case ID_BTN_CV_PRESET_1024:
                     undo_ensure_baseline();
-                    set_canvas_size(hwnd, 1024, 768);
+                    resize_canvas_with_transform(hwnd, 1024, 768);
                     undo_snapshot_capture("Resize Canvas 1024x768");
                     SetFocus(hwnd);
                     break;
                 case ID_BTN_CV_PRESET_1280:
                     undo_ensure_baseline();
-                    set_canvas_size(hwnd, 1280, 720);
+                    resize_canvas_with_transform(hwnd, 1280, 720);
                     undo_snapshot_capture("Resize Canvas 1280x720");
                     SetFocus(hwnd);
                     break;
@@ -2654,28 +2654,28 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
                 case ID_MENU_CANVAS_640_480:
                     undo_ensure_baseline();
-                    set_canvas_size(hwnd, 640, 480);
+                    resize_canvas_with_transform(hwnd, 640, 480);
                     undo_snapshot_capture("Resize Canvas 640x480");
                     SetFocus(hwnd);
                     break;
 
                 case ID_MENU_CANVAS_800_600:
                     undo_ensure_baseline();
-                    set_canvas_size(hwnd, 800, 600);
+                    resize_canvas_with_transform(hwnd, 800, 600);
                     undo_snapshot_capture("Resize Canvas 800x600");
                     SetFocus(hwnd);
                     break;
 
                 case ID_MENU_CANVAS_1024_768:
                     undo_ensure_baseline();
-                    set_canvas_size(hwnd, 1024, 768);
+                    resize_canvas_with_transform(hwnd, 1024, 768);
                     undo_snapshot_capture("Resize Canvas 1024x768");
                     SetFocus(hwnd);
                     break;
 
                 case ID_MENU_CANVAS_1280_720:
                     undo_ensure_baseline();
-                    set_canvas_size(hwnd, 1280, 720);
+                    resize_canvas_with_transform(hwnd, 1280, 720);
                     undo_snapshot_capture("Resize Canvas 1280x720");
                     SetFocus(hwnd);
                     break;
@@ -3659,7 +3659,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     g_pan_y = g_canvas_drag_snap.pan_y + move_dy;
                     float shift_x = -move_dx / zoom_val;
                     float shift_y = -move_dy / zoom_val;
-                    apply_canvas_drag_shift(shift_x, shift_y);
+                    apply_canvas_transform(g_drag_start_w, g_drag_start_h, g_drag_start_w, g_drag_start_h, shift_x, shift_y, false);
                 } else {
                     float delta_w = 0.0f;
                     float delta_h = 0.0f;
@@ -3776,7 +3776,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     g_canvas_h = new_h;
                     g_pan_x = new_pan_x;
                     g_pan_y = new_pan_y;
-                    apply_canvas_drag_shift(shift_x, shift_y);
+                    apply_canvas_transform(g_drag_start_w, g_drag_start_h, new_w, new_h, shift_x, shift_y, true);
                 }
 
                 if (g_edit_cv_w && g_edit_cv_h) {
@@ -5317,6 +5317,29 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                                     }
                                 }
 
+                                /* Affect Transform Checkbox Rows (content_y: 406..428, 432..454, 458..480, x: 8..228) */
+                                if (rel_x >= 8 && rel_x <= 228) {
+                                    if (content_y >= 406 && content_y <= 428) {
+                                        hit_btn = true;
+                                        g_cv_affect_element = !g_cv_affect_element;
+                                        InvalidateRect(hwnd, NULL, FALSE);
+                                        update_status_bar();
+                                        return 0;
+                                    } else if (content_y >= 432 && content_y <= 454) {
+                                        hit_btn = true;
+                                        g_cv_affect_curve = !g_cv_affect_curve;
+                                        InvalidateRect(hwnd, NULL, FALSE);
+                                        update_status_bar();
+                                        return 0;
+                                    } else if (content_y >= 458 && content_y <= 480) {
+                                        hit_btn = true;
+                                        g_cv_affect_overlay = !g_cv_affect_overlay;
+                                        InvalidateRect(hwnd, NULL, FALSE);
+                                        update_status_bar();
+                                        return 0;
+                                    }
+                                }
+
                                 if (!hit_btn && max_s > 0) {
                                     g_is_dragging_cv_tools_bg = true;
                                     g_drag_cv_tools_bg_mouse_start_y = my;
@@ -5346,6 +5369,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                         g_drag_start_mouse_sx = mx;
                         g_drag_start_mouse_sy = my;
 
+                        undo_ensure_baseline();
                         snapshot_canvas_drag_state();
                         SetCapture(hwnd);
                         InvalidateRect(hwnd, NULL, FALSE);
@@ -6303,6 +6327,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 return 0;
             }
             if (g_drag_canvas_handle != CANVAS_HANDLE_NONE) {
+                bool was_move = (g_drag_canvas_handle == CANVAS_HANDLE_CENTER_MOVE);
                 g_drag_canvas_handle = CANVAS_HANDLE_NONE;
                 ReleaseCapture();
                 if (g_edit_cv_w && g_edit_cv_h) {
@@ -6314,7 +6339,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     SetWindowTextA(g_edit_cv_h, buf_h);
                     g_in_canvas_edit_sync = false;
                 }
-                undo_snapshot_capture("Resize Canvas");
+                undo_snapshot_capture(was_move ? "Move Canvas" : "Resize Canvas");
                 InvalidateRect(hwnd, NULL, FALSE);
                 update_status_bar();
                 return 0;
@@ -7523,6 +7548,11 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             } else if (g_mode_canvas && g_has_canvas) {
                 if (wParam == VK_LEFT || wParam == VK_RIGHT || wParam == VK_UP || wParam == VK_DOWN) {
                     if (is_any_canvas_handle_selected()) {
+                        undo_ensure_baseline();
+                        int old_w = g_canvas_w;
+                        int old_h = g_canvas_h;
+                        snapshot_canvas_drag_state();
+
                         int ndx = 0, ndy = 0;
                         if (wParam == VK_LEFT)  ndx = -1;
                         if (wParam == VK_RIGHT) ndx =  1;
@@ -7579,9 +7609,11 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                             shift_y += (float)(-ndy);
                         }
 
+                        int new_w = g_canvas_w;
+                        int new_h = g_canvas_h;
                         if (delta_w != 0 || delta_h != 0) {
-                            int new_w = g_canvas_w + delta_w;
-                            int new_h = g_canvas_h + delta_h;
+                            new_w = g_canvas_w + delta_w;
+                            new_h = g_canvas_h + delta_h;
                             if (new_w < 64) new_w = 64;
                             if (new_h < 64) new_h = 64;
 
@@ -7609,9 +7641,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                         g_pan_x += pan_dx;
                         g_pan_y += pan_dy;
 
-                        if (shift_x != 0.0f || shift_y != 0.0f) {
-                            shift_all_canvas_objects((int)roundf(shift_x), (int)roundf(shift_y));
-                        }
+                        bool is_resize = (old_w != new_w || old_h != new_h);
+                        apply_canvas_transform(old_w, old_h, new_w, new_h, shift_x, shift_y, is_resize);
+                        undo_snapshot_capture(is_resize ? "Nudge Canvas Resize" : "Nudge Canvas Move");
 
                         if (g_edit_cv_w && g_edit_cv_h) {
                             g_in_canvas_edit_sync = true;

@@ -766,41 +766,56 @@ bool image_load_from_file(const char *filepath, CanvasImage *out_img) {
     if (!filepath || !out_img) return false;
     memset(out_img, 0, sizeof(CanvasImage));
 
+    bool ok = false;
     /* 1. Check if video file */
     if (image_is_video_ext(filepath)) {
         if (load_video_internal(filepath, out_img)) {
-            return true;
+            ok = true;
         }
     }
 
-    /* 2. Peek first 16 bytes for WebP magic */
-    uint8_t header[16] = {0};
-    FILE *f = fopen(filepath, "rb");
-    if (f) {
-        fread(header, 1, sizeof(header), f);
-        fclose(f);
-    }
+    if (!ok) {
+        /* 2. Peek first 16 bytes for WebP magic */
+        uint8_t header[16] = {0};
+        FILE *f = fopen(filepath, "rb");
+        if (f) {
+            fread(header, 1, sizeof(header), f);
+            fclose(f);
+        }
 
-    if (is_webp_file(filepath, header, sizeof(header))) {
-        if (load_webp_internal(filepath, out_img)) {
-            return true;
+        if (is_webp_file(filepath, header, sizeof(header))) {
+            if (load_webp_internal(filepath, out_img)) {
+                ok = true;
+            }
+        }
+
+        /* 3. Fallback to WIC (PNG, JPG, BMP, TIFF, GIF, etc.) */
+        if (!ok && load_wic_internal(filepath, out_img)) {
+            ok = true;
+        }
+
+        /* 4. If WIC didn't succeed and haven't tried WebP yet */
+        if (!ok && !is_webp_file(filepath, header, sizeof(header))) {
+            if (load_webp_internal(filepath, out_img)) {
+                ok = true;
+            }
+        }
+
+        /* 5. Final fallback: try Media Foundation in case video has unusual extension */
+        if (!ok && load_video_internal(filepath, out_img)) {
+            ok = true;
         }
     }
 
-    /* 3. Fallback to WIC (PNG, JPG, BMP, TIFF, GIF, etc.) */
-    if (load_wic_internal(filepath, out_img)) {
-        return true;
-    }
-
-    /* 4. If WIC didn't succeed and haven't tried WebP yet */
-    if (!is_webp_file(filepath, header, sizeof(header))) {
-        if (load_webp_internal(filepath, out_img)) {
-            return true;
+    if (ok) {
+        if (out_img->bits && out_img->width > 0 && out_img->height > 0 && !out_img->orig_bits) {
+            out_img->orig_bits = malloc((size_t)out_img->width * out_img->height * 4);
+            if (out_img->orig_bits) {
+                memcpy(out_img->orig_bits, out_img->bits, (size_t)out_img->width * out_img->height * 4);
+                out_img->orig_width = out_img->width;
+                out_img->orig_height = out_img->height;
+            }
         }
-    }
-
-    /* 5. Final fallback: try Media Foundation in case video has unusual extension */
-    if (load_video_internal(filepath, out_img)) {
         return true;
     }
 
@@ -904,6 +919,15 @@ bool image_load_from_memory(const void *data, size_t size, CanvasImage *out_img)
     out_img->frame_count = 1;
     strncpy(out_img->filename, "embedded_resource", sizeof(out_img->filename) - 1);
     strncpy(out_img->display_name, "embedded_resource", sizeof(out_img->display_name) - 1);
+
+    if (bits && width > 0 && height > 0 && !out_img->orig_bits) {
+        out_img->orig_bits = malloc((size_t)width * height * 4);
+        if (out_img->orig_bits) {
+            memcpy(out_img->orig_bits, bits, (size_t)width * height * 4);
+            out_img->orig_width = (int)width;
+            out_img->orig_height = (int)height;
+        }
+    }
 
     return true;
 }
@@ -1095,6 +1119,12 @@ void image_free(CanvasImage *img) {
 
     img->bits = NULL;
     img->first_frame_bits = NULL;
+    if (img->orig_bits) {
+        free(img->orig_bits);
+        img->orig_bits = NULL;
+    }
+    img->orig_width = 0;
+    img->orig_height = 0;
     img->width = 0;
     img->height = 0;
     img->media_type = MEDIA_TYPE_STATIC;
@@ -1279,6 +1309,70 @@ static void scale_bgra_buffer(const uint8_t *src, int src_w, int src_h, uint8_t 
     if (!scale_bgra_wic(src, src_w, src_h, dst, dst_w, dst_h, is_premultiplied)) {
         scale_bgra_software_bilinear(src, src_w, src_h, dst, dst_w, dst_h);
     }
+}
+
+bool image_resize_in_place(CanvasImage *img, int new_w, int new_h) {
+    if (!img) return false;
+    if (new_w < 1) new_w = 1;
+    if (new_h < 1) new_h = 1;
+    if (new_w > 4096) new_w = 4096;
+    if (new_h > 4096) new_h = 4096;
+
+    if (img->width == new_w && img->height == new_h && img->hbm) {
+        return true;
+    }
+
+    /* Ensure we have pristine orig_bits */
+    if (!img->orig_bits && img->bits && img->width > 0 && img->height > 0) {
+        img->orig_bits = malloc((size_t)img->width * img->height * 4);
+        if (img->orig_bits) {
+            memcpy(img->orig_bits, img->bits, (size_t)img->width * img->height * 4);
+            img->orig_width = img->width;
+            img->orig_height = img->height;
+        }
+    }
+
+    if (!img->orig_bits || img->orig_width <= 0 || img->orig_height <= 0) {
+        return false;
+    }
+
+    void *new_bits = NULL;
+    HDC new_dc = NULL;
+    HBITMAP new_hbm = create_premultiplied_dib(new_w, new_h, NULL, &new_bits, &new_dc);
+    if (!new_hbm || !new_bits) {
+        if (new_dc) DeleteDC(new_dc);
+        if (new_hbm) DeleteObject(new_hbm);
+        return false;
+    }
+
+    scale_bgra_buffer(
+        (const uint8_t*)img->orig_bits, img->orig_width, img->orig_height,
+        (uint8_t*)new_bits, new_w, new_h, true
+    );
+
+    /* Delete old GDI bitmap and DC if not pointing to an animation frame */
+    if (!img->frames) {
+        if (img->hdc_mem) DeleteDC(img->hdc_mem);
+        if (img->hbm) DeleteObject(img->hbm);
+    }
+    img->hbm = new_hbm;
+    img->hdc_mem = new_dc;
+    img->bits = new_bits;
+    img->width = new_w;
+    img->height = new_h;
+
+    /* If first_frame_hbm exists, invalidate it so export uses resized bits directly */
+    if (img->first_frame_hdc) {
+        DeleteDC(img->first_frame_hdc);
+        img->first_frame_hdc = NULL;
+    }
+    if (img->first_frame_hbm) {
+        DeleteObject(img->first_frame_hbm);
+        img->first_frame_hbm = NULL;
+    }
+    img->first_frame_bits = NULL;
+
+    return true;
 }
 
 extern CanvasFitMode   g_canvas_fit_mode;
@@ -2088,8 +2182,9 @@ bool image_export_to_file_ex(
 ) {
     if (!img || !dest_filepath || dest_filepath[0] == '\0') return false;
 
-    /* 1. Fast direct copy if keeping original format and not resizing and not video */
-    if (format == IMG_EXPORT_KEEP_ORIGINAL && !resize && !img->is_video) {
+    /* 1. Fast direct copy if keeping original format and not resizing, dimensions unchanged, and not video */
+    bool is_dim_changed = (img->orig_width > 0 && (img->width != img->orig_width || img->height != img->orig_height));
+    if (format == IMG_EXPORT_KEEP_ORIGINAL && !resize && !is_dim_changed && !img->is_video) {
         if (img->filepath[0] != '\0' && GetFileAttributesA(img->filepath) != INVALID_FILE_ATTRIBUTES) {
             if (_stricmp(img->filepath, dest_filepath) == 0) {
                 return true;

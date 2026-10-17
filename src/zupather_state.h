@@ -259,7 +259,7 @@ typedef void(WINAPI *pfnFlushMenuThemes)(void);
 
 #define RIGHT_PANEL_WIDTH         254
 #define TOOLBAR_NEEDED_WIDTH      620
-#define ZUPATHER_VERSION_STR      "v0.1.2"
+#define ZUPATHER_VERSION_STR      "v0.1.3"
 
 /* Embedded Resource IDs */
 #define IDR_SPLASH_JPG              101
@@ -520,6 +520,9 @@ extern CanvasFitMode g_canvas_fit_mode;
 extern CanvasAlignment g_canvas_alignment;
 extern bool          g_hud_canvas_collapsed;
 extern bool          g_hud_canvas_guide_collapsed;
+extern bool          g_cv_affect_element;
+extern bool          g_cv_affect_curve;
+extern bool          g_cv_affect_overlay;
 
 extern bool          g_hud_preview_guide_collapsed;
 extern bool          g_hud_preview_info_collapsed;
@@ -882,23 +885,37 @@ void update_canvas_handle_marquee_selection(int min_sx, int min_sy, int max_sx, 
 #define MAX_BEZIER_NODES 1024
 
 typedef struct {
+    int canvas_w, canvas_h;
     int frog_x, frog_y;
     int coin_x[MAX_TREASURE_POINTS], coin_y[MAX_TREASURE_POINTS];
     int cutout_x[MAX_CUTOUTS], cutout_y[MAX_CUTOUTS];
+    int cutout_w[MAX_CUTOUTS], cutout_h[MAX_CUTOUTS];
     int sprite_x[MAX_SPRITES], sprite_y[MAX_SPRITES];
+    int sprite_w[MAX_SPRITES], sprite_h[MAX_SPRITES];
     int bgalpha_x[MAX_BG_ALPHAS], bgalpha_y[MAX_BG_ALPHAS];
+    int bgalpha_w[MAX_BG_ALPHAS], bgalpha_h[MAX_BG_ALPHAS];
     float pan_x, pan_y;
     int path_count;
     struct {
         int node_count;
         float node_x[MAX_BEZIER_NODES];
         float node_y[MAX_BEZIER_NODES];
+        float hin_x[MAX_BEZIER_NODES];
+        float hin_y[MAX_BEZIER_NODES];
+        float hout_x[MAX_BEZIER_NODES];
+        float hout_y[MAX_BEZIER_NODES];
+        double node_s[MAX_BEZIER_NODES];
+        int span_count;
+        float span_off_c[256];
+        float span_off_d[256];
     } paths[MAX_PATHS];
 } CanvasDragSnapshot;
 
 extern CanvasDragSnapshot g_canvas_drag_snap;
 void snapshot_canvas_drag_state(void);
 void apply_canvas_drag_shift(float shift_x, float shift_y);
+void apply_canvas_transform(int old_w, int old_h, int new_w, int new_h, float unchk_shift_x, float unchk_shift_y, bool is_resize);
+void resize_canvas_with_transform(HWND hwnd, int new_w, int new_h);
 
 void toggle_element_mode(HWND hwnd);
 void refresh_toolbar_buttons(void);

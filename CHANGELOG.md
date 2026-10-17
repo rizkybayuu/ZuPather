@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.3] - 2026-10-17
+
+Major feature release introducing Canvas Affect Transform, enabling proportional, synchronized transformation of level elements, curves, and overlay assets during canvas resizing and panning, backed by non-destructive image resampling and full undo/redo dimensions tracking.
+
+### Added
+- **Canvas Mode "Affect Transform" Subsystem**:
+  - Added new dedicated controls section directly below **Image Alignment** in the Top-Right Canvas Tools HUD.
+  - Provided three toggleable boolean options:
+    1. `[x] Include Element (Frog & Coin)`: Proportionally scales Frog shooter anchor and Treasure Point coin waypoints with the canvas.
+    2. `[x] Include Curve (Paths & Attrs)`: Proportionally scales all path anchor coordinates $(x, y)$, tangent handles $(h_{\text{in}}, h_{\text{out}})$, and curve attribute spans (`CurveSpan` tunnel and priority offsets $off_c, off_d$) according to exact arc-length stretch ratios.
+    3. `[x] Include Overlay (Cutout/Sprite)`: Proportionally transforms both placement coordinates $(x, y)$ and image dimensions $(w, h)$ of Cutouts, Sprites, and Background Alpha masks.
+  - Integrated with all canvas resize pathways: 8 interactive drag handles, Center Move handle, HUD Apply button, HUD/Menu preset buttons (640x480, 800x600, 1024x768, 1280x720), and keyboard arrow key handle nudging.
+  - Documented Affect Transform shortcuts and behavior in the in-app Canvas Guide HUD (<kbd>F1</kbd>).
+- **Non-Destructive Image Resampling (`orig_bits`)**:
+  - Implemented pristine original bitmap retention in `CanvasImage` (`orig_bits`, `orig_width`, `orig_height`).
+  - Added `image_resize_in_place()` which performs bilinear resampling directly from pristine unscaled source pixels, preventing generational quality degradation or blurring during continuous 60 FPS viewport resizing.
+
+### Fixed
+- **Dimension-Aware Level Export**:
+  - Updated asset exporter in `level_io.c` to detect dimension modifications (`is_resized`) on Cutouts, Sprites, and Background Alphas.
+  - Resized assets are cleanly re-encoded and exported to target directories rather than bypassing resizing via raw file copies.
+- **Undo / Redo Overlay Dimension Synchronization**:
+  - Extended memory undo snapshots (`UndoCutoutSnapshot`, `UndoSpriteSnapshot`, `UndoBgAlphaSnapshot`) with image width and height tracking.
+  - Restoring state via <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> now accurately restores previous asset dimensions via non-destructive resampling.
+- **Keyboard Arrow Key Canvas Nudging**:
+  - Connected keyboard arrow keys in Canvas Mode to `apply_canvas_transform()`.
+  - Added baseline protection and automatic `"Nudge Canvas Resize"` / `"Nudge Canvas Move"` undo snapshot recording.
+
+### Changed
+- **Version & Metadata Alignment**:
+  - Updated in-app splash screen version indicator badge to `v0.1.3`.
+  - Updated Windows PE resource metadata to File Version `0.1.3.0` and Product Version `0.1.3`.
+
+---
+
 ## [0.1.2] - 2026-10-17
 
 Major feature and stability release introducing cross-toolchain CMake and GitHub Actions CI, curve segment subdivision and node insertion in Draw Mode, stacked overlay layer cycling, and complete Undo/Redo hardening across all editor modules.

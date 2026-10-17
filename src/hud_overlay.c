@@ -1658,6 +1658,10 @@ static const char *g_canvas_guide_lines[] = {
     "Numeric Input & Presets:",
     "  * Enter exact W & H values in Canvas Tools HUD and click Set.",
     "  * Quick 1-click presets: 640x480, 800x600, 1024x768, 1280x720.",
+    "Affect Transform Options (Synchronized Scaling):",
+    "  * Include Element: Frog & Coins scale proportionally with canvas.",
+    "  * Include Curve: Path anchor nodes, handles & attributes scale.",
+    "  * Include Overlay: Cutouts, Sprites & Alpha masks resize & shift.",
     "F1: Guide | F2: Tools | Ctrl+M: Toggle Canvas Mode"
 };
 
@@ -1888,7 +1892,7 @@ void render_canvas_guide_hud(HDC mem_dc, int client_w, int work_h, const ThemeCo
 
 int get_canvas_tools_content_height(void) {
     if (g_hud_canvas_collapsed) return 26;
-    return 386; /* Exact fit: anchor summary badge is 378 + 8px bottom margin */
+    return 490; /* Accommodates Affect Transform section */
 }
 
 int get_canvas_tools_hud_max_scroll(int work_h) {
@@ -2235,6 +2239,65 @@ void render_canvas_hud(HDC mem_dc, int client_w, int work_h, const ThemeColors *
         char ali_txt[64];
         snprintf(ali_txt, sizeof(ali_txt), "Anchor: %s", cur_align_name);
         DrawTextA(dc_tr, ali_txt, -1, &rc_cur_ali, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
+
+        /* Row 6: Section "Affect Transform" */
+        SelectObject(dc_tr, g_font_primary_bold);
+        SetTextColor(dc_tr, th->text_accent_blue);
+        RECT rc_lbl_aff = { 8, 384 + sy, 228, 402 + sy };
+        DrawTextA(dc_tr, "Affect Transform:", -1, &rc_lbl_aff, DT_SINGLELINE | DT_VCENTER | DT_LEFT);
+
+        struct {
+            const char *label;
+            bool active;
+            int y_top;
+            int y_bottom;
+        } aff_items[3] = {
+            { "Include Element (Frog & Coin)", g_cv_affect_element, 406 + sy, 428 + sy },
+            { "Include Curve (Paths & Attrs)", g_cv_affect_curve,   432 + sy, 454 + sy },
+            { "Include Overlay (Cutout/Sprite)", g_cv_affect_overlay, 458 + sy, 480 + sy }
+        };
+
+        for (int i = 0; i < 3; ++i) {
+            RECT rc_row = { 8, aff_items[i].y_top, 228, aff_items[i].y_bottom };
+            bool is_act = aff_items[i].active;
+
+            COLORREF bg_row = is_act ? (is_dark ? RGB(30, 42, 60) : RGB(225, 235, 250))
+                                     : (is_dark ? RGB(32, 36, 46) : RGB(236, 240, 246));
+            COLORREF border_row = is_act ? th->text_accent_blue : th->btn_border;
+
+            HBRUSH br_row = CreateSolidBrush(bg_row);
+            HPEN pen_row = CreatePen(PS_SOLID, 1, border_row);
+            HPEN old_p_r = (HPEN)SelectObject(dc_tr, pen_row);
+            HBRUSH old_b_r = (HBRUSH)SelectObject(dc_tr, br_row);
+            RoundRect(dc_tr, rc_row.left, rc_row.top, rc_row.right, rc_row.bottom, 4, 4);
+            SelectObject(dc_tr, old_b_r);
+            SelectObject(dc_tr, old_p_r);
+            DeleteObject(br_row);
+            DeleteObject(pen_row);
+
+            /* Checkbox box (14x14) */
+            int cb_x = rc_row.left + 6;
+            int cb_y = rc_row.top + 4;
+            RECT rc_cb = { cb_x, cb_y, cb_x + 14, cb_y + 14 };
+
+            COLORREF cb_bg = is_act ? th->text_accent_blue : (is_dark ? RGB(20, 24, 32) : RGB(255, 255, 255));
+            HBRUSH br_cb = CreateSolidBrush(cb_bg);
+            FillRect(dc_tr, &rc_cb, br_cb);
+            DeleteObject(br_cb);
+            FrameRect(dc_tr, &rc_cb, (HBRUSH)GetStockObject(BLACK_BRUSH));
+
+            if (is_act) {
+                SelectObject(dc_tr, g_font_mono_bold);
+                SetTextColor(dc_tr, RGB(255, 255, 255));
+                DrawTextA(dc_tr, "v", -1, &rc_cb, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
+            }
+
+            /* Label */
+            SelectObject(dc_tr, is_act ? g_font_primary_bold : g_font_primary_regular);
+            SetTextColor(dc_tr, is_act ? (is_dark ? RGB(220, 235, 255) : RGB(20, 50, 110)) : th->text_secondary);
+            RECT rc_txt = { cb_x + 20, rc_row.top, rc_row.right - 4, rc_row.bottom };
+            DrawTextA(dc_tr, aff_items[i].label, -1, &rc_txt, DT_SINGLELINE | DT_VCENTER | DT_LEFT);
+        }
 
         SelectClipRgn(dc_tr, NULL);
         DeleteObject(clip_tr);

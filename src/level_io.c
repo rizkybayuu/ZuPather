@@ -2257,7 +2257,11 @@ bool execute_save_canvas_with_plan(
         cleanup_alternate_ext_files(folder_path, "_", co_name, ext);
         cleanup_alternate_ext_files(folder_path, NULL, co_name, ext);
 
-        if (co_fmt == IMG_EXPORT_KEEP_ORIGINAL && !is_video && g_cutouts[i].source_filepath[0] &&
+        bool is_co_resized = (g_cutouts[i].has_img && g_cutouts[i].img.orig_bits &&
+                              (g_cutouts[i].img.width != g_cutouts[i].img.orig_width ||
+                               g_cutouts[i].img.height != g_cutouts[i].img.orig_height));
+
+        if (co_fmt == IMG_EXPORT_KEEP_ORIGINAL && !is_video && !is_co_resized && g_cutouts[i].source_filepath[0] &&
             GetFileAttributesA(g_cutouts[i].source_filepath) != INVALID_FILE_ATTRIBUTES &&
             _stricmp(g_cutouts[i].source_filepath, dest_path) != 0 &&
             image_is_zuma_native_ext(ext)) {
@@ -2336,7 +2340,11 @@ bool execute_save_canvas_with_plan(
         /* Clean up any older sprite files with different extensions */
         cleanup_alternate_ext_files(folder_path, NULL, sp_name, ext);
 
-        if (sp_fmt == IMG_EXPORT_KEEP_ORIGINAL && !is_video && g_sprites[i].source_filepath[0] &&
+        bool is_sp_resized = (g_sprites[i].has_img && g_sprites[i].img.orig_bits &&
+                              (g_sprites[i].img.width != g_sprites[i].img.orig_width ||
+                               g_sprites[i].img.height != g_sprites[i].img.orig_height));
+
+        if (sp_fmt == IMG_EXPORT_KEEP_ORIGINAL && !is_video && !is_sp_resized && g_sprites[i].source_filepath[0] &&
             GetFileAttributesA(g_sprites[i].source_filepath) != INVALID_FILE_ATTRIBUTES &&
             _stricmp(g_sprites[i].source_filepath, dest_path) != 0 &&
             image_is_zuma_native_ext(ext)) {
@@ -2420,7 +2428,11 @@ bool execute_save_canvas_with_plan(
         cleanup_alternate_ext_files(folder_path, "_", clean_name, ext);
         cleanup_alternate_ext_files(folder_path, NULL, clean_name, ext);
 
-        if (ba_fmt == IMG_EXPORT_KEEP_ORIGINAL && !is_video && g_bg_alphas[i].source_filepath[0] &&
+        bool is_ba_resized = (g_bg_alphas[i].has_img && g_bg_alphas[i].img.orig_bits &&
+                              (g_bg_alphas[i].img.width != g_bg_alphas[i].img.orig_width ||
+                               g_bg_alphas[i].img.height != g_bg_alphas[i].img.orig_height));
+
+        if (ba_fmt == IMG_EXPORT_KEEP_ORIGINAL && !is_video && !is_ba_resized && g_bg_alphas[i].source_filepath[0] &&
             GetFileAttributesA(g_bg_alphas[i].source_filepath) != INVALID_FILE_ATTRIBUTES &&
             _stricmp(g_bg_alphas[i].source_filepath, dest_path) != 0 &&
             image_is_zuma_native_ext(ext)) {

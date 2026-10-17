@@ -41,6 +41,8 @@ typedef struct {
 typedef struct {
     int  x;
     int  y;
+    int  w;
+    int  h;
     int  pri;
     char image_name[64];
     char source_filepath[MAX_PATH];
@@ -50,6 +52,8 @@ typedef struct {
 typedef struct {
     int  x;
     int  y;
+    int  w;
+    int  h;
     int  pri;
     char image_name[64];
     char source_filepath[MAX_PATH];
@@ -59,6 +63,8 @@ typedef struct {
 typedef struct {
     int  x;
     int  y;
+    int  w;
+    int  h;
     int  pri;
     int  vx;
     int  vy;
@@ -183,6 +189,8 @@ static void capture_current_state(UndoMemorySnapshot *snap, const char *action_n
     for (int i = 0; i < g_cutout_count && i < MAX_CUTOUTS; ++i) {
         snap->cutouts[i].x = g_cutouts[i].x;
         snap->cutouts[i].y = g_cutouts[i].y;
+        snap->cutouts[i].w = g_cutouts[i].has_img ? g_cutouts[i].img.width : 0;
+        snap->cutouts[i].h = g_cutouts[i].has_img ? g_cutouts[i].img.height : 0;
         snap->cutouts[i].pri = g_cutouts[i].pri;
         snap->cutouts[i].selected = g_cutouts[i].selected;
         strncpy(snap->cutouts[i].image_name, g_cutouts[i].image_name, sizeof(snap->cutouts[i].image_name) - 1);
@@ -194,6 +202,8 @@ static void capture_current_state(UndoMemorySnapshot *snap, const char *action_n
     for (int i = 0; i < g_sprite_count && i < MAX_SPRITES; ++i) {
         snap->sprites[i].x = g_sprites[i].x;
         snap->sprites[i].y = g_sprites[i].y;
+        snap->sprites[i].w = g_sprites[i].has_img ? g_sprites[i].img.width : 0;
+        snap->sprites[i].h = g_sprites[i].has_img ? g_sprites[i].img.height : 0;
         snap->sprites[i].pri = g_sprites[i].pri;
         snap->sprites[i].selected = g_sprites[i].selected;
         strncpy(snap->sprites[i].image_name, g_sprites[i].image_name, sizeof(snap->sprites[i].image_name) - 1);
@@ -205,6 +215,8 @@ static void capture_current_state(UndoMemorySnapshot *snap, const char *action_n
     for (int i = 0; i < g_bg_alpha_count && i < MAX_BG_ALPHAS; ++i) {
         snap->bg_alphas[i].x = g_bg_alphas[i].x;
         snap->bg_alphas[i].y = g_bg_alphas[i].y;
+        snap->bg_alphas[i].w = g_bg_alphas[i].has_img ? g_bg_alphas[i].img.width : 0;
+        snap->bg_alphas[i].h = g_bg_alphas[i].has_img ? g_bg_alphas[i].img.height : 0;
         snap->bg_alphas[i].pri = g_bg_alphas[i].pri;
         snap->bg_alphas[i].vx = g_bg_alphas[i].vx;
         snap->bg_alphas[i].vy = g_bg_alphas[i].vy;
@@ -368,6 +380,11 @@ static void restore_state(const UndoMemorySnapshot *snap, HWND hwnd_main) {
         } else if (g_canvas_folder[0]) {
             resolve_cutout_image_in_folder(g_canvas_folder, co->image_name, &co->img);
         }
+        if (co->has_img && snap->cutouts[i].w > 0 && snap->cutouts[i].h > 0) {
+            if (co->img.width != snap->cutouts[i].w || co->img.height != snap->cutouts[i].h) {
+                image_resize_in_place(&co->img, snap->cutouts[i].w, snap->cutouts[i].h);
+            }
+        }
         cutout_generate_masks(co);
     }
 
@@ -387,6 +404,11 @@ static void restore_state(const UndoMemorySnapshot *snap, HWND hwnd_main) {
             if (image_load_from_file(sp->source_filepath, &sp->img)) sp->has_img = true;
         } else if (g_canvas_folder[0]) {
             resolve_sprite_image_in_folder(g_canvas_folder, sp->image_name, &sp->img);
+        }
+        if (sp->has_img && snap->sprites[i].w > 0 && snap->sprites[i].h > 0) {
+            if (sp->img.width != snap->sprites[i].w || sp->img.height != snap->sprites[i].h) {
+                image_resize_in_place(&sp->img, snap->sprites[i].w, snap->sprites[i].h);
+            }
         }
     }
 
@@ -408,6 +430,11 @@ static void restore_state(const UndoMemorySnapshot *snap, HWND hwnd_main) {
             if (image_load_from_file(ba->source_filepath, &ba->img)) ba->has_img = true;
         } else if (g_canvas_folder[0]) {
             resolve_bgalpha_image_in_folder(g_canvas_folder, ba->image_name, &ba->img);
+        }
+        if (ba->has_img && snap->bg_alphas[i].w > 0 && snap->bg_alphas[i].h > 0) {
+            if (ba->img.width != snap->bg_alphas[i].w || ba->img.height != snap->bg_alphas[i].h) {
+                image_resize_in_place(&ba->img, snap->bg_alphas[i].w, snap->bg_alphas[i].h);
+            }
         }
         bgalpha_generate_masks(ba);
     }
