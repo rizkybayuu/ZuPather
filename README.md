@@ -1,6 +1,6 @@
-# ZuPather (v0.1.3)
+# ZuPather (v0.1.4)
 
-> **Version:** 0.1.3 (Canvas Affect Transform & Non-Destructive Resampling Release)  
+> **Version:** 0.1.4 (Adaptive Zuma Engine .DAT Curve Import & Mod Compatibility Release)  
 > **Target Game:** *Zuma Deluxe* v1.0.0.1 & *ZuCompleluxe* Multi-Curve Framework  
 > **Project Scope:** High-Precision Vector Path Editor, Asset Composer & Direct-to-Engine Exporter  
 > **Core Language:** Pure C (C99 / Win32 API)  

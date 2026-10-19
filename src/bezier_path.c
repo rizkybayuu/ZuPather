@@ -920,7 +920,7 @@ static inline void attrs_at(const BakedSpan *b, int n, double s, uint8_t *out_tu
     *out_tunnel = 0;
     *out_prio = 0; /* Default baseline: tunnel=0 (hittable), priority=0 (surface layer) */
     for (int k = 0; k < n; ++k) {
-        if (b[k].active && s >= (b[k].s_c - 1e-4) && s <= (b[k].s_d + 1e-4)) {
+        if (b[k].active && s >= (b[k].s_c - 1e-4) && s < (b[k].s_d - 1e-5)) {
             if (b[k].has_tunnel) *out_tunnel = b[k].tunnel;
             if (b[k].has_prio)   *out_prio   = b[k].prio;
         }
@@ -1390,7 +1390,225 @@ const char* dat_import_error_to_string(DatImportError err) {
     }
 }
 
-/* Import official Zuma Deluxe CURV (.dat) binary file into BezierPath with detailed error reporting */
+/* Fit a cubic Bezier segment between pt_x/pt_y at k0 and k1 using least-squares,
+ * and calculate maximum deviation and split point. */
+static void fit_bezier_segment_points(
+    const float *pt_x, const float *pt_y, const double *pt_s,
+    uint32_t k0, uint32_t k1,
+    float *out_h1x, float *out_h1y,
+    float *out_h2x, float *out_h2y,
+    double *out_max_err, uint32_t *out_split_k
+) {
+    uint32_t seg_len = (k1 >= k0) ? (k1 - k0 + 1) : 0;
+    float P0x = pt_x[k0];
+    float P0y = pt_y[k0];
+    float P3x = pt_x[k1];
+    float P3y = pt_y[k1];
+
+    if (seg_len <= 2) {
+        if (out_h1x) *out_h1x = (P3x - P0x) / 3.0f;
+        if (out_h1y) *out_h1y = (P3y - P0y) / 3.0f;
+        if (out_h2x) *out_h2x = -(P3x - P0x) / 3.0f;
+        if (out_h2y) *out_h2y = -(P3y - P0y) / 3.0f;
+        if (out_max_err) *out_max_err = 0.0;
+        if (out_split_k) *out_split_k = k0;
+        return;
+    }
+
+    double tot_s = pt_s[k1] - pt_s[k0];
+    if (tot_s < 1e-6) {
+        if (out_h1x) *out_h1x = 0.0f;
+        if (out_h1y) *out_h1y = 0.0f;
+        if (out_h2x) *out_h2x = 0.0f;
+        if (out_h2y) *out_h2y = 0.0f;
+        if (out_max_err) *out_max_err = 0.0;
+        if (out_split_k) *out_split_k = k0;
+        return;
+    }
+
+    double a11 = 0.0, a12 = 0.0, a22 = 0.0;
+    double bx1 = 0.0, bx2 = 0.0, by1 = 0.0, by2 = 0.0;
+    for (uint32_t m = 1; m + 1 < seg_len; ++m) {
+        uint32_t idx = k0 + m;
+        double t = (pt_s[idx] - pt_s[k0]) / tot_s;
+        double u = 1.0 - t;
+        double c1 = 3.0 * u * u * t;
+        double c2 = 3.0 * u * t * t;
+        double c0 = u * u * u;
+        double c3 = t * t * t;
+        double rx = (double)pt_x[idx] - c0 * (double)P0x - c3 * (double)P3x;
+        double ry = (double)pt_y[idx] - c0 * (double)P0y - c3 * (double)P3y;
+        a11 += c1 * c1;
+        a12 += c1 * c2;
+        a22 += c2 * c2;
+        bx1 += c1 * rx;
+        bx2 += c2 * rx;
+        by1 += c1 * ry;
+        by2 += c2 * ry;
+    }
+
+    double b1x, b1y, b2x, b2y;
+    double det = a11 * a22 - a12 * a12;
+    if (fabs(det) < 1e-9) {
+        b1x = (double)P0x + (double)(P3x - P0x) / 3.0;
+        b2x = (double)P3x - (double)(P3x - P0x) / 3.0;
+        b1y = (double)P0y + (double)(P3y - P0y) / 3.0;
+        b2y = (double)P3y - (double)(P3y - P0y) / 3.0;
+    } else {
+        b1x = (a22 * bx1 - a12 * bx2) / det;
+        b2x = (a11 * bx2 - a12 * bx1) / det;
+        b1y = (a22 * by1 - a12 * by2) / det;
+        b2y = (a11 * by2 - a12 * by1) / det;
+    }
+
+    if (out_h1x) *out_h1x = (float)(b1x - (double)P0x);
+    if (out_h1y) *out_h1y = (float)(b1y - (double)P0y);
+    if (out_h2x) *out_h2x = (float)(b2x - (double)P3x);
+    if (out_h2y) *out_h2y = (float)(b2y - (double)P3y);
+
+    if (out_max_err) {
+        double max_err = 0.0;
+        uint32_t split_k = k0;
+        for (uint32_t m = 1; m < seg_len; ++m) {
+            uint32_t idx = k0 + m;
+            double t = (pt_s[idx] - pt_s[k0]) / tot_s;
+            double u = 1.0 - t;
+            double bx = u * u * u * (double)P0x + 3.0 * u * u * t * b1x + 3.0 * u * t * t * b2x + t * t * t * (double)P3x;
+            double by = u * u * u * (double)P0y + 3.0 * u * u * t * b1y + 3.0 * u * t * t * b2y + t * t * t * (double)P3y;
+            double err = hypot(bx - (double)pt_x[idx], by - (double)pt_y[idx]);
+            if (err > max_err) {
+                max_err = err;
+                split_k = idx;
+            }
+        }
+        *out_max_err = max_err;
+        if (out_split_k) *out_split_k = split_k;
+    }
+}
+
+/* Helper comparison for qsort */
+static int compare_uint32_asc(const void *a, const void *b) {
+    uint32_t va = *(const uint32_t*)a;
+    uint32_t vb = *(const uint32_t*)b;
+    return (va > vb) - (va < vb);
+}
+
+/* Extract optimal Bezier anchor node indices from raw trajectory points when
+ * PopCap control point metadata is missing or custom (e.g. mods, ZGR, third-party editors). */
+static uint32_t* extract_adaptive_control_points(
+    const float *pt_x, const float *pt_y,
+    const uint8_t *pt_tunnel, const uint8_t *pt_prio,
+    const double *pt_s, uint32_t pt_count,
+    uint32_t *out_cp_count
+) {
+    if (!pt_x || !pt_y || !pt_s || pt_count < 2 || !out_cp_count) return NULL;
+
+    uint32_t max_nodes = 256;
+    uint32_t *node_arr = (uint32_t*)malloc(max_nodes * sizeof(uint32_t));
+    if (!node_arr) return NULL;
+
+    uint32_t count = 0;
+    node_arr[count++] = 0;
+
+    double last_s = 0.0;
+    const double step_target = 65.0; /* target ~65 px spacing */
+
+    for (uint32_t i = 1; i + 1 < pt_count; ++i) {
+        bool add = false;
+        if (pt_tunnel && pt_tunnel[i] != pt_tunnel[i - 1]) add = true;
+        if (pt_prio && pt_prio[i] != pt_prio[i - 1]) add = true;
+        if (pt_s[i] - last_s >= step_target) add = true;
+        if (!add && i >= 8 && i + 8 < pt_count) {
+            double v1x = (double)pt_x[i] - (double)pt_x[i - 8];
+            double v1y = (double)pt_y[i] - (double)pt_y[i - 8];
+            double v2x = (double)pt_x[i + 8] - (double)pt_x[i];
+            double v2y = (double)pt_y[i + 8] - (double)pt_y[i];
+            double l1 = hypot(v1x, v1y);
+            double l2 = hypot(v2x, v2y);
+            if (l1 > 1.0 && l2 > 1.0) {
+                double dot = (v1x * v2x + v1y * v2y) / (l1 * l2);
+                if (dot < 0.60) {
+                    add = true;
+                }
+            }
+        }
+
+        if (add) {
+            if (count + 2 >= max_nodes) {
+                max_nodes *= 2;
+                uint32_t *tmp = (uint32_t*)realloc(node_arr, max_nodes * sizeof(uint32_t));
+                if (!tmp) break;
+                node_arr = tmp;
+            }
+            node_arr[count++] = i;
+            last_s = pt_s[i];
+        }
+    }
+
+    node_arr[count++] = pt_count - 1;
+
+    /* Sort and remove duplicate indices */
+    qsort(node_arr, count, sizeof(uint32_t), compare_uint32_asc);
+    uint32_t unique_count = 0;
+    for (uint32_t i = 0; i < count; ++i) {
+        if (i == 0 || node_arr[i] != node_arr[unique_count - 1]) {
+            node_arr[unique_count++] = node_arr[i];
+        }
+    }
+    count = unique_count;
+
+    /* Adaptive recursive error refinement: split segments where deviation > 1.0 px */
+    const double error_tolerance = 1.0;
+    for (int iter = 0; iter < 120; ++iter) {
+        double worst_err = 0.0;
+        uint32_t worst_split = 0;
+        uint32_t insert_pos = 0;
+
+        for (uint32_t i = 0; i + 1 < count; ++i) {
+            uint32_t k0 = node_arr[i];
+            uint32_t k1 = node_arr[i + 1];
+            if (k1 - k0 <= 4) continue;
+
+            double seg_err = 0.0;
+            uint32_t split_k = 0;
+            fit_bezier_segment_points(pt_x, pt_y, pt_s, k0, k1, NULL, NULL, NULL, NULL, &seg_err, &split_k);
+            if (seg_err > worst_err && split_k > k0 && split_k < k1) {
+                worst_err = seg_err;
+                worst_split = split_k;
+                insert_pos = i + 1;
+            }
+        }
+
+        if (worst_err <= error_tolerance || worst_split == 0 || count >= 200) {
+            break;
+        }
+
+        bool exists = false;
+        for (uint32_t i = 0; i < count; ++i) {
+            if (node_arr[i] == worst_split) { exists = true; break; }
+        }
+        if (exists) break;
+
+        if (count + 1 >= max_nodes) {
+            max_nodes += 64;
+            uint32_t *tmp = (uint32_t*)realloc(node_arr, max_nodes * sizeof(uint32_t));
+            if (!tmp) break;
+            node_arr = tmp;
+        }
+        for (uint32_t j = count; j > insert_pos; --j) {
+            node_arr[j] = node_arr[j - 1];
+        }
+        node_arr[insert_pos] = worst_split;
+        count++;
+    }
+
+    *out_cp_count = count;
+    return node_arr;
+}
+
+/* Import official Zuma Deluxe CURV (.dat) binary file into BezierPath with detailed error reporting.
+ * Follows the exact Zuma.exe binary parsing engine: supports vanilla files, mods (e.g. ZGR),
+ * and third-party tools (GScienceStudio, DeathKnight Bessel Generator, stripped .dat). */
 bool bezier_path_import_dat_ex(BezierPath *path, const char *in_filepath, float alpha, DatImportError *out_error) {
     if (out_error) *out_error = DAT_ERR_OK;
     if (!path || !in_filepath) {
@@ -1410,69 +1628,90 @@ bool bezier_path_import_dat_ex(BezierPath *path, const char *in_filepath, float 
         return false;
     }
 
-    uint32_t version = 0, edit_type = 0, edit_size = 0;
-    if (fread(&version, 4, 1, f) != 1 ||
-        fread(&edit_type, 4, 1, f) != 1 ||
-        fread(&edit_size, 4, 1, f) != 1) {
+    uint32_t version = 0;
+    if (fread(&version, 4, 1, f) != 1) {
         fclose(f);
         if (out_error) *out_error = DAT_ERR_READ_CP_FAILED;
         return false;
     }
 
-    if (version != 1 && version != 2) {
-        fclose(f);
-        if (out_error) *out_error = DAT_ERR_UNSUPPORTED_VERSION;
-        return false;
-    }
-
-    if (edit_type != 1) {
-        fclose(f);
-        if (out_error) *out_error = DAT_ERR_INVALID_EDIT_TYPE;
-        return false;
-    }
-
-    uint32_t cp_count = 0;
-    if (edit_size < 4 || fread(&cp_count, 4, 1, f) != 1) {
-        fclose(f);
-        if (out_error) *out_error = DAT_ERR_READ_CP_FAILED;
-        return false;
-    }
-
-    /* Validate header format & control point buffer size */
-    if (cp_count < 2 || edit_size != 4 + (cp_count * 10)) {
-        fclose(f);
-        if (out_error) *out_error = DAT_ERR_INVALID_CP_COUNT;
-        return false;
-    }
-
-    /* Read raw control points */
-    int32_t *raw_x = (int32_t*)malloc(cp_count * sizeof(int32_t));
-    int32_t *raw_y = (int32_t*)malloc(cp_count * sizeof(int32_t));
-    uint8_t *raw_t = (uint8_t*)malloc(cp_count * sizeof(uint8_t));
-    uint8_t *raw_p = (uint8_t*)malloc(cp_count * sizeof(uint8_t));
-
-    if (!raw_x || !raw_y || !raw_t || !raw_p) {
-        if (raw_x) free(raw_x);
-        if (raw_y) free(raw_y);
-        if (raw_t) free(raw_t);
-        if (raw_p) free(raw_p);
-        fclose(f);
-        if (out_error) *out_error = DAT_ERR_ALLOC_FAILED;
-        return false;
-    }
-
-    for (uint32_t i = 0; i < cp_count; ++i) {
-        if (fread(&raw_x[i], 4, 1, f) != 1 ||
-            fread(&raw_y[i], 4, 1, f) != 1 ||
-            fread(&raw_t[i], 1, 1, f) != 1 ||
-            fread(&raw_p[i], 1, 1, f) != 1) {
-            free(raw_x); free(raw_y); free(raw_t); free(raw_p);
+    bool small_version = false;
+    bool has_tunnels = true;
+    if (version <= 2) {
+        small_version = false;
+        has_tunnels = true;
+    } else {
+        uint8_t b_small = 0, b_tunnels = 0;
+        if (fread(&b_small, 1, 1, f) != 1 || fread(&b_tunnels, 1, 1, f) != 1) {
             fclose(f);
             if (out_error) *out_error = DAT_ERR_READ_CP_FAILED;
             return false;
         }
+        small_version = (b_small != 0);
+        has_tunnels = (b_tunnels != 0);
     }
 
+    uint32_t edit_type = 0, edit_size = 0;
+    uint8_t *edit_buf = NULL;
+    if (!small_version) {
+        if (fread(&edit_type, 4, 1, f) != 1 || fread(&edit_size, 4, 1, f) != 1) {
+            fclose(f);
+            if (out_error) *out_error = DAT_ERR_READ_CP_FAILED;
+            return false;
+        }
+        if (edit_size > 0) {
+            edit_buf = (uint8_t*)malloc(edit_size);
+            if (edit_buf) {
+                if (fread(edit_buf, 1, edit_size, f) != edit_size) {
+                    free(edit_buf);
+                    fclose(f);
+                    if (out_error) *out_error = DAT_ERR_READ_CP_FAILED;
+                    return false;
+                }
+            } else {
+                fseek(f, edit_size, SEEK_CUR);
+            }
+        }
+    }
+
+    /* Check if edit_buf has valid PopCap control points format */
+    bool has_popcap_cp = false;
+    uint32_t cp_count = 0;
+    int32_t *raw_x = NULL;
+    int32_t *raw_y = NULL;
+    uint8_t *raw_t = NULL;
+    uint8_t *raw_p = NULL;
+
+    if (edit_type == 1 && edit_buf && edit_size >= 4) {
+        memcpy(&cp_count, edit_buf, 4);
+        if (cp_count >= 2 && edit_size == 4 + (cp_count * 10)) {
+            raw_x = (int32_t*)malloc(cp_count * sizeof(int32_t));
+            raw_y = (int32_t*)malloc(cp_count * sizeof(int32_t));
+            raw_t = (uint8_t*)malloc(cp_count * sizeof(uint8_t));
+            raw_p = (uint8_t*)malloc(cp_count * sizeof(uint8_t));
+            if (raw_x && raw_y && raw_t && raw_p) {
+                const uint8_t *ptr = edit_buf + 4;
+                for (uint32_t i = 0; i < cp_count; ++i) {
+                    memcpy(&raw_x[i], ptr, 4); ptr += 4;
+                    memcpy(&raw_y[i], ptr, 4); ptr += 4;
+                    raw_t[i] = *ptr++;
+                    raw_p[i] = *ptr++;
+                }
+                has_popcap_cp = true;
+            } else {
+                if (raw_x) { free(raw_x); raw_x = NULL; }
+                if (raw_y) { free(raw_y); raw_y = NULL; }
+                if (raw_t) { free(raw_t); raw_t = NULL; }
+                if (raw_p) { free(raw_p); raw_p = NULL; }
+            }
+        }
+    }
+    if (edit_buf) {
+        free(edit_buf);
+        edit_buf = NULL;
+    }
+
+    /* Read runtime trajectory points */
     uint32_t pt_count = 0;
     bool has_points = (fread(&pt_count, 4, 1, f) == 1 && pt_count > 1);
     float *pt_x = NULL;
@@ -1501,13 +1740,16 @@ bool bezier_path_import_dat_ex(BezierPath *path, const char *in_filepath, float 
                 bool ok = true;
                 for (uint32_t i = 0; i < pt_count; ++i) {
                     float px, py;
-                    uint8_t pt_t, pt_p;
-                    if (fread(&px, 4, 1, f) != 1 ||
-                        fread(&py, 4, 1, f) != 1 ||
-                        fread(&pt_t, 1, 1, f) != 1 ||
-                        fread(&pt_p, 1, 1, f) != 1) {
+                    uint8_t pt_t = 0, pt_p = 0;
+                    if (fread(&px, 4, 1, f) != 1 || fread(&py, 4, 1, f) != 1) {
                         ok = false;
                         break;
+                    }
+                    if (has_tunnels) {
+                        if (fread(&pt_t, 1, 1, f) != 1 || fread(&pt_p, 1, 1, f) != 1) {
+                            ok = false;
+                            break;
+                        }
                     }
                     pt_x[i] = px;
                     pt_y[i] = py;
@@ -1522,13 +1764,16 @@ bool bezier_path_import_dat_ex(BezierPath *path, const char *in_filepath, float 
                 }
                 if (!ok) has_points = false;
             } else {
-                /* version == 2 */
+                /* version >= 2 */
                 float first_x, first_y;
-                uint8_t first_t, first_p;
-                if (fread(&first_x, 4, 1, f) == 1 &&
-                    fread(&first_y, 4, 1, f) == 1 &&
-                    fread(&first_t, 1, 1, f) == 1 &&
-                    fread(&first_p, 1, 1, f) == 1) {
+                uint8_t first_t = 0, first_p = 0;
+                bool ok_first = (fread(&first_x, 4, 1, f) == 1 && fread(&first_y, 4, 1, f) == 1);
+                if (ok_first && has_tunnels) {
+                    if (fread(&first_t, 1, 1, f) != 1 || fread(&first_p, 1, 1, f) != 1) {
+                        ok_first = false;
+                    }
+                }
+                if (ok_first) {
                     pt_x[0] = first_x;
                     pt_y[0] = first_y;
                     pt_tunnel[0] = first_t;
@@ -1539,13 +1784,16 @@ bool bezier_path_import_dat_ex(BezierPath *path, const char *in_filepath, float 
                     bool ok = true;
                     for (uint32_t i = 1; i < pt_count; ++i) {
                         int8_t dx, dy;
-                        uint8_t pt_t, pt_p;
-                        if (fread(&dx, 1, 1, f) != 1 ||
-                            fread(&dy, 1, 1, f) != 1 ||
-                            fread(&pt_t, 1, 1, f) != 1 ||
-                            fread(&pt_p, 1, 1, f) != 1) {
+                        uint8_t pt_t = 0, pt_p = 0;
+                        if (fread(&dx, 1, 1, f) != 1 || fread(&dy, 1, 1, f) != 1) {
                             ok = false;
                             break;
+                        }
+                        if (has_tunnels) {
+                            if (fread(&pt_t, 1, 1, f) != 1 || fread(&pt_p, 1, 1, f) != 1) {
+                                ok = false;
+                                break;
+                            }
                         }
                         cur_x += (double)dx * 0.01;
                         cur_y += (double)dy * 0.01;
@@ -1570,145 +1818,157 @@ bool bezier_path_import_dat_ex(BezierPath *path, const char *in_filepath, float 
     }
     fclose(f);
 
+    if (!has_popcap_cp && !has_points) {
+        if (out_error) *out_error = DAT_ERR_READ_CP_FAILED;
+        return false;
+    }
+
     bezier_path_clear(path);
 
-    uint32_t *cp_idx = (uint32_t*)malloc(cp_count * sizeof(uint32_t));
-    if (has_points && cp_idx) {
-        /* Map each control point raw_x[i], raw_y[i] to nearest discrete trajectory point */
-        cp_idx[0] = 0;
-        cp_idx[cp_count - 1] = pt_count - 1;
-        uint32_t cur_start = 0;
-        for (uint32_t i = 1; i + 1 < cp_count; ++i) {
-            float cx = (float)raw_x[i];
-            float cy = (float)raw_y[i];
-            uint32_t best_k = cur_start;
-            double best_d2 = 1e18;
-            for (uint32_t k = cur_start; k < pt_count; ++k) {
-                double d2 = (double)(pt_x[k] - cx) * (double)(pt_x[k] - cx) +
-                            (double)(pt_y[k] - cy) * (double)(pt_y[k] - cy);
-                if (d2 < best_d2) {
-                    best_d2 = d2;
-                    best_k = k;
-                } else if (best_d2 < 2.5 * 2.5 && d2 > best_d2 + 25.0) {
-                    break;
+    if (has_points) {
+        uint32_t *cp_idx = NULL;
+        if (has_popcap_cp) {
+            cp_idx = (uint32_t*)malloc(cp_count * sizeof(uint32_t));
+            if (cp_idx) {
+                cp_idx[0] = 0;
+                cp_idx[cp_count - 1] = pt_count - 1;
+                uint32_t cur_start = 0;
+                for (uint32_t i = 1; i + 1 < cp_count; ++i) {
+                    float cx = (float)raw_x[i];
+                    float cy = (float)raw_y[i];
+                    uint32_t best_k = cur_start;
+                    double best_d2 = 1e18;
+                    for (uint32_t k = cur_start; k < pt_count; ++k) {
+                        double d2 = (double)(pt_x[k] - cx) * (double)(pt_x[k] - cx) +
+                                    (double)(pt_y[k] - cy) * (double)(pt_y[k] - cy);
+                        if (d2 < best_d2) {
+                            best_d2 = d2;
+                            best_k = k;
+                        } else if (best_d2 < 2.5 * 2.5 && d2 > best_d2 + 25.0) {
+                            break;
+                        }
+                    }
+                    cp_idx[i] = best_k;
+                    cur_start = best_k;
                 }
             }
-            cp_idx[i] = best_k;
-            cur_start = best_k;
+        } else {
+            /* Adaptive node reconstruction for mod / custom / stripped .dat files */
+            cp_idx = extract_adaptive_control_points(pt_x, pt_y, pt_tunnel, pt_priority, pt_s, pt_count, &cp_count);
         }
 
-        /* Step 1: Add all nodes using exact sub-pixel trajectory coordinates */
-        for (uint32_t i = 0; i < cp_count; ++i) {
-            BezierNode node;
-            memset(&node, 0, sizeof(BezierNode));
-            node.x = pt_x[cp_idx[i]];
-            node.y = pt_y[cp_idx[i]];
-            node.type = (i == 0 || i == cp_count - 1) ? NODE_CORNER : NODE_SMOOTH;
-            bezier_path_add_node(path, &node);
-        }
+        if (cp_idx && cp_count >= 2) {
+            /* Step 1: Add all nodes using exact sub-pixel trajectory coordinates */
+            for (uint32_t i = 0; i < cp_count; ++i) {
+                BezierNode node;
+                memset(&node, 0, sizeof(BezierNode));
+                node.x = pt_x[cp_idx[i]];
+                node.y = pt_y[cp_idx[i]];
+                node.type = (i == 0 || i == cp_count - 1) ? NODE_CORNER : NODE_SMOOTH;
+                bezier_path_add_node(path, &node);
+            }
 
-        /* Step 2: Fit Bezier handles per segment (i -> i+1) to discrete trajectory points via least-squares */
-        for (uint32_t i = 0; i + 1 < cp_count; ++i) {
-            uint32_t k0 = cp_idx[i];
-            uint32_t k1 = cp_idx[i + 1];
-            uint32_t seg_len = (k1 >= k0) ? (k1 - k0 + 1) : 0;
-            float P0x = path->nodes[i].x;
-            float P0y = path->nodes[i].y;
-            float P3x = path->nodes[i + 1].x;
-            float P3y = path->nodes[i + 1].y;
+            /* Step 2: Fit Bezier handles per segment (i -> i+1) to discrete trajectory points via least-squares */
+            for (uint32_t i = 0; i + 1 < cp_count; ++i) {
+                uint32_t k0 = cp_idx[i];
+                uint32_t k1 = cp_idx[i + 1];
+                float h1x = 0.0f, h1y = 0.0f, h2x = 0.0f, h2y = 0.0f;
+                fit_bezier_segment_points(pt_x, pt_y, pt_s, k0, k1, &h1x, &h1y, &h2x, &h2y, NULL, NULL);
+                path->nodes[i].hout_x = h1x;
+                path->nodes[i].hout_y = h1y;
+                path->nodes[i + 1].hin_x = h2x;
+                path->nodes[i + 1].hin_y = h2y;
+            }
 
-            if (seg_len <= 2) {
-                path->nodes[i].hout_x = (P3x - P0x) / 3.0f;
-                path->nodes[i].hout_y = (P3y - P0y) / 3.0f;
-                path->nodes[i + 1].hin_x = -(P3x - P0x) / 3.0f;
-                path->nodes[i + 1].hin_y = -(P3y - P0y) / 3.0f;
-            } else {
-                double *seg_s = (double*)malloc(seg_len * sizeof(double));
-                if (!seg_s) {
-                    path->nodes[i].hout_x = (P3x - P0x) / 3.0f;
-                    path->nodes[i].hout_y = (P3y - P0y) / 3.0f;
-                    path->nodes[i + 1].hin_x = -(P3x - P0x) / 3.0f;
-                    path->nodes[i + 1].hin_y = -(P3y - P0y) / 3.0f;
-                } else {
-                    seg_s[0] = 0.0;
-                    for (uint32_t m = 1; m < seg_len; ++m) {
-                        double dx = (double)(pt_x[k0 + m] - pt_x[k0 + m - 1]);
-                        double dy = (double)(pt_y[k0 + m] - pt_y[k0 + m - 1]);
-                        seg_s[m] = seg_s[m - 1] + hypot(dx, dy);
-                    }
-                    double tot_s = seg_s[seg_len - 1];
-                    if (tot_s < 1e-6) {
-                        path->nodes[i].hout_x = 0.0f;
-                        path->nodes[i].hout_y = 0.0f;
-                        path->nodes[i + 1].hin_x = 0.0f;
-                        path->nodes[i + 1].hin_y = 0.0f;
+            /* Determine smooth vs corner node types based on tangent alignment */
+            for (uint32_t i = 1; i + 1 < cp_count; ++i) {
+                float hix = path->nodes[i].hin_x;
+                float hiy = path->nodes[i].hin_y;
+                float hox = path->nodes[i].hout_x;
+                float hoy = path->nodes[i].hout_y;
+                float len_in = hypotf(hix, hiy);
+                float len_out = hypotf(hox, hoy);
+                if (len_in > 0.1f && len_out > 0.1f) {
+                    float dot = (-hix * hox + -hiy * hoy) / (len_in * len_out);
+                    if (dot > 0.95f) {
+                        path->nodes[i].type = NODE_SMOOTH;
                     } else {
-                        double a11 = 0.0, a12 = 0.0, a22 = 0.0;
-                        double bx1 = 0.0, bx2 = 0.0, by1 = 0.0, by2 = 0.0;
-                        for (uint32_t m = 1; m + 1 < seg_len; ++m) {
-                            double t = seg_s[m] / tot_s;
-                            double u = 1.0 - t;
-                            double c1 = 3.0 * u * u * t;
-                            double c2 = 3.0 * u * t * t;
-                            double c0 = u * u * u;
-                            double c3 = t * t * t;
-                            double rx = (double)pt_x[k0 + m] - c0 * (double)P0x - c3 * (double)P3x;
-                            double ry = (double)pt_y[k0 + m] - c0 * (double)P0y - c3 * (double)P3y;
-                            a11 += c1 * c1;
-                            a12 += c1 * c2;
-                            a22 += c2 * c2;
-                            bx1 += c1 * rx;
-                            bx2 += c2 * rx;
-                            by1 += c1 * ry;
-                            by2 += c2 * ry;
-                        }
-                        double det = a11 * a22 - a12 * a12;
-                        if (fabs(det) < 1e-9) {
-                            path->nodes[i].hout_x = (P3x - P0x) / 3.0f;
-                            path->nodes[i].hout_y = (P3y - P0y) / 3.0f;
-                            path->nodes[i + 1].hin_x = -(P3x - P0x) / 3.0f;
-                            path->nodes[i + 1].hin_y = -(P3y - P0y) / 3.0f;
-                        } else {
-                            double b1x = (a22 * bx1 - a12 * bx2) / det;
-                            double b2x = (a11 * bx2 - a12 * bx1) / det;
-                            double b1y = (a22 * by1 - a12 * by2) / det;
-                            double b2y = (a11 * by2 - a12 * by1) / det;
-                            path->nodes[i].hout_x = (float)(b1x - (double)P0x);
-                            path->nodes[i].hout_y = (float)(b1y - (double)P0y);
-                            path->nodes[i + 1].hin_x = (float)(b2x - (double)P3x);
-                            path->nodes[i + 1].hin_y = (float)(b2y - (double)P3y);
-                        }
+                        path->nodes[i].type = NODE_CORNER;
                     }
-                    free(seg_s);
-                }
-            }
-        }
-
-        /* Determine smooth vs corner node types based on tangent alignment */
-        for (uint32_t i = 1; i + 1 < cp_count; ++i) {
-            float hix = path->nodes[i].hin_x;
-            float hiy = path->nodes[i].hin_y;
-            float hox = path->nodes[i].hout_x;
-            float hoy = path->nodes[i].hout_y;
-            float len_in = hypotf(hix, hiy);
-            float len_out = hypotf(hox, hoy);
-            if (len_in > 0.1f && len_out > 0.1f) {
-                float dot = (-hix * hox + -hiy * hoy) / (len_in * len_out);
-                if (dot > 0.95f) {
-                    path->nodes[i].type = NODE_SMOOTH;
                 } else {
                     path->nodes[i].type = NODE_CORNER;
                 }
-            } else {
-                path->nodes[i].type = NODE_CORNER;
+            }
+            path->nodes[0].type = NODE_CORNER;
+            path->nodes[cp_count - 1].type = NODE_CORNER;
+
+            free(cp_idx);
+        }
+
+        path_cache_update(path);
+
+        /* Step 3: Extract attribute spans directly mapped to arc-length */
+        if (path->cache.node_s && path->cache.node_count == path->node_count && pt_s) {
+            double total_pt_s = pt_s[pt_count - 1];
+            double total_bez_s = path->cache.total_length;
+            double scale_s = (total_pt_s > 1e-4 && total_bez_s > 1e-4) ? (total_bez_s / total_pt_s) : 1.0;
+
+            /* Tunnel runs from points */
+            uint32_t t_start = 0;
+            bool in_t = false;
+            for (uint32_t i = 0; i < pt_count; ++i) {
+                if (pt_tunnel[i] != 0 && !in_t) {
+                    in_t = true;
+                    t_start = i;
+                } else if (pt_tunnel[i] == 0 && in_t) {
+                    in_t = false;
+                    double s_start = pt_s[t_start] * scale_s;
+                    double s_end   = pt_s[i] * scale_s;
+                    bezier_path_add_span_from_s(path, s_start, s_end, true, 1, false, 0);
+                }
+            }
+            if (in_t) {
+                double s_start = pt_s[t_start] * scale_s;
+                double s_end   = total_bez_s;
+                bezier_path_add_span_from_s(path, s_start, s_end, true, 1, false, 0);
+            }
+
+            /* Priority runs from points */
+            uint32_t p_start = 0;
+            uint8_t cur_prio = 0;
+            bool in_p = false;
+            for (uint32_t i = 0; i < pt_count; ++i) {
+                uint8_t p = pt_priority[i];
+                if (p != 0 && (!in_p || p != cur_prio)) {
+                    if (in_p) {
+                        double s_start = pt_s[p_start] * scale_s;
+                        double s_end   = pt_s[i] * scale_s;
+                        bezier_path_add_span_from_s(path, s_start, s_end, false, 0, true, cur_prio);
+                    }
+                    in_p = true;
+                    p_start = i;
+                    cur_prio = p;
+                } else if (p == 0 && in_p) {
+                    in_p = false;
+                    double s_start = pt_s[p_start] * scale_s;
+                    double s_end   = pt_s[i] * scale_s;
+                    bezier_path_add_span_from_s(path, s_start, s_end, false, 0, true, cur_prio);
+                }
+            }
+            if (in_p) {
+                double s_start = pt_s[p_start] * scale_s;
+                double s_end   = total_bez_s;
+                bezier_path_add_span_from_s(path, s_start, s_end, false, 0, true, cur_prio);
             }
         }
-        path->nodes[0].type = NODE_CORNER;
-        path->nodes[cp_count - 1].type = NODE_CORNER;
 
-        free(cp_idx);
+        free(pt_x);
+        free(pt_y);
+        free(pt_tunnel);
+        free(pt_priority);
+        free(pt_s);
     } else {
-        /* Fallback when no discrete points are present: Catmull-Rom */
+        /* Fallback when no discrete trajectory points are present: Catmull-Rom from control points */
         for (uint32_t i = 0; i < cp_count; ++i) {
             BezierNode node;
             memset(&node, 0, sizeof(BezierNode));
@@ -1735,72 +1995,10 @@ bool bezier_path_import_dat_ex(BezierPath *path, const char *in_filepath, float 
             path->nodes[i + 1].hin_x = b2x - p2x;
             path->nodes[i + 1].hin_y = b2y - p2y;
         }
-        if (cp_idx) free(cp_idx);
-    }
 
-    path_cache_update(path);
+        path_cache_update(path);
 
-    /* Step 3: Extract attribute spans directly mapped to arc-length */
-    if (has_points && path->cache.node_s && path->cache.node_count == path->node_count && pt_s) {
-        double total_pt_s = pt_s[pt_count - 1];
-        double total_bez_s = path->cache.total_length;
-        double scale_s = (total_pt_s > 1e-4 && total_bez_s > 1e-4) ? (total_bez_s / total_pt_s) : 1.0;
-
-        /* Tunnel runs from points */
-        uint32_t t_start = 0;
-        bool in_t = false;
-        for (uint32_t i = 0; i < pt_count; ++i) {
-            if (pt_tunnel[i] != 0 && !in_t) {
-                in_t = true;
-                t_start = i;
-            } else if (pt_tunnel[i] == 0 && in_t) {
-                in_t = false;
-                double s_start = pt_s[t_start] * scale_s;
-                double s_end   = pt_s[i] * scale_s;
-                bezier_path_add_span_from_s(path, s_start, s_end, true, 1, false, 0);
-            }
-        }
-        if (in_t) {
-            double s_start = pt_s[t_start] * scale_s;
-            double s_end   = total_bez_s;
-            bezier_path_add_span_from_s(path, s_start, s_end, true, 1, false, 0);
-        }
-
-        /* Priority runs from points (pt_priority[i] != 0) */
-        uint32_t p_start = 0;
-        uint8_t cur_prio = 0;
-        bool in_p = false;
-        for (uint32_t i = 0; i < pt_count; ++i) {
-            uint8_t p = pt_priority[i];
-            if (p != 0 && (!in_p || p != cur_prio)) {
-                if (in_p) {
-                    double s_start = pt_s[p_start] * scale_s;
-                    double s_end   = pt_s[i] * scale_s;
-                    bezier_path_add_span_from_s(path, s_start, s_end, false, 0, true, cur_prio);
-                }
-                in_p = true;
-                p_start = i;
-                cur_prio = p;
-            } else if (p == 0 && in_p) {
-                in_p = false;
-                double s_start = pt_s[p_start] * scale_s;
-                double s_end   = pt_s[i] * scale_s;
-                bezier_path_add_span_from_s(path, s_start, s_end, false, 0, true, cur_prio);
-            }
-        }
-        if (in_p) {
-            double s_start = pt_s[p_start] * scale_s;
-            double s_end   = total_bez_s;
-            bezier_path_add_span_from_s(path, s_start, s_end, false, 0, true, cur_prio);
-        }
-
-        free(pt_x);
-        free(pt_y);
-        free(pt_tunnel);
-        free(pt_priority);
-        free(pt_s);
-    } else {
-        /* Fallback: extract attribute spans from control points flags */
+        /* Extract attribute spans from control points flags */
         uint32_t t_start = 0;
         bool in_t_run = false;
         for (uint32_t i = 0; i < cp_count; ++i) {
@@ -1820,7 +2018,6 @@ bool bezier_path_import_dat_ex(BezierPath *path, const char *in_filepath, float 
             bezier_path_add_span_from_s(path, s_start, s_end, true, 1, false, 0);
         }
 
-        /* Priority runs from control points (where raw_p != 0) */
         uint32_t p_start = 0;
         uint8_t cur_prio = 0;
         bool in_p_run = false;
@@ -1849,10 +2046,10 @@ bool bezier_path_import_dat_ex(BezierPath *path, const char *in_filepath, float 
         }
     }
 
-    free(raw_x);
-    free(raw_y);
-    free(raw_t);
-    free(raw_p);
+    if (raw_x) free(raw_x);
+    if (raw_y) free(raw_y);
+    if (raw_t) free(raw_t);
+    if (raw_p) free(raw_p);
 
     path_cache_invalidate(path);
     path_cache_update(path);

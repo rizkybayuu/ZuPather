@@ -5,6 +5,30 @@ All notable changes to the **ZuPather** level design suite will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] - 2026-10-19
+
+Targeted engine release introducing the adaptive Zuma engine `.dat` curve importer with automatic least-squares Bézier curve reconstruction, full compatibility with custom level editors and mod formats (including *Zuma Glitched Remake*), multi-track XML level parser robustness, and sub-pixel curve fidelity.
+
+### Added
+- **Adaptive Zuma Engine `.dat` Curve Importer (`src/bezier_path.c`)**:
+  - Re-engineered `bezier_path_import_dat_ex` based on decompiled `Zuma.exe` engine runtime logic (`CurveMgr::LoadCurve`), decoupling discrete waypoint ingestion from rigid PopCap editor control-point structures.
+  - Added support for `.dat` files authored with non-standard, modified, or custom tool headers (such as "DeathKnight Zuma Bessel Generator", "GScienceStudio", or custom mod signatures found in *Zuma Glitched Remake*), eliminating erroneous `DAT_ERR_INVALID_CP_COUNT` rejections.
+  - Implemented analytical least-squares cubic Bézier curve fitting (`fit_bezier_segment_points`, `extract_adaptive_control_points`) with recursive subdivision when standard PopCap control points are absent or custom, guaranteeing sub-pixel curve deviation ($< 1.0\text{ px}$) while yielding clean, intuitive, and fully editable Bézier anchors.
+  - Maintained 100% bitwise parity and control point integrity for official vanilla PopCap `.dat` curve files.
+- **Multi-Track Zuma Level Importer Robustness (`src/dialog_modals.c`)**:
+  - Enhanced Zuma level XML parser in `import_zuma_level_to_canvas` and `show_zuma_level_attributes_dialog` to support both `curve` and `curve1` attribute keys in `<Graphics>` tags.
+  - Fixed an issue where custom mod levels declaring track 1 as `curve1` (e.g. `betawings`, `final`, `longpit`) failed to load their first curve.
+
+### Fixed
+- **Attribute Span Half-Open Interval Boundary**:
+  - Corrected `attrs_at` boundary evaluation (`s < (b[k].s_d - 1e-5)`) to strictly conform to half-open interval $[s_c, s_d)$, preventing false attribute overlaps at segment transition boundaries.
+
+### Changed
+- **Version & Metadata Alignment**:
+  - Updated in-app splash screen version indicator badge to `v0.1.4`.
+  - Updated Windows PE resource metadata (`res/zupather.rc`) to File Version `0.1.4.0` and Product Version `0.1.4`.
+  - Updated CMake project configuration to `0.1.4`.
+
 ---
 
 ## [0.1.3] - 2026-10-17

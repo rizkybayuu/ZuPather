@@ -28,6 +28,8 @@ canvas/
 
 # Local Unit Tests, Verification Captures & Scratches (git-ignored)
 tests/
+wasm/
+web/
 *.bmp
 __pycache__/
 *.pyc

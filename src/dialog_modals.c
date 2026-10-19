@@ -7274,6 +7274,9 @@ static bool import_zuma_level_to_canvas(HWND hwnd_dlg, const char *level_id) {
     if (get_xml_attr_str(gfx_tag, "curve", c1, sizeof(c1)) && c1[0]) {
         strncpy(curve_names[0], c1, 63);
         curve_count = 1;
+    } else if (get_xml_attr_str(gfx_tag, "curve1", c1, sizeof(c1)) && c1[0]) {
+        strncpy(curve_names[0], c1, 63);
+        curve_count = 1;
     }
     for (int k = 2; k <= 4; ++k) {
         char attr[16];
@@ -7638,6 +7641,9 @@ static void show_zuma_level_attributes_dialog(HWND parent_hwnd, const char *leve
 
     char c1[64] = {0};
     if (get_xml_attr_str(gfx_tag, "curve", c1, sizeof(c1)) && c1[0]) {
+        strncpy(curve_names[0], c1, 63);
+        curve_count = 1;
+    } else if (get_xml_attr_str(gfx_tag, "curve1", c1, sizeof(c1)) && c1[0]) {
         strncpy(curve_names[0], c1, 63);
         curve_count = 1;
     }
