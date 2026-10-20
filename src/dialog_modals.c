@@ -5386,27 +5386,27 @@ void show_themed_notice_dialog(
 }
 
 void show_video_load_warning(HWND hwnd_parent) {
-    const char *title = "Video Format Notice - ZuPather";
-    const char *header = "Video Media File Loaded";
+    const char *title = "Video Media Notice - ZuPather";
+    const char *header = "Video Animation File Loaded";
     const char *body =
-        "1. Audio in video files will NOT be loaded, used, or saved (only visual video frames are processed).\n\n"
-        "2. Vanilla Zuma Deluxe naturally does NOT support video files. Full animation and video playback are exclusively supported in the \"Zuma Compleluxe\" mod or Zuma.exe patched with \"ZuCompleluxe\".\n\n"
-        "3. ZuCompleluxe is hosted on GitHub and will be released to the public alongside the official release of the \"Zuma Compleluxe\" mod, which is currently in active development and modding.\n\n"
-        "4. When saving the canvas project, video media will be exported as Animated WebP.\n\n"
+        "1. Audio in video files is NOT loaded or saved (only visual video frames are processed).\n\n"
+        "2. Vanilla Zuma Deluxe does NOT support video or WebP files. In-game animation playback is exclusively supported in Zuma.exe patched with \"ZuCompleluxe\" (modules\\zumawebp.dll) or in the \"Zuma Compleluxe\" mod.\n\n"
+        "3. ZuCompleluxe is hosted on GitHub and will be released to the public alongside the official release of the \"Zuma Compleluxe\" mod, which is currently in active development.\n\n"
+        "4. When saving the canvas project, video media will be exported as Animated WebP (.webp).\n\n"
         "5. The video will play in a continuous loop on the canvas.";
 
     show_themed_notice_dialog_ex(hwnd_parent, title, header, body, 580, 410, false);
 }
 
 bool show_webp_patch_warning_ex(HWND hwnd_parent, bool allow_cancel) {
-    const char *title = "WebP Compatibility - Zuma Compleluxe";
-    const char *header = "Zuma Compleluxe WebP Compatibility Note";
+    const char *title = "WebP Compatibility - ZuCompleluxe";
+    const char *header = "Animated WebP Compatibility Notice";
     const char *body =
-        "WebP format (specifically Animated WebP) is exclusively supported in the \"Zuma Compleluxe\" mod or Zuma.exe patched with \"ZuCompleluxe\", available on GitHub.\n\n"
-        "The public release of ZuCompleluxe will take place alongside the official release of the \"Zuma Compleluxe\" mod, which is currently in active development and modding.\n\n"
-        "Original vanilla Zuma Deluxe does not natively support WebP images. Please ensure your Zuma Deluxe game executable is patched with ZuCompleluxe to use WebP assets in-game.";
+        "WebP format (specifically Animated WebP) is supported in Zuma.exe patched with the \"ZuCompleluxe\" framework (modules\\zumawebp.dll) and in the upcoming \"Zuma Compleluxe\" mod.\n\n"
+        "Original vanilla Zuma Deluxe only supports standard formats (.jpg, .png, .gif) and does not natively read WebP images.\n\n"
+        "To run WebP assets in-game, please ensure your Zuma Deluxe game executable is patched with ZuCompleluxe. ZuCompleluxe will be released on GitHub alongside the official launch of the Zuma Compleluxe mod.";
 
-    return show_themed_notice_dialog_ex(hwnd_parent, title, header, body, 560, 340, allow_cancel);
+    return show_themed_notice_dialog_ex(hwnd_parent, title, header, body, 560, 350, allow_cancel);
 }
 
 void show_webp_patch_warning(HWND hwnd_parent) {
@@ -5420,7 +5420,7 @@ bool show_animation_flatten_warning(HWND hwnd_parent, const char *asset_names, b
         "The following media assets contain multiple animation frames or video streams, but the selected export format is a static image (*.png / *.jpg / *.gif):\n\n"
         "%s\n"
         "Animation will NOT play in-game, and only the first still frame will be exported as the static replacement image.\n\n"
-        "If you wish to preserve in-game animation, select the *.webp format and use Zuma.exe patched with ZuCompleluxe (available on GitHub, releasing alongside the Zuma Compleluxe mod).",
+        "If you wish to preserve in-game animation, select the *.webp format and use Zuma.exe patched with ZuCompleluxe (modules\\zumawebp.dll) or the Zuma Compleluxe mod.",
         (asset_names && asset_names[0]) ? asset_names : "- Background Image\n"
     );
 
@@ -5434,15 +5434,16 @@ bool show_extra_paths_warning_ex(HWND hwnd_parent, int path_count, bool allow_ca
     snprintf(
         body, sizeof(body),
         "This level contains %d curve paths (tracks).\n\n"
-        "1. Vanilla Zuma Deluxe natively supports a maximum of 3 curve paths per level. Having 4 to 10 paths (extra paths) is exclusively supported in the \"Zuma Compleluxe\" mod or Zuma.exe patched with \"ZuCompleluxe\".\n\n"
-        "2. Zuma Deluxe and Zuma Compleluxe support a maximum limit of 10 curve paths per level.\n\n"
-        "3. ZuCompleluxe is hosted on GitHub and will be released to the public alongside the official release of the \"Zuma Compleluxe\" mod, which is currently in active development and modding.\n\n"
-        "4. Original vanilla Zuma Deluxe will not load 4 or more curve tracks. Please ensure your Zuma Deluxe game executable is patched with ZuCompleluxe to play levels with extra paths in-game.",
+        "1. Vanilla Zuma Deluxe natively only supports up to 3 curve paths per level (curve, curve2, curve3). Any 4th curve or beyond is completely ignored by vanilla Zuma.exe.\n\n"
+        "2. Having 4 to 10 curve paths (extra tracks) is supported when using Zuma.exe patched with the \"ZuCompleluxe\" framework (modules\\zumaextrapath.dll) or playing on the upcoming \"Zuma Compleluxe\" mod.\n\n"
+        "3. ZuCompleluxe is hosted on GitHub and will be released to the public alongside the official release of the \"Zuma Compleluxe\" mod, which is currently in active development.\n\n"
+        "Please ensure your target game is patched with ZuCompleluxe to play all %d curve tracks in-game.",
+        path_count,
         path_count
     );
 
-    const char *title = "Extra Paths Compatibility - Zuma Compleluxe";
-    const char *header = "Zuma Compleluxe Extra Paths Note (Max 10 Paths)";
+    const char *title = "Extra Paths Compatibility - ZuCompleluxe";
+    const char *header = "Multi-Track Level Compatibility (4 to 10 Paths)";
     return show_themed_notice_dialog_ex(hwnd_parent, title, header, body, 580, 390, allow_cancel);
 }
 
@@ -5457,8 +5458,9 @@ bool show_path_limit_warning_ex(HWND hwnd_parent, int total_count, bool is_impor
         snprintf(
             body, sizeof(body),
             "The imported file contains %d curve paths (tracks).\n\n"
-            "1. Zuma Deluxe and Zuma Compleluxe exclusively support a maximum of 10 curve paths per level.\n\n"
-            "2. Only the first 10 paths will be preserved. Paths #11 onwards (%d excess path%s) will be automatically removed.\n\n"
+            "1. The ZuCompleluxe framework (modules\\zumaextrapath.dll) and Zuma Compleluxe support a maximum limit of 10 curve tracks per level.\n\n"
+            "2. Vanilla Zuma Deluxe natively only reads up to 3 paths, while ZuCompleluxe expands capacity up to 10 paths.\n\n"
+            "3. Only the first 10 paths will be preserved. Paths #11 onwards (%d excess path%s) will be automatically removed.\n\n"
             "Click OK to proceed with the first 10 paths.",
             total_count,
             excess,
@@ -5468,13 +5470,14 @@ bool show_path_limit_warning_ex(HWND hwnd_parent, int total_count, bool is_impor
         snprintf(
             body, sizeof(body),
             "You have reached the maximum limit of 10 curve paths (tracks).\n\n"
-            "1. Zuma Deluxe and Zuma Compleluxe exclusively support a maximum of 10 curve paths per level.\n\n"
-            "2. Adding an 11th path or beyond is not permitted and has been blocked.\n\n"
+            "1. The ZuCompleluxe framework (modules\\zumaextrapath.dll) and Zuma Compleluxe support a maximum of 10 curve tracks per level (curve, curve2..curve10).\n\n"
+            "2. Vanilla Zuma Deluxe natively only supports up to 3 paths, ignoring any 4th track onwards.\n\n"
+            "3. Adding an 11th path or beyond exceeds the engine allocation limit and has been blocked.\n\n"
             "To create or split another path, please delete one of your existing paths first."
         );
     }
 
-    const char *title = "Curve Path Limit - Zuma Compleluxe";
+    const char *title = "Curve Path Limit - ZuCompleluxe";
     const char *header = "Maximum 10 Curve Paths Limit";
     return show_themed_notice_dialog_ex(hwnd_parent, title, header, body, 580, 360, false);
 }
@@ -5496,7 +5499,7 @@ void show_import_path_limit_warning(HWND hwnd_parent, int canvas_count, int impo
                 "- Imported SVG tracks: %d paths\n"
                 "- Total resulting tracks: %d paths (exceeds limit by %d)\n\n"
                 "Path Handling & Resolution:\n"
-                "Zuma Deluxe and Zuma Compleluxe exclusively support up to 10 curve tracks per level. Only the first 10 paths from the imported SVG (tracks #1 to #10) will be kept. The remaining %d excess path%s (tracks #11 to #%d) will be automatically discarded.\n\n"
+                "The ZuCompleluxe framework and Zuma Compleluxe support up to 10 curve tracks per level (vanilla Zuma Deluxe natively only reads up to 3). Only the first 10 paths from the imported SVG (tracks #1 to #10) will be kept. The remaining %d excess path%s (tracks #11 to #%d) will be automatically discarded.\n\n"
                 "Click OK to proceed with the preserved 10 tracks.",
                 imported_count,
                 canvas_count, canvas_count > 1 ? "s" : "",
@@ -5512,7 +5515,7 @@ void show_import_path_limit_warning(HWND hwnd_parent, int canvas_count, int impo
                 "- Imported SVG tracks: %d paths\n"
                 "- Total resulting tracks: %d paths (exceeds limit by %d)\n\n"
                 "Path Handling & Resolution:\n"
-                "Zuma Deluxe and Zuma Compleluxe exclusively support up to 10 curve tracks per level. Only the first 10 paths from the imported SVG (tracks #1 to #10) will be kept. The remaining %d excess path%s (tracks #11 to #%d) will be automatically discarded.\n\n"
+                "The ZuCompleluxe framework and Zuma Compleluxe support up to 10 curve tracks per level (vanilla Zuma Deluxe natively only reads up to 3). Only the first 10 paths from the imported SVG (tracks #1 to #10) will be kept. The remaining %d excess path%s (tracks #11 to #%d) will be automatically discarded.\n\n"
                 "Click OK to proceed with the preserved 10 tracks.",
                 imported_count,
                 imported_count,
@@ -5565,7 +5568,7 @@ void show_import_path_limit_warning(HWND hwnd_parent, int canvas_count, int impo
         }
     }
 
-    const char *title = "Curve Path Limit - Zuma Compleluxe";
+    const char *title = "Curve Path Limit - ZuCompleluxe";
     const char *header = "Maximum 10 Curve Paths Limit";
     show_themed_notice_dialog_ex(hwnd_parent, title, header, body, 620, 440, false);
 }

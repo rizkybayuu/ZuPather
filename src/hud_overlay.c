@@ -2351,7 +2351,7 @@ static const char *g_preview_guide_lines[] = {
     " - Set display title (dispname) and unique level ID in the Canvas Info HUD.",
     "",
     "2. Canvas Mode (Ctrl+M)",
-    " - Configure canvas resolution (640x480 Classic, 800x600 Compleluxe, custom).",
+    " - Configure canvas resolution (640x480 Classic, 800x600 Zuma Compleluxe, custom).",
     " - Position and scale artwork: Original, Fit, Fill, Stretch, or 9-point Anchor.",
     " - Drag corner and edge transformation handles for interactive canvas resizing.",
     "",

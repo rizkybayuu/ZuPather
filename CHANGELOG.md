@@ -5,6 +5,26 @@ All notable changes to the **ZuPather** level design suite will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4.1] - 2026-10-20
+
+Targeted maintenance hotfix aligning compatibility notices and dialog modals with the **ZuCompleluxe** engine patcher framework (`modules\zumaextrapath.dll`, `modules\zumawebp.dll`) and the upcoming **Zuma Compleluxe** total conversion mod, accurately reflecting vanilla Zuma Deluxe curve limits.
+
+### Fixed
+- **ZuCompleluxe Framework & Compatibility Dialog Alignment**:
+  - Clarified the distinction between the **ZuCompleluxe** engine patcher framework (`modules\zumaextrapath.dll`, `modules\zumawebp.dll`) and the upcoming **Zuma Compleluxe** total conversion mod across all in-app dialog modals.
+  - Corrected the multi-track level warning dialog (`show_extra_paths_warning_ex`): accurately noted that vanilla `Zuma.exe` natively only reads up to 3 curve paths (`curve`, `curve2`, `curve3`) and completely ignores any 4th curve or beyond, rather than crashing or failing to load.
+  - Clarified that levels utilizing 4 to 10 curve tracks require Zuma Deluxe patched with the ZuCompleluxe framework (`modules\zumaextrapath.dll`) or running under the Zuma Compleluxe mod.
+  - Updated the 10-path limit warning dialogs (`show_path_limit_warning_ex` and `show_import_path_limit_warning`) to reflect that the 10-path allocation ceiling is defined by the ZuCompleluxe engine framework.
+  - Clarified the WebP and Video animation notice dialogs (`show_webp_patch_warning_ex` and `show_video_load_warning`) to specify that Animated WebP playback is powered by `modules\zumawebp.dll` under ZuCompleluxe / Zuma Compleluxe.
+
+### Changed
+- **Version & Metadata Alignment**:
+  - Updated in-app splash screen version indicator badge to `v0.1.4.1`.
+  - Updated Windows PE resource metadata (`res/zupather.rc`) to File Version `0.1.4.1` and Product Version `0.1.4.1`.
+  - Updated CMake project configuration to `0.1.4.1`.
+
+---
+
 ## [0.1.4] - 2026-10-19
 
 Targeted engine release introducing the adaptive Zuma engine `.dat` curve importer with automatic least-squares Bézier curve reconstruction, full compatibility with custom level editors and mod formats (including *Zuma Glitched Remake*), multi-track XML level parser robustness, and sub-pixel curve fidelity.

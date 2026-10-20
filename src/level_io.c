@@ -115,7 +115,7 @@ void handle_import_path(HWND hwnd) {
                     hwnd,
                     "Path Limit Exceeded - ZuPather",
                     "Track Limit Reached (Max 10)",
-                    "Cannot append additional paths: the project has reached the Zuma Compleluxe limit of 10 curve paths.",
+                    "Cannot append additional paths: the project has reached the ZuCompleluxe limit of 10 curve paths.",
                     520, 240
                 );
                 return;
@@ -303,7 +303,7 @@ void handle_import_path(HWND hwnd) {
             snprintf(msg, sizeof(msg),
                 "Import complete.\n\n"
                 "Preserved %d existing canvas track%s and added first %d track%s from SVG (10 tracks total).\n"
-                "(%d excess track%s from SVG discarded due to Zuma Compleluxe limit).",
+                "(%d excess track%s from SVG discarded due to ZuCompleluxe limit).",
                 old_canvas_count, old_canvas_count > 1 ? "s" : "",
                 to_add, to_add > 1 ? "s" : "",
                 imported_count - to_add, (imported_count - to_add) > 1 ? "s" : ""
@@ -312,7 +312,7 @@ void handle_import_path(HWND hwnd) {
             snprintf(msg, sizeof(msg),
                 "Import complete.\n\n"
                 "Imported first 10 tracks from SVG.\n"
-                "(%d excess track%s from SVG discarded due to Zuma Compleluxe limit).",
+                "(%d excess track%s from SVG discarded due to ZuCompleluxe limit).",
                 imported_count - 10, (imported_count - 10) > 1 ? "s" : ""
             );
         }
@@ -2159,7 +2159,7 @@ bool execute_save_canvas_with_plan(
         bg_resized = resize;
 
         if (g_canvas_img.is_video) {
-            update_save_progress("Encoding video frames to Animated WebP (Zuma Compleluxe)...", 15);
+            update_save_progress("Encoding video frames to Animated WebP (ZuCompleluxe)...", 15);
         } else {
             update_save_progress("Exporting background image...", 15);
         }
