@@ -59,6 +59,7 @@ const ThemeColors g_theme_dark = {
 };
 
 /* Active Application State */
+AppThemePreference g_theme_preference = THEME_PREF_SYSTEM;
 AppTheme g_current_theme = THEME_LIGHT;
 
 /* Canvas State (Initial launch has NO canvas) */
@@ -821,6 +822,17 @@ void snapshot_object_selection(void) {
     for (int i = 0; i < g_cutout_count; ++i) g_snap_cutout_selected[i] = g_cutouts[i].selected;
     for (int i = 0; i < g_sprite_count; ++i) g_snap_sprite_selected[i] = g_sprites[i].selected;
     for (int i = 0; i < g_bg_alpha_count; ++i) g_snap_bgalpha_selected[i] = g_bg_alphas[i].selected;
+}
+
+bool is_system_dark_mode(void) {
+    HKEY hKey;
+    DWORD value = 1;
+    DWORD size = sizeof(value);
+    if (RegOpenKeyExA(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+        RegQueryValueExA(hKey, "AppsUseLightTheme", NULL, NULL, (LPBYTE)&value, &size);
+        RegCloseKey(hKey);
+    }
+    return (value == 0);
 }
 
 const ThemeColors *get_theme(void) {
@@ -3015,7 +3027,10 @@ void save_zuma_config(void) {
 
     WritePrivateProfileStringA("Zuma", "LevelsDir", g_zuma_levels_dir, ini_path);
     WritePrivateProfileStringA("Zuma", "RootDir", g_zuma_root_dir, ini_path);
-    WritePrivateProfileStringA("Preferences", "Theme", (g_current_theme == THEME_DARK) ? "dark" : "light", ini_path);
+    const char *pref_str = "system";
+    if (g_theme_preference == THEME_PREF_DARK) pref_str = "dark";
+    else if (g_theme_preference == THEME_PREF_LIGHT) pref_str = "light";
+    WritePrivateProfileStringA("Preferences", "Theme", pref_str, ini_path);
     WritePrivateProfileStringA("Preferences", "Grid", g_show_grid ? "1" : "0", ini_path);
     char num_buf[32];
     WritePrivateProfileStringA("Preferences", "PerformanceDirectBlit", g_perf_direct_blit ? "1" : "0", ini_path);

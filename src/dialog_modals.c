@@ -11307,7 +11307,7 @@ typedef struct {
     HWND hwnd_chk_hud_cache;
     HWND hwnd_chk_smooth_scroll;
     HWND hwnd_edit_undo_limit;
-    HWND hwnd_chk_dark_theme;
+    HWND hwnd_combo_theme;
     HWND hwnd_chk_show_grid;
     HWND hwnd_btn_change_zuma;
     HWND hwnd_btn_save;
@@ -11318,7 +11318,7 @@ typedef struct {
     bool chk_hud_cache;
     bool chk_smooth_scroll;
     int  undo_limit_val;
-    bool is_dark_theme;
+    AppThemePreference theme_pref_val;
     bool show_grid;
     bool is_done;
 } SettingsModalData;
@@ -11446,6 +11446,78 @@ static LRESULT CALLBACK SettingsChkSubclassProc(HWND hwnd, UINT msg, WPARAM wPar
     return CallWindowProcA(s_orig_settings_chk_proc ? s_orig_settings_chk_proc : DefWindowProcA, hwnd, msg, wParam, lParam);
 }
 
+static WNDPROC s_orig_settings_combo_proc = NULL;
+static LRESULT CALLBACK SettingsThemedComboSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    WNDPROC orig_proc = s_orig_settings_combo_proc ? s_orig_settings_combo_proc : DefWindowProcA;
+    if (msg == WM_PAINT) {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hwnd, &ps);
+        RECT rc;
+        GetClientRect(hwnd, &rc);
+        bool is_dark = (g_current_theme == THEME_DARK);
+
+        COLORREF bg_col = is_dark ? RGB(36, 40, 48) : RGB(255, 255, 255);
+        COLORREF border_col = is_dark ? RGB(70, 78, 92) : RGB(175, 182, 194);
+        COLORREF text_col = is_dark ? RGB(222, 226, 235) : RGB(32, 36, 44);
+        COLORREF arrow_col = is_dark ? RGB(160, 168, 182) : RGB(85, 92, 105);
+
+        HBRUSH bg_br = CreateSolidBrush(bg_col);
+        FillRect(hdc, &rc, bg_br);
+        DeleteObject(bg_br);
+
+        HPEN pen = CreatePen(PS_SOLID, 1, border_col);
+        HPEN old_pen = (HPEN)SelectObject(hdc, pen);
+        SelectObject(hdc, GetStockObject(NULL_BRUSH));
+        Rectangle(hdc, rc.left, rc.top, rc.right, rc.bottom);
+        SelectObject(hdc, old_pen);
+        DeleteObject(pen);
+
+        int btn_w = 20;
+        int arrow_cx = rc.right - btn_w / 2 - 2;
+        int arrow_cy = (rc.bottom - rc.top) / 2;
+
+        HPEN sep_pen = CreatePen(PS_SOLID, 1, border_col);
+        old_pen = (HPEN)SelectObject(hdc, sep_pen);
+        MoveToEx(hdc, rc.right - btn_w, rc.top + 3, NULL);
+        LineTo(hdc, rc.right - btn_w, rc.bottom - 3);
+        SelectObject(hdc, old_pen);
+        DeleteObject(sep_pen);
+
+        POINT pts[3];
+        pts[0].x = arrow_cx - 4; pts[0].y = arrow_cy - 2;
+        pts[1].x = arrow_cx + 4; pts[1].y = arrow_cy - 2;
+        pts[2].x = arrow_cx;     pts[2].y = arrow_cy + 2;
+
+        HBRUSH ar_br = CreateSolidBrush(arrow_col);
+        HPEN ar_pen = CreatePen(PS_SOLID, 1, arrow_col);
+        old_pen = (HPEN)SelectObject(hdc, ar_pen);
+        HBRUSH old_br = (HBRUSH)SelectObject(hdc, ar_br);
+        Polygon(hdc, pts, 3);
+        SelectObject(hdc, old_br);
+        SelectObject(hdc, old_pen);
+        DeleteObject(ar_br);
+        DeleteObject(ar_pen);
+
+        int sel = (int)CallWindowProcA(orig_proc, hwnd, CB_GETCURSEL, 0, 0);
+        char text[64] = {0};
+        if (sel >= 0) {
+            CallWindowProcA(orig_proc, hwnd, CB_GETLBTEXT, sel, (LPARAM)text);
+        }
+
+        RECT rc_text = { rc.left + 8, rc.top, rc.right - btn_w - 4, rc.bottom };
+        SetBkMode(hdc, TRANSPARENT);
+        SetTextColor(hdc, text_col);
+        HFONT font = g_font_primary_regular ? g_font_primary_regular : (HFONT)GetStockObject(DEFAULT_GUI_FONT);
+        HFONT old_font = (HFONT)SelectObject(hdc, font);
+        DrawTextA(hdc, text, -1, &rc_text, DT_SINGLELINE | DT_VCENTER | DT_LEFT | DT_NOPREFIX);
+        SelectObject(hdc, old_font);
+
+        EndPaint(hwnd, &ps);
+        return 0;
+    }
+    return CallWindowProcA(orig_proc, hwnd, msg, wParam, lParam);
+}
+
 static LRESULT CALLBACK SettingsModalWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     const ThemeColors *th = get_theme();
     SettingsModalData *data = (SettingsModalData*)GetWindowLongPtrA(hwnd, GWLP_USERDATA);
@@ -11488,33 +11560,55 @@ static LRESULT CALLBACK SettingsModalWndProc(HWND hwnd, UINT msg, WPARAM wParam,
             snprintf(cur_limit_str, sizeof(cur_limit_str), "%d", data->undo_limit_val);
             SetWindowTextA(data->hwnd_edit_undo_limit, cur_limit_str);
 
-            /* Section 3: Workspace & Environment (inside Card 3: y=284, h=104) */
-            MAKE_CHK(ID_SETTINGS_RADIO_THEME_DARK, "Dark Mode Color Theme (High-Contrast Slate)",
-                     34, 311, 472, 17, &data->is_dark_theme);
+            /* Section 3: Workspace & Environment (inside Card 3: y=284, h=114) */
+            data->hwnd_combo_theme = CreateWindowA(
+                "COMBOBOX", "",
+                WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | CBS_OWNERDRAWFIXED | CBS_HASSTRINGS | WS_VSCROLL | WS_TABSTOP,
+                126, 308, 180, 120, hwnd, (HMENU)ID_SETTINGS_COMBO_THEME, hinst, NULL
+            );
+            SendMessage(data->hwnd_combo_theme, WM_SETFONT, (WPARAM)g_font_primary_regular, TRUE);
+            s_orig_settings_combo_proc = (WNDPROC)SetWindowLongPtrA(data->hwnd_combo_theme, GWLP_WNDPROC, (LONG_PTR)SettingsThemedComboSubclassProc);
+
+            SendMessageA(data->hwnd_combo_theme, CB_ADDSTRING, 0, (LPARAM)"Light");
+            SendMessageA(data->hwnd_combo_theme, CB_ADDSTRING, 0, (LPARAM)"Dark");
+            SendMessageA(data->hwnd_combo_theme, CB_ADDSTRING, 0, (LPARAM)"Use System Default");
+            int sel_th = (int)data->theme_pref_val;
+            if (sel_th < 0 || sel_th > 2) sel_th = 2;
+            SendMessage(data->hwnd_combo_theme, CB_SETCURSEL, sel_th, 0);
+
             MAKE_CHK(ID_SETTINGS_CHK_SHOW_GRID, "Show Canvas Coordinate Grid by Default",
-                     34, 332, 472, 17, &data->show_grid);
+                     34, 338, 472, 17, &data->show_grid);
 
             data->hwnd_btn_change_zuma = CreateWindowA(
                 "BUTTON", "Change...", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW | WS_TABSTOP,
-                414, 354, 90, 24, hwnd, (HMENU)ID_SETTINGS_BTN_CHANGE_ZUMA, hinst, NULL
+                414, 360, 90, 25, hwnd, (HMENU)ID_SETTINGS_BTN_CHANGE_ZUMA, hinst, NULL
             );
 
             /* Bottom Action Buttons (tightly placed) */
             data->hwnd_btn_reset = CreateWindowA(
                 "BUTTON", "Reset Defaults", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW | WS_TABSTOP,
-                20, 398, 105, 28, hwnd, (HMENU)ID_SETTINGS_BTN_RESET, hinst, NULL
+                20, 408, 105, 28, hwnd, (HMENU)ID_SETTINGS_BTN_RESET, hinst, NULL
             );
             data->hwnd_btn_cancel = CreateWindowA(
                 "BUTTON", "Cancel", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW | WS_TABSTOP,
-                322, 398, 80, 28, hwnd, (HMENU)ID_SETTINGS_BTN_CANCEL, hinst, NULL
+                322, 408, 80, 28, hwnd, (HMENU)ID_SETTINGS_BTN_CANCEL, hinst, NULL
             );
             data->hwnd_btn_save = CreateWindowA(
                 "BUTTON", "Save & Apply", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW | WS_TABSTOP,
-                410, 398, 110, 28, hwnd, (HMENU)ID_SETTINGS_BTN_SAVE, hinst, NULL
+                410, 408, 110, 28, hwnd, (HMENU)ID_SETTINGS_BTN_SAVE, hinst, NULL
             );
 
             #undef MAKE_CHK
             return 0;
+        }
+
+        case WM_MEASUREITEM: {
+            LPMEASUREITEMSTRUCT mis = (LPMEASUREITEMSTRUCT)lParam;
+            if (mis->CtlType == ODT_COMBOBOX && mis->CtlID == ID_SETTINGS_COMBO_THEME) {
+                mis->itemHeight = 22;
+                return TRUE;
+            }
+            break;
         }
 
         case WM_CTLCOLOREDIT: {
@@ -11589,11 +11683,14 @@ static LRESULT CALLBACK SettingsModalWndProc(HWND hwnd, UINT msg, WPARAM wParam,
             SetTextColor(hdc, th->text_dim);
             DrawTextA(hdc, "Maximum undo/redo states retained in memory (zero disk cache).", -1, &rc_sub_hist, DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_NOPREFIX);
 
-            /* 5. Card 3: WORKSPACE & ENVIRONMENT (y: 284 to 388 -> h = 104) */
-            draw_settings_card(hdc, 20, 284, rc.right - 40, 104, "WORKSPACE & ENVIRONMENT", th, is_dark);
-            RECT rc_lbl_zuma = { 34, 354, 124, 378 };
+            /* 5. Card 3: WORKSPACE & ENVIRONMENT (y: 284 to 398 -> h = 114) */
+            draw_settings_card(hdc, 20, 284, rc.right - 40, 114, "WORKSPACE & ENVIRONMENT", th, is_dark);
+            RECT rc_lbl_theme = { 34, 308, 122, 332 };
             SetTextColor(hdc, th->text_primary);
             SelectObject(hdc, g_font_primary_regular);
+            DrawTextA(hdc, "Color Theme:", -1, &rc_lbl_theme, DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_NOPREFIX);
+
+            RECT rc_lbl_zuma = { 34, 362, 122, 386 };
             DrawTextA(hdc, "Zuma Folder:", -1, &rc_lbl_zuma, DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_NOPREFIX);
 
             char zuma_disp[MAX_PATH];
@@ -11604,7 +11701,7 @@ static LRESULT CALLBACK SettingsModalWndProc(HWND hwnd, UINT msg, WPARAM wParam,
             }
             SetTextColor(hdc, (g_has_zuma_dir && g_zuma_levels_dir[0]) ? th->text_accent_green : th->text_secondary);
             SelectObject(hdc, g_font_mono_regular);
-            RECT rc_txt_zuma = { 124, 354, 406, 378 };
+            RECT rc_txt_zuma = { 124, 362, 406, 386 };
             DrawTextA(hdc, zuma_disp, -1, &rc_txt_zuma, DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_PATH_ELLIPSIS);
 
             /* Notice: NO horizontal line above the bottom buttons! */
@@ -11615,6 +11712,36 @@ static LRESULT CALLBACK SettingsModalWndProc(HWND hwnd, UINT msg, WPARAM wParam,
 
         case WM_DRAWITEM: {
             LPDRAWITEMSTRUCT dis = (LPDRAWITEMSTRUCT)lParam;
+            if (dis->CtlType == ODT_COMBOBOX && dis->CtlID == ID_SETTINGS_COMBO_THEME) {
+                if (dis->itemID == (UINT)-1) return TRUE;
+                bool is_dark = (g_current_theme == THEME_DARK);
+                bool is_sel = (dis->itemState & ODS_SELECTED) != 0;
+
+                COLORREF bg_col;
+                if (is_sel) {
+                    bg_col = is_dark ? RGB(45, 60, 85) : RGB(215, 230, 252);
+                } else {
+                    bg_col = is_dark ? RGB(32, 36, 44) : RGB(255, 255, 255);
+                }
+                HBRUSH br = CreateSolidBrush(bg_col);
+                FillRect(dis->hDC, &dis->rcItem, br);
+                DeleteObject(br);
+
+                char item_text[64] = {0};
+                SendMessageA(dis->hwndItem, CB_GETLBTEXT, dis->itemID, (LPARAM)item_text);
+
+                COLORREF text_col = is_dark ? RGB(225, 230, 240) : RGB(30, 35, 45);
+                SetBkMode(dis->hDC, TRANSPARENT);
+                SetTextColor(dis->hDC, text_col);
+                HFONT old_f = (HFONT)SelectObject(dis->hDC, g_font_primary_regular ? g_font_primary_regular : (HFONT)GetStockObject(DEFAULT_GUI_FONT));
+
+                RECT rc_t = dis->rcItem;
+                rc_t.left += 8;
+                DrawTextA(dis->hDC, item_text, -1, &rc_t, DT_SINGLELINE | DT_VCENTER | DT_LEFT | DT_NOPREFIX);
+                SelectObject(dis->hDC, old_f);
+                return TRUE;
+            }
+
             if (dis->CtlType == ODT_BUTTON) {
                 bool is_pressed = (dis->itemState & ODS_SELECTED) != 0;
                 bool is_save = (dis->CtlID == ID_SETTINGS_BTN_SAVE);
@@ -11672,8 +11799,12 @@ static LRESULT CALLBACK SettingsModalWndProc(HWND hwnd, UINT msg, WPARAM wParam,
                     data->chk_direct_blit = true;
                     data->chk_hud_cache = true;
                     data->chk_smooth_scroll = true;
-                    data->is_dark_theme = true;
                     data->show_grid = true;
+                    data->theme_pref_val = THEME_PREF_SYSTEM;
+                    if (data->hwnd_combo_theme) {
+                        SendMessage(data->hwnd_combo_theme, CB_SETCURSEL, (WPARAM)THEME_PREF_SYSTEM, 0);
+                        InvalidateRect(data->hwnd_combo_theme, NULL, TRUE);
+                    }
                     if (data->hwnd_edit_undo_limit) SetWindowTextA(data->hwnd_edit_undo_limit, "64");
                     InvalidateRect(hwnd, NULL, TRUE);
                 }
@@ -11695,12 +11826,18 @@ static LRESULT CALLBACK SettingsModalWndProc(HWND hwnd, UINT msg, WPARAM wParam,
                     g_perf_smooth_scroll = data->chk_smooth_scroll;
                     g_show_grid = data->show_grid;
 
+                    int sel_th = (int)SendMessage(data->hwnd_combo_theme, CB_GETCURSEL, 0, 0);
+                    if (sel_th < 0 || sel_th > 2) sel_th = (int)THEME_PREF_SYSTEM;
+                    AppThemePreference new_pref = (AppThemePreference)sel_th;
+
                     HWND parent = GetParent(hwnd);
                     if (parent && IsWindow(parent)) {
-                        AppTheme new_th = data->is_dark_theme ? THEME_DARK : THEME_LIGHT;
-                        if (g_current_theme != new_th) {
-                            apply_theme(parent, new_th);
-                        }
+                        apply_theme_preference(parent, new_pref);
+                    } else {
+                        g_theme_preference = new_pref;
+                        g_current_theme = (new_pref == THEME_PREF_SYSTEM)
+                            ? (is_system_dark_mode() ? THEME_DARK : THEME_LIGHT)
+                            : (new_pref == THEME_PREF_DARK ? THEME_DARK : THEME_LIGHT);
                     }
 
                     undo_set_history_limit(lim);
@@ -11744,7 +11881,7 @@ void show_settings_dialog(HWND parent_hwnd) {
         s_settings_class_registered = true;
     }
 
-    RECT rc_dlg = { 0, 0, 540, 436 };
+    RECT rc_dlg = { 0, 0, 540, 446 };
     AdjustWindowRectEx(&rc_dlg, WS_POPUP | WS_CAPTION | WS_SYSMENU, FALSE, WS_EX_DLGMODALFRAME);
     int dlg_w = rc_dlg.right - rc_dlg.left;
     int dlg_h = rc_dlg.bottom - rc_dlg.top;
@@ -11765,7 +11902,7 @@ void show_settings_dialog(HWND parent_hwnd) {
     data.chk_hud_cache = g_perf_hud_cache;
     data.chk_smooth_scroll = g_perf_smooth_scroll;
     data.undo_limit_val = g_undo_limit;
-    data.is_dark_theme = (g_current_theme == THEME_DARK);
+    data.theme_pref_val = g_theme_preference;
     data.show_grid = g_show_grid;
     data.is_done = false;
 

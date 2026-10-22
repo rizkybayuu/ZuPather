@@ -1203,14 +1203,23 @@ static void create_toolbar_buttons(HWND hwnd) {
     }
 }
 
+void apply_theme_preference(HWND hwnd, AppThemePreference pref) {
+    g_theme_preference = pref;
+    AppTheme resolved = (pref == THEME_PREF_SYSTEM)
+        ? (is_system_dark_mode() ? THEME_DARK : THEME_LIGHT)
+        : (pref == THEME_PREF_DARK ? THEME_DARK : THEME_LIGHT);
+    apply_theme(hwnd, resolved);
+}
+
 void apply_theme(HWND hwnd, AppTheme new_theme) {
     g_current_theme = new_theme;
     save_zuma_config();
 
     HMENU hmenu = GetMenu(hwnd);
     if (hmenu) {
-        CheckMenuItem(hmenu, ID_MENU_THEME_LIGHT, (g_current_theme == THEME_LIGHT) ? MF_CHECKED : MF_UNCHECKED);
-        CheckMenuItem(hmenu, ID_MENU_THEME_DARK,  (g_current_theme == THEME_DARK)  ? MF_CHECKED : MF_UNCHECKED);
+        CheckMenuItem(hmenu, ID_MENU_THEME_LIGHT,  (g_theme_preference == THEME_PREF_LIGHT)  ? MF_CHECKED : MF_UNCHECKED);
+        CheckMenuItem(hmenu, ID_MENU_THEME_DARK,   (g_theme_preference == THEME_PREF_DARK)   ? MF_CHECKED : MF_UNCHECKED);
+        CheckMenuItem(hmenu, ID_MENU_THEME_SYSTEM, (g_theme_preference == THEME_PREF_SYSTEM) ? MF_CHECKED : MF_UNCHECKED);
     }
 
     update_status_bar();
@@ -1713,8 +1722,9 @@ void create_main_menu(HWND hwnd) {
     add_custom_menu_item(hview, MF_SEPARATOR, 0, NULL);
 
     HMENU htheme = CreatePopupMenu();
-    add_custom_menu_item(htheme, MF_STRING | (g_current_theme == THEME_LIGHT ? MF_CHECKED : MF_UNCHECKED), ID_MENU_THEME_LIGHT, "&Light Mode");
-    add_custom_menu_item(htheme, MF_STRING | (g_current_theme == THEME_DARK  ? MF_CHECKED : MF_UNCHECKED), ID_MENU_THEME_DARK,  "&Dark Mode");
+    add_custom_menu_item(htheme, MF_STRING | (g_theme_preference == THEME_PREF_LIGHT  ? MF_CHECKED : MF_UNCHECKED), ID_MENU_THEME_LIGHT,  "&Light Mode");
+    add_custom_menu_item(htheme, MF_STRING | (g_theme_preference == THEME_PREF_DARK   ? MF_CHECKED : MF_UNCHECKED), ID_MENU_THEME_DARK,   "&Dark Mode");
+    add_custom_menu_item(htheme, MF_STRING | (g_theme_preference == THEME_PREF_SYSTEM ? MF_CHECKED : MF_UNCHECKED), ID_MENU_THEME_SYSTEM, "&Use System Default");
     add_custom_menu_item(htheme, MF_SEPARATOR, 0, NULL);
     add_custom_menu_item(htheme, MF_STRING, ID_MENU_THEME_TOGGLE, "&Toggle Theme\tCtrl+T");
     add_custom_menu_item(hview, MF_POPUP, (UINT_PTR)htheme, "&Theme");
@@ -2463,17 +2473,26 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 }
 
                 case ID_MENU_THEME_LIGHT:
-                    apply_theme(hwnd, THEME_LIGHT);
+                    apply_theme_preference(hwnd, THEME_PREF_LIGHT);
+                    create_main_menu(hwnd);
                     SetFocus(hwnd);
                     break;
 
                 case ID_MENU_THEME_DARK:
-                    apply_theme(hwnd, THEME_DARK);
+                    apply_theme_preference(hwnd, THEME_PREF_DARK);
+                    create_main_menu(hwnd);
+                    SetFocus(hwnd);
+                    break;
+
+                case ID_MENU_THEME_SYSTEM:
+                    apply_theme_preference(hwnd, THEME_PREF_SYSTEM);
+                    create_main_menu(hwnd);
                     SetFocus(hwnd);
                     break;
 
                 case ID_MENU_THEME_TOGGLE:
-                    apply_theme(hwnd, (g_current_theme == THEME_LIGHT) ? THEME_DARK : THEME_LIGHT);
+                    apply_theme_preference(hwnd, (g_current_theme == THEME_LIGHT) ? THEME_PREF_DARK : THEME_PREF_LIGHT);
+                    create_main_menu(hwnd);
                     SetFocus(hwnd);
                     break;
 

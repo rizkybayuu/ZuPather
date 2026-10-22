@@ -129,6 +129,7 @@ typedef void(WINAPI *pfnFlushMenuThemes)(void);
 #define ID_MENU_THEME_LIGHT       307
 #define ID_MENU_THEME_DARK        308
 #define ID_MENU_THEME_TOGGLE      309
+#define ID_MENU_THEME_SYSTEM      345
 
 #define ID_MENU_CANVAS_NEW        310
 #define ID_MENU_CANVAS_OPEN       311
@@ -242,8 +243,7 @@ typedef void(WINAPI *pfnFlushMenuThemes)(void);
 #define ID_SETTINGS_BTN_UNDO_64         5806
 #define ID_SETTINGS_BTN_UNDO_128        5807
 #define ID_SETTINGS_BTN_UNDO_256        5808
-#define ID_SETTINGS_RADIO_THEME_DARK    5809
-#define ID_SETTINGS_RADIO_THEME_LIGHT   5810
+#define ID_SETTINGS_COMBO_THEME         5809
 #define ID_SETTINGS_CHK_SHOW_GRID       5811
 #define ID_SETTINGS_BTN_SAVE            5812
 #define ID_SETTINGS_BTN_CANCEL          5813
@@ -313,6 +313,12 @@ typedef enum {
     THEME_LIGHT = 0,
     THEME_DARK  = 1
 } AppTheme;
+
+typedef enum {
+    THEME_PREF_LIGHT  = 0,
+    THEME_PREF_DARK   = 1,
+    THEME_PREF_SYSTEM = 2
+} AppThemePreference;
 
 typedef struct {
     COLORREF workspace_bg;
@@ -450,7 +456,8 @@ extern HFONT g_font_mono_bold;
 
 extern const ThemeColors g_theme_light;
 extern const ThemeColors g_theme_dark;
-extern AppTheme g_current_theme;
+extern AppThemePreference g_theme_preference;
+extern AppTheme           g_current_theme;
 extern HMENU g_hmenu_action_history;
 
 extern bool        g_has_canvas;
@@ -834,6 +841,8 @@ extern float g_canvas_mouse_y;
 extern bool  g_mouse_inside_canvas;
 
 /* Functions in zupather_state.c */
+bool is_system_dark_mode(void);
+void apply_theme_preference(HWND hwnd, AppThemePreference pref);
 const ThemeColors *get_theme(void);
 void draw_menu_nc_bottom_line(HWND hWnd, COLORREF bg_color);
 void update_window_theme_attributes(HWND hwnd, bool is_dark);
