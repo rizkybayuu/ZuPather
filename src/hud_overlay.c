@@ -1,5 +1,21 @@
 #include "hud_overlay.h"
 
+/* High-Performance HUD Rendering Helpers */
+static void blit_hud_surface(HDC dst_dc, int x, int y, int w, int h, HDC src_dc, BYTE alpha) {
+    if (alpha >= 255 || g_perf_direct_blit) {
+        BitBlt(dst_dc, x, y, w, h, src_dc, 0, 0, SRCCOPY);
+    } else {
+        BLENDFUNCTION bf = { AC_SRC_OVER, 0, alpha, 0 };
+        GdiAlphaBlend(dst_dc, x, y, w, h, src_dc, 0, 0, w, h, bf);
+    }
+}
+
+static bool s_hud_cache_dirty = true;
+void invalidate_hud_cache(void) {
+    s_hud_cache_dirty = true;
+}
+
+
 typedef struct {
     const char *key;
     const char *desc;
@@ -596,8 +612,7 @@ void render_curve_submode_huds(HDC mem_dc, int client_w, int work_h, const Theme
     }
 
     BYTE alpha_tr = g_hud_mode_collapsed ? 128 : 255;
-    BLENDFUNCTION bf_tr = { AC_SRC_OVER, 0, alpha_tr, 0 };
-    GdiAlphaBlend(mem_dc, rc_tr.left, rc_tr.top, tr_w, tr_h, dc_tr, 0, 0, tr_w, tr_h, bf_tr);
+    blit_hud_surface(mem_dc, rc_tr.left, rc_tr.top, tr_w, tr_h, dc_tr, alpha_tr);
 
     SelectObject(dc_tr, old_bm_tr);
     DeleteObject(bm_tr);
@@ -775,8 +790,7 @@ void render_curve_submode_huds(HDC mem_dc, int client_w, int work_h, const Theme
     }
 
     BYTE alpha_tl = g_hud_shortcuts_collapsed ? 128 : 255;
-    BLENDFUNCTION bf_tl = { AC_SRC_OVER, 0, alpha_tl, 0 };
-    GdiAlphaBlend(mem_dc, rc_tl.left, rc_tl.top, tl_w, tl_h, dc_tl, 0, 0, tl_w, tl_h, bf_tl);
+    blit_hud_surface(mem_dc, rc_tl.left, rc_tl.top, tl_w, tl_h, dc_tl, alpha_tl);
 
     SelectObject(dc_tl, old_bm_tl);
     DeleteObject(bm_tl);
@@ -931,8 +945,7 @@ void render_overlay_guide_hud(HDC mem_dc, int client_w, int work_h, const ThemeC
     }
 
     BYTE alpha_tl = g_hud_overlay_guide_collapsed ? 128 : 255;
-    BLENDFUNCTION bf_tl = { AC_SRC_OVER, 0, alpha_tl, 0 };
-    GdiAlphaBlend(mem_dc, rc_tl.left, rc_tl.top, tl_w, tl_h, dc_tl, 0, 0, tl_w, tl_h, bf_tl);
+    blit_hud_surface(mem_dc, rc_tl.left, rc_tl.top, tl_w, tl_h, dc_tl, alpha_tl);
 
     SelectObject(dc_tl, old_bm_tl);
     DeleteObject(bm_tl);
@@ -1158,8 +1171,7 @@ void render_overlay_hud(HDC mem_dc, int client_w, int work_h, const ThemeColors 
     }
 
     BYTE alpha_tr = g_hud_overlay_collapsed ? 128 : 255;
-    BLENDFUNCTION bf_tr = { AC_SRC_OVER, 0, alpha_tr, 0 };
-    GdiAlphaBlend(mem_dc, rc_tr.left, rc_tr.top, tr_w, tr_h, dc_tr, 0, 0, tr_w, tr_h, bf_tr);
+    blit_hud_surface(mem_dc, rc_tr.left, rc_tr.top, tr_w, tr_h, dc_tr, alpha_tr);
     SelectObject(dc_tr, old_bm_tr);
     DeleteObject(bm_tr);
     DeleteDC(dc_tr);
@@ -1408,8 +1420,7 @@ void render_element_guide_hud(HDC mem_dc, int client_w, int work_h, const ThemeC
     }
 
     BYTE alpha_tl = g_hud_element_guide_collapsed ? 128 : 255;
-    BLENDFUNCTION bf_tl = { AC_SRC_OVER, 0, alpha_tl, 0 };
-    GdiAlphaBlend(mem_dc, rc_tl.left, rc_tl.top, tl_w, tl_h, dc_tl, 0, 0, tl_w, tl_h, bf_tl);
+    blit_hud_surface(mem_dc, rc_tl.left, rc_tl.top, tl_w, tl_h, dc_tl, alpha_tl);
 
     SelectObject(dc_tl, old_bm_tl);
     DeleteObject(bm_tl);
@@ -1622,8 +1633,7 @@ void render_element_hud(HDC mem_dc, int client_w, int work_h, const ThemeColors 
     }
 
     BYTE alpha_tr = g_hud_element_collapsed ? 128 : 255;
-    BLENDFUNCTION bf_tr = { AC_SRC_OVER, 0, alpha_tr, 0 };
-    GdiAlphaBlend(mem_dc, rc_tr.left, rc_tr.top, tr_w, tr_h, dc_tr, 0, 0, tr_w, tr_h, bf_tr);
+    blit_hud_surface(mem_dc, rc_tr.left, rc_tr.top, tr_w, tr_h, dc_tr, alpha_tr);
     SelectObject(dc_tr, old_bm_tr);
     DeleteObject(bm_tr);
     DeleteDC(dc_tr);
@@ -1883,8 +1893,7 @@ void render_canvas_guide_hud(HDC mem_dc, int client_w, int work_h, const ThemeCo
     }
 
     BYTE alpha_tl = g_hud_canvas_guide_collapsed ? 128 : 255;
-    BLENDFUNCTION bf_tl = { AC_SRC_OVER, 0, alpha_tl, 0 };
-    GdiAlphaBlend(mem_dc, rc_tl.left, rc_tl.top, tl_w, tl_h, dc_tl, 0, 0, tl_w, tl_h, bf_tl);
+    blit_hud_surface(mem_dc, rc_tl.left, rc_tl.top, tl_w, tl_h, dc_tl, alpha_tl);
     SelectObject(dc_tl, old_bm_tl);
     DeleteObject(bm_tl);
     DeleteDC(dc_tl);
@@ -2331,8 +2340,7 @@ void render_canvas_hud(HDC mem_dc, int client_w, int work_h, const ThemeColors *
     }
 
     BYTE alpha_tr = g_hud_canvas_collapsed ? 128 : 255;
-    BLENDFUNCTION bf_tr = { AC_SRC_OVER, 0, alpha_tr, 0 };
-    GdiAlphaBlend(mem_dc, rc_tr.left, rc_tr.top, tr_w, tr_h, dc_tr, 0, 0, tr_w, tr_h, bf_tr);
+    blit_hud_surface(mem_dc, rc_tr.left, rc_tr.top, tr_w, tr_h, dc_tr, alpha_tr);
     SelectObject(dc_tr, old_bm_tr);
     DeleteObject(bm_tr);
     DeleteDC(dc_tr);
@@ -2632,8 +2640,7 @@ void render_preview_guide_hud(HDC mem_dc, int client_w, int work_h, const ThemeC
     }
 
     BYTE alpha_tl = g_hud_preview_guide_collapsed ? 128 : 255;
-    BLENDFUNCTION bf_tl = { AC_SRC_OVER, 0, alpha_tl, 0 };
-    GdiAlphaBlend(mem_dc, rc_tl.left, rc_tl.top, tl_w, tl_h, dc_tl, 0, 0, tl_w, tl_h, bf_tl);
+    blit_hud_surface(mem_dc, rc_tl.left, rc_tl.top, tl_w, tl_h, dc_tl, alpha_tl);
     SelectObject(dc_tl, old_bm_tl);
     DeleteObject(bm_tl);
     DeleteDC(dc_tl);
@@ -2791,11 +2798,24 @@ static void draw_hud_checkbox(HDC hdc, int x, int y, bool checked, bool dark_mod
 
 static void position_hud_edit_control(HWND hwnd_edit, bool is_enabled, int edit_x, int edit_y, int edit_w, int edit_h, int top_bound, int bot_bound) {
     if (!hwnd_edit) return;
-    if (is_enabled && edit_y >= top_bound && edit_y + edit_h <= bot_bound) {
-        SetWindowPos(hwnd_edit, HWND_TOP, edit_x, edit_y, edit_w, edit_h, SWP_SHOWWINDOW | SWP_NOACTIVATE);
-        RedrawWindow(hwnd_edit, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ERASE);
+    bool should_show = is_enabled && (edit_y >= top_bound) && (edit_y + edit_h <= bot_bound);
+    bool is_visible = (IsWindowVisible(hwnd_edit) != FALSE);
+    if (should_show) {
+        RECT cur_rc;
+        GetWindowRect(hwnd_edit, &cur_rc);
+        POINT pt = { cur_rc.left, cur_rc.top };
+        HWND parent = GetParent(hwnd_edit);
+        if (parent) ScreenToClient(parent, &pt);
+        int cur_w = cur_rc.right - cur_rc.left;
+        int cur_h = cur_rc.bottom - cur_rc.top;
+        if (!is_visible || pt.x != edit_x || pt.y != edit_y || cur_w != edit_w || cur_h != edit_h) {
+            SetWindowPos(hwnd_edit, HWND_TOP, edit_x, edit_y, edit_w, edit_h, SWP_SHOWWINDOW | SWP_NOACTIVATE);
+            InvalidateRect(hwnd_edit, NULL, FALSE);
+        }
     } else {
-        ShowWindow(hwnd_edit, SW_HIDE);
+        if (is_visible) {
+            ShowWindow(hwnd_edit, SW_HIDE);
+        }
     }
 }
 
@@ -3375,8 +3395,7 @@ void render_preview_hud(HDC mem_dc, int client_w, int work_h, const ThemeColors 
     }
 
     BYTE alpha_tr = g_hud_preview_info_collapsed ? 128 : 255;
-    BLENDFUNCTION bf_tr = { AC_SRC_OVER, 0, alpha_tr, 0 };
-    GdiAlphaBlend(mem_dc, rc_tr.left, rc_tr.top, tr_w, tr_h, dc_tr, 0, 0, tr_w, tr_h, bf_tr);
+    blit_hud_surface(mem_dc, rc_tr.left, rc_tr.top, tr_w, tr_h, dc_tr, alpha_tr);
     SelectObject(dc_tr, old_bm_tr);
     DeleteObject(bm_tr);
     DeleteDC(dc_tr);

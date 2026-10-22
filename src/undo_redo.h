@@ -8,10 +8,13 @@
 extern "C" {
 #endif
 
-#define MAX_UNDO_STACK 64
+#define MAX_UNDO_STACK 256
 
-/* Initialize in-memory undo subsystem (64 turns capacity, zero disk cache) */
+/* Initialize in-memory undo subsystem (up to 256 turns capacity, zero disk cache) */
 void undo_redo_init(void);
+
+/* Set runtime undo history limit (10 to 256 turns) and prune older states if needed */
+void undo_set_history_limit(int limit);
 
 /* Ensure at least one initial/baseline state is saved before any modification */
 void undo_ensure_baseline(void);

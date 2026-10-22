@@ -59,5 +59,6 @@ void show_import_path_limit_warning(HWND hwnd_parent, int canvas_count, int impo
 /* Bidirectional Canvas Title Synchronization */
 void sync_save_dialog_title_if_open(const char *title, HWND sender_hwnd);
 void show_splash_screen_dialog(HWND parent_hwnd);
+void show_settings_dialog(HWND parent_hwnd);
 
 #endif /* DIALOG_MODALS_H */

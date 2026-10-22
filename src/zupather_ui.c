@@ -22,7 +22,7 @@ static LRESULT CALLBACK ToolbarScrollProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 static LRESULT CALLBACK ToolbarRightProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 static LRESULT CALLBACK EditSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 static LRESULT CALLBACK StatusBarSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
-static void apply_theme(HWND hwnd, AppTheme new_theme);
+void apply_theme(HWND hwnd, AppTheme new_theme);
 static void apply_menu_dark_mode_to_hwnd(HWND hwnd);
 
 
@@ -1053,6 +1053,7 @@ static HACCEL create_app_accelerators(void) {
         { FCONTROL | FVIRTKEY, 'R', ID_MENU_VIEW_RESET },
         { FCONTROL | FVIRTKEY, 'T', ID_MENU_THEME_TOGGLE },
         { FCONTROL | FVIRTKEY, 'G', ID_MENU_VIEW_GRID },
+        { FCONTROL | FVIRTKEY, VK_OEM_COMMA, ID_MENU_SETTINGS_PREFERENCES },
         { FCONTROL | FVIRTKEY, 'L', ID_MENU_LEVEL_PREVIEW },
         { FCONTROL | FVIRTKEY, VK_OEM_PLUS, ID_MENU_VIEW_ZOOMIN },
         { FCONTROL | FVIRTKEY, VK_OEM_MINUS, ID_MENU_VIEW_ZOOMOUT }
@@ -1202,7 +1203,7 @@ static void create_toolbar_buttons(HWND hwnd) {
     }
 }
 
-static void apply_theme(HWND hwnd, AppTheme new_theme) {
+void apply_theme(HWND hwnd, AppTheme new_theme) {
     g_current_theme = new_theme;
     save_zuma_config();
 
@@ -1686,7 +1687,7 @@ static LRESULT handle_custom_menuchar(WPARAM wParam, LPARAM lParam) {
 }
 
 /* Create Classic Windows Menu Bar */
-static void create_main_menu(HWND hwnd) {
+void create_main_menu(HWND hwnd) {
     s_static_menu_item_count = 0;
     HMENU hmenu = CreateMenu();
 
@@ -1761,8 +1762,20 @@ static void create_main_menu(HWND hwnd) {
     add_custom_menu_item(hcanvas, MF_SEPARATOR, 0, NULL);
     add_custom_menu_item(hcanvas, MF_STRING, ID_MENU_SELECT_ALL,   "Select &All\tCtrl+A");
     add_custom_menu_item(hcanvas, MF_STRING, ID_MENU_INVERT_SEL,   "&Invert Selection\tCtrl+I");
-    add_custom_menu_item(hcanvas, MF_STRING, ID_MENU_DESELECT_ALL, "&Deselect All\tCtrl+D");
+        add_custom_menu_item(hcanvas, MF_STRING, ID_MENU_DESELECT_ALL, "&Deselect All\tCtrl+D");
     AppendMenuA(hmenu, MF_POPUP, (UINT_PTR)hcanvas, "&Edit");
+
+    /* Settings Menu */
+    HMENU hsettings = CreatePopupMenu();
+    add_custom_menu_item(hsettings, MF_STRING, ID_MENU_SETTINGS_PREFERENCES, "&Preferences...\tCtrl+,");
+    add_custom_menu_item(hsettings, MF_SEPARATOR, 0, NULL);
+    add_custom_menu_item(hsettings, MF_STRING | (g_perf_direct_blit ? MF_CHECKED : MF_UNCHECKED),
+                         ID_MENU_SETTINGS_DIRECT_BLIT, "&Direct Blit (Hardware Optimization)");
+    add_custom_menu_item(hsettings, MF_STRING | (g_perf_hud_cache ? MF_CHECKED : MF_UNCHECKED),
+                         ID_MENU_SETTINGS_HUD_CACHE, "&Offscreen HUD Surface Cache (60+ FPS)");
+    add_custom_menu_item(hsettings, MF_STRING | (g_perf_smooth_scroll ? MF_CHECKED : MF_UNCHECKED),
+                         ID_MENU_SETTINGS_SMOOTH_SCROLL, "&Smooth Mouse Wheel Throttling");
+    AppendMenuA(hmenu, MF_POPUP, (UINT_PTR)hsettings, "&Settings");
 
     SetMenu(hwnd, hmenu);
 }
@@ -2463,6 +2476,35 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     apply_theme(hwnd, (g_current_theme == THEME_LIGHT) ? THEME_DARK : THEME_LIGHT);
                     SetFocus(hwnd);
                     break;
+
+                case ID_MENU_SETTINGS_PREFERENCES:
+                    show_settings_dialog(hwnd);
+                    break;
+
+                case ID_MENU_SETTINGS_DIRECT_BLIT: {
+                    g_perf_direct_blit = !g_perf_direct_blit;
+                    save_zuma_config();
+                    invalidate_hud_cache();
+                    create_main_menu(hwnd);
+                    InvalidateRect(hwnd, NULL, FALSE);
+                    break;
+                }
+
+                case ID_MENU_SETTINGS_HUD_CACHE: {
+                    g_perf_hud_cache = !g_perf_hud_cache;
+                    save_zuma_config();
+                    invalidate_hud_cache();
+                    create_main_menu(hwnd);
+                    InvalidateRect(hwnd, NULL, FALSE);
+                    break;
+                }
+
+                case ID_MENU_SETTINGS_SMOOTH_SCROLL: {
+                    g_perf_smooth_scroll = !g_perf_smooth_scroll;
+                    save_zuma_config();
+                    create_main_menu(hwnd);
+                    break;
+                }
 
                 case ID_EDIT_CV_W:
                 case ID_EDIT_CV_H: {
@@ -6864,6 +6906,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             bool alt_down   = (GetKeyState(VK_MENU) & 0x8000) != 0;
 
             if (ctrl_down && !shift_down && !alt_down) {
+                if (wParam == VK_OEM_COMMA || wParam == ',') {
+                    show_settings_dialog(hwnd);
+                    return 0;
+                }
                 if (wParam == 'Z' || wParam == 'z') {
                     undo_perform(hwnd);
                     return 0;

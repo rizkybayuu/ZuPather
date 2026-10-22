@@ -439,6 +439,12 @@ bool g_snap_canvas_handle_selected[10] = { false };
 
 HWND    g_active_modal_dlg = NULL;
 /* Viewport & Navigation State */
+/* Performance & History Preferences */
+bool g_perf_direct_blit = true;
+bool g_perf_hud_cache = true;
+bool g_perf_smooth_scroll = true;
+int  g_undo_limit = 64;
+
 bool  g_show_grid      = true;
 float g_zoom           = 1.0f;
 float g_pan_x          = 0.0f;
@@ -2981,6 +2987,20 @@ void load_zuma_config(void) {
     }
 
     /* Load Grid Mode toggle */
+    /* Load Performance & Undo preferences */
+    int blit_val = GetPrivateProfileIntA("Preferences", "PerformanceDirectBlit", -1, ini_path);
+    if (blit_val != -1) g_perf_direct_blit = (blit_val != 0);
+
+    int cache_val = GetPrivateProfileIntA("Preferences", "PerformanceHudCache", -1, ini_path);
+    if (cache_val != -1) g_perf_hud_cache = (cache_val != 0);
+
+    int smooth_val = GetPrivateProfileIntA("Preferences", "PerformanceSmoothScroll", -1, ini_path);
+    if (smooth_val != -1) g_perf_smooth_scroll = (smooth_val != 0);
+
+    int hist_val = GetPrivateProfileIntA("Preferences", "ActionHistoryLimit", -1, ini_path);
+    if (hist_val >= 10 && hist_val <= 256) g_undo_limit = hist_val;
+
+    /* Load Grid Mode toggle */
     int grid_val = GetPrivateProfileIntA("Preferences", "Grid", -1, ini_path);
     if (grid_val == 0) {
         g_show_grid = false;
@@ -2997,6 +3017,12 @@ void save_zuma_config(void) {
     WritePrivateProfileStringA("Zuma", "RootDir", g_zuma_root_dir, ini_path);
     WritePrivateProfileStringA("Preferences", "Theme", (g_current_theme == THEME_DARK) ? "dark" : "light", ini_path);
     WritePrivateProfileStringA("Preferences", "Grid", g_show_grid ? "1" : "0", ini_path);
+    char num_buf[32];
+    WritePrivateProfileStringA("Preferences", "PerformanceDirectBlit", g_perf_direct_blit ? "1" : "0", ini_path);
+    WritePrivateProfileStringA("Preferences", "PerformanceHudCache", g_perf_hud_cache ? "1" : "0", ini_path);
+    WritePrivateProfileStringA("Preferences", "PerformanceSmoothScroll", g_perf_smooth_scroll ? "1" : "0", ini_path);
+    snprintf(num_buf, sizeof(num_buf), "%d", g_undo_limit);
+    WritePrivateProfileStringA("Preferences", "ActionHistoryLimit", num_buf, ini_path);
     WritePrivateProfileStringA(NULL, NULL, NULL, ini_path); /* Flush cache to disk */
 }
 

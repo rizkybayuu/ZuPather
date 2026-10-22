@@ -1111,7 +1111,7 @@ static LRESULT CALLBACK NewCanvasModalProc(HWND hwnd, UINT msg, WPARAM wParam, L
 
                 RECT rc_t = dis->rcItem;
                 if (is_pressed) { rc_t.left += 1; rc_t.top += 1; }
-                DrawTextA(dis->hDC, text, -1, &rc_t, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
+                DrawTextA(dis->hDC, text, -1, &rc_t, DT_SINGLELINE | DT_CENTER | DT_VCENTER | DT_NOPREFIX);
                 return TRUE;
             }
             break;
@@ -2601,7 +2601,7 @@ static LRESULT CALLBACK SaveCanvasModalProc(HWND hwnd, UINT msg, WPARAM wParam, 
 
                 RECT rc_t = dis->rcItem;
                 if (is_pressed) { rc_t.left += 1; rc_t.top += 1; }
-                DrawTextA(dis->hDC, text, -1, &rc_t, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
+                DrawTextA(dis->hDC, text, -1, &rc_t, DT_SINGLELINE | DT_CENTER | DT_VCENTER | DT_NOPREFIX);
                 return TRUE;
             }
             break;
@@ -11293,5 +11293,558 @@ void show_splash_screen_dialog(HWND parent_hwnd) {
         show_open_canvas_dialog(parent_hwnd);
     } else if (s_splash_chosen_action == SPLASH_ACT_MAP) {
         show_manage_levels_dialog(parent_hwnd);
+    }
+}
+
+
+/* ========================================================================= */
+/* Settings & Preferences Modal Dialog Implementation                        */
+/* ========================================================================= */
+
+typedef struct {
+    HWND hwnd_dlg;
+    HWND hwnd_chk_direct_blit;
+    HWND hwnd_chk_hud_cache;
+    HWND hwnd_chk_smooth_scroll;
+    HWND hwnd_edit_undo_limit;
+    HWND hwnd_btn_32;
+    HWND hwnd_btn_64;
+    HWND hwnd_btn_128;
+    HWND hwnd_btn_256;
+    HWND hwnd_chk_dark_theme;
+    HWND hwnd_chk_show_grid;
+    HWND hwnd_lbl_zuma_path;
+    HWND hwnd_btn_change_zuma;
+    HWND hwnd_btn_save;
+    HWND hwnd_btn_cancel;
+    HWND hwnd_btn_reset;
+
+    bool chk_direct_blit;
+    bool chk_hud_cache;
+    bool chk_smooth_scroll;
+    int  undo_limit_val;
+    bool is_dark_theme;
+    bool show_grid;
+    bool is_done;
+} SettingsModalData;
+
+static void draw_settings_themed_checkbox(HWND hwnd, HDC hdc, bool is_checked) {
+    RECT rc;
+    GetClientRect(hwnd, &rc);
+    const ThemeColors *th = get_theme();
+    bool is_dark = (g_current_theme == THEME_DARK);
+
+    COLORREF bg_col = is_dark ? RGB(28, 32, 40) : RGB(255, 255, 255);
+    COLORREF box_bg = is_dark ? RGB(36, 40, 48) : RGB(255, 255, 255);
+    COLORREF box_bd = is_dark ? RGB(70, 78, 92) : RGB(175, 182, 194);
+    COLORREF text_col = th->text_primary;
+    COLORREF check_col = is_dark ? RGB(97, 175, 239) : RGB(24, 90, 175);
+
+    HBRUSH bg_br = CreateSolidBrush(bg_col);
+    FillRect(hdc, &rc, bg_br);
+    DeleteObject(bg_br);
+
+    int box_sz = 13;
+    int box_x = 1;
+    int box_y = (rc.bottom - rc.top - box_sz) / 2;
+    RECT rc_box = { box_x, box_y, box_x + box_sz, box_y + box_sz };
+
+    HBRUSH in_br = CreateSolidBrush(box_bg);
+    FillRect(hdc, &rc_box, in_br);
+    DeleteObject(in_br);
+
+    HPEN pen = CreatePen(PS_SOLID, 1, box_bd);
+    HPEN old_pen = (HPEN)SelectObject(hdc, pen);
+    SelectObject(hdc, GetStockObject(NULL_BRUSH));
+    Rectangle(hdc, rc_box.left, rc_box.top, rc_box.right, rc_box.bottom);
+    SelectObject(hdc, old_pen);
+    DeleteObject(pen);
+
+    if (is_checked) {
+        HPEN chk_pen = CreatePen(PS_SOLID, 2, check_col);
+        old_pen = (HPEN)SelectObject(hdc, chk_pen);
+        MoveToEx(hdc, box_x + 3, box_y + 6, NULL);
+        LineTo(hdc, box_x + 5, box_y + 10);
+        LineTo(hdc, box_x + 10, box_y + 3);
+        SelectObject(hdc, old_pen);
+        DeleteObject(chk_pen);
+    }
+
+    char text[128] = {0};
+    GetWindowTextA(hwnd, text, sizeof(text));
+    RECT rc_text = { box_x + box_sz + 8, 0, rc.right, rc.bottom };
+    SetBkMode(hdc, TRANSPARENT);
+    SetTextColor(hdc, text_col);
+    HFONT font = g_font_primary_regular ? g_font_primary_regular : (HFONT)GetStockObject(DEFAULT_GUI_FONT);
+    HFONT old_font = (HFONT)SelectObject(hdc, font);
+    DrawTextA(hdc, text, -1, &rc_text, DT_SINGLELINE | DT_VCENTER | DT_LEFT | DT_NOPREFIX);
+    SelectObject(hdc, old_font);
+}
+
+static WNDPROC s_orig_settings_chk_proc = NULL;
+static LRESULT CALLBACK SettingsChkSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    bool *p_chk = (bool*)GetWindowLongPtrA(hwnd, GWLP_USERDATA);
+    switch (msg) {
+        case WM_LBUTTONDOWN:
+            SetFocus(hwnd);
+            if (p_chk) {
+                *p_chk = !(*p_chk);
+                InvalidateRect(hwnd, NULL, TRUE);
+                SendMessage(GetParent(hwnd), WM_COMMAND, MAKEWPARAM(GetDlgCtrlID(hwnd), BN_CLICKED), (LPARAM)hwnd);
+            }
+            return 0;
+        case WM_LBUTTONUP:
+        case WM_LBUTTONDBLCLK:
+            return 0;
+        case WM_KEYDOWN:
+            if (wParam == VK_SPACE) {
+                if (p_chk) {
+                    *p_chk = !(*p_chk);
+                    InvalidateRect(hwnd, NULL, TRUE);
+                    SendMessage(GetParent(hwnd), WM_COMMAND, MAKEWPARAM(GetDlgCtrlID(hwnd), BN_CLICKED), (LPARAM)hwnd);
+                }
+                return 0;
+            }
+            break;
+        case BM_SETCHECK:
+            if (p_chk) {
+                *p_chk = (wParam == BST_CHECKED);
+                InvalidateRect(hwnd, NULL, TRUE);
+            }
+            return 0;
+        case BM_GETCHECK:
+            return (p_chk && *p_chk) ? BST_CHECKED : BST_UNCHECKED;
+        case WM_ERASEBKGND:
+            return 1;
+        case WM_PAINT: {
+            PAINTSTRUCT ps;
+            HDC hdc = BeginPaint(hwnd, &ps);
+            draw_settings_themed_checkbox(hwnd, hdc, p_chk ? *p_chk : false);
+            EndPaint(hwnd, &ps);
+            return 0;
+        }
+    }
+    return CallWindowProcA(s_orig_settings_chk_proc ? s_orig_settings_chk_proc : DefWindowProcA, hwnd, msg, wParam, lParam);
+}
+
+static void draw_settings_card(HDC hdc, int x, int y, int w, int h, const char *title, const ThemeColors *th, bool is_dark) {
+    COLORREF card_bg = is_dark ? RGB(28, 32, 40) : RGB(255, 255, 255);
+    COLORREF card_bd = is_dark ? RGB(55, 62, 75) : RGB(215, 220, 230);
+
+    HBRUSH br = CreateSolidBrush(card_bg);
+    HPEN pen = CreatePen(PS_SOLID, 1, card_bd);
+    HPEN old_pen = (HPEN)SelectObject(hdc, pen);
+    HBRUSH old_br = (HBRUSH)SelectObject(hdc, br);
+    RoundRect(hdc, x, y, x + w, y + h, 8, 8);
+    SelectObject(hdc, old_br);
+    SelectObject(hdc, old_pen);
+    DeleteObject(br);
+    DeleteObject(pen);
+
+    if (title && title[0]) {
+        RECT rc_t = { x + 16, y + 8, x + w - 16, y + 26 };
+        SetBkMode(hdc, TRANSPARENT);
+        SetTextColor(hdc, th->text_accent_blue);
+        HFONT old_f = (HFONT)SelectObject(hdc, g_font_primary_bold);
+        DrawTextA(hdc, title, -1, &rc_t, DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_NOPREFIX);
+        SelectObject(hdc, old_f);
+    }
+}
+
+static LRESULT CALLBACK SettingsModalWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    const ThemeColors *th = get_theme();
+    SettingsModalData *data = (SettingsModalData*)GetWindowLongPtrA(hwnd, GWLP_USERDATA);
+    bool is_dark = (g_current_theme == THEME_DARK);
+
+    switch (msg) {
+        case WM_CREATE: {
+            CREATESTRUCTA *cs = (CREATESTRUCTA*)lParam;
+            data = (SettingsModalData*)cs->lpCreateParams;
+            SetWindowLongPtrA(hwnd, GWLP_USERDATA, (LONG_PTR)data);
+            if (!data) return 0;
+            data->hwnd_dlg = hwnd;
+            HINSTANCE hinst = GetModuleHandle(NULL);
+
+            /* Helper lambda or macro to setup themed checkbox */
+            #define MAKE_CHK(id, text, x, y, w, h, bool_ptr) \
+                do { \
+                    HWND chk = CreateWindowA("BUTTON", text, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP, \
+                                            x, y, w, h, hwnd, (HMENU)(UINT_PTR)(id), hinst, NULL); \
+                    SendMessage(chk, WM_SETFONT, (WPARAM)g_font_primary_regular, TRUE); \
+                    SetWindowLongPtrA(chk, GWLP_USERDATA, (LONG_PTR)(bool_ptr)); \
+                    s_orig_settings_chk_proc = (WNDPROC)SetWindowLongPtrA(chk, GWLP_WNDPROC, (LONG_PTR)SettingsChkSubclassProc); \
+                } while (0)
+
+            /* Group 1 Checkboxes */
+            MAKE_CHK(ID_SETTINGS_CHK_DIRECT_BLIT, "Direct Blit (Bypass CPU AlphaBlend on opaque HUDs)",
+                     40, 95, 540, 20, &data->chk_direct_blit);
+            MAKE_CHK(ID_SETTINGS_CHK_HUD_CACHE, "Offscreen HUD Surface Caching (60+ FPS Butter-Smooth Viewport)",
+                     40, 133, 540, 20, &data->chk_hud_cache);
+            MAKE_CHK(ID_SETTINGS_CHK_SMOOTH_SCROLL, "Smooth Mouse Wheel Throttling & Precision Event Coalescing",
+                     40, 171, 540, 20, &data->chk_smooth_scroll);
+
+            /* Group 2 Controls: History Limit Edit & Presets */
+            data->hwnd_edit_undo_limit = CreateWindowExA(
+                WS_EX_CLIENTEDGE, "EDIT", "64",
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_NUMBER | ES_CENTER,
+                240, 252, 60, 24, hwnd, (HMENU)ID_SETTINGS_EDIT_UNDO_LIMIT, hinst, NULL
+            );
+            SendMessage(data->hwnd_edit_undo_limit, WM_SETFONT, (WPARAM)g_font_mono_bold, TRUE);
+            char cur_limit_str[32];
+            snprintf(cur_limit_str, sizeof(cur_limit_str), "%d", data->undo_limit_val);
+            SetWindowTextA(data->hwnd_edit_undo_limit, cur_limit_str);
+
+            data->hwnd_btn_32 = CreateWindowA(
+                "BUTTON", "32", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW | WS_TABSTOP,
+                315, 251, 62, 26, hwnd, (HMENU)ID_SETTINGS_BTN_UNDO_32, hinst, NULL
+            );
+            data->hwnd_btn_64 = CreateWindowA(
+                "BUTTON", "64 (Def)", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW | WS_TABSTOP,
+                383, 251, 78, 26, hwnd, (HMENU)ID_SETTINGS_BTN_UNDO_64, hinst, NULL
+            );
+            data->hwnd_btn_128 = CreateWindowA(
+                "BUTTON", "128", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW | WS_TABSTOP,
+                467, 251, 62, 26, hwnd, (HMENU)ID_SETTINGS_BTN_UNDO_128, hinst, NULL
+            );
+            data->hwnd_btn_256 = CreateWindowA(
+                "BUTTON", "256", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW | WS_TABSTOP,
+                535, 251, 62, 26, hwnd, (HMENU)ID_SETTINGS_BTN_UNDO_256, hinst, NULL
+            );
+
+            /* Group 3 Controls: Theme, Grid, and Zuma Folder */
+            MAKE_CHK(ID_SETTINGS_RADIO_THEME_DARK, "Dark Mode Color Theme (High-Contrast Slate)",
+                     40, 385, 340, 20, &data->is_dark_theme);
+            MAKE_CHK(ID_SETTINGS_CHK_SHOW_GRID, "Show Canvas Coordinate Grid by Default",
+                     40, 412, 340, 20, &data->show_grid);
+
+            data->hwnd_btn_change_zuma = CreateWindowA(
+                "BUTTON", "Change Folder...", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW | WS_TABSTOP,
+                480, 439, 118, 26, hwnd, (HMENU)ID_SETTINGS_BTN_CHANGE_ZUMA, hinst, NULL
+            );
+
+            /* Bottom Bar Action Buttons */
+            data->hwnd_btn_reset = CreateWindowA(
+                "BUTTON", "Reset Defaults", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW | WS_TABSTOP,
+                24, 522, 115, 32, hwnd, (HMENU)ID_SETTINGS_BTN_RESET, hinst, NULL
+            );
+            data->hwnd_btn_cancel = CreateWindowA(
+                "BUTTON", "Cancel", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW | WS_TABSTOP,
+                386, 522, 95, 32, hwnd, (HMENU)ID_SETTINGS_BTN_CANCEL, hinst, NULL
+            );
+            data->hwnd_btn_save = CreateWindowA(
+                "BUTTON", "Save && Apply", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW | WS_TABSTOP,
+                491, 522, 125, 32, hwnd, (HMENU)ID_SETTINGS_BTN_SAVE, hinst, NULL
+            );
+
+            #undef MAKE_CHK
+            return 0;
+        }
+
+        case WM_CTLCOLOREDIT: {
+            HDC hdc = (HDC)wParam;
+            COLORREF bg = is_dark ? RGB(32, 36, 44) : RGB(255, 255, 255);
+            COLORREF fg = is_dark ? RGB(220, 225, 235) : RGB(20, 24, 32);
+            SetBkColor(hdc, bg);
+            SetTextColor(hdc, fg);
+            static HBRUSH s_edit_brush = NULL;
+            if (s_edit_brush) DeleteObject(s_edit_brush);
+            s_edit_brush = CreateSolidBrush(bg);
+            return (LRESULT)s_edit_brush;
+        }
+
+        case WM_CTLCOLORSTATIC: {
+            HDC hdc = (HDC)wParam;
+            SetBkMode(hdc, TRANSPARENT);
+            SetTextColor(hdc, th->text_primary);
+            return (LRESULT)GetStockObject(NULL_BRUSH);
+        }
+
+        case WM_ERASEBKGND:
+            return 1;
+
+        case WM_PAINT: {
+            PAINTSTRUCT ps;
+            HDC hdc = BeginPaint(hwnd, &ps);
+            RECT rc_client;
+            GetClientRect(hwnd, &rc_client);
+
+            /* 1. Window Background */
+            HBRUSH bg_br = CreateSolidBrush(th->bar_bg);
+            FillRect(hdc, &rc_client, bg_br);
+            DeleteObject(bg_br);
+
+            /* 2. Header Banner */
+            RECT rc_hdr_title = { 24, 14, rc_client.right - 24, 36 };
+            SetBkMode(hdc, TRANSPARENT);
+            SetTextColor(hdc, th->text_accent_blue);
+            SelectObject(hdc, g_font_primary_bold);
+            DrawTextA(hdc, "Settings & Performance Tuning", -1, &rc_hdr_title, DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_NOPREFIX);
+
+            RECT rc_hdr_sub = { 24, 36, rc_client.right - 24, 56 };
+            SetTextColor(hdc, th->text_secondary);
+            SelectObject(hdc, g_font_primary_regular);
+            DrawTextA(hdc, "Configure hardware blit, HUD surface caching, and action history buffer.", -1, &rc_hdr_sub, DT_SINGLELINE | DT_LEFT | DT_VCENTER);
+
+            /* 3. Cards */
+            draw_settings_card(hdc, 24, 66, rc_client.right - 48, 140, "PERFORMANCE & GPU ACCELERATION", th, is_dark);
+            /* Descriptions under checkboxes */
+            SelectObject(hdc, g_font_primary_regular);
+            SetTextColor(hdc, th->text_dim);
+            RECT rc_d1 = { 58, 115, rc_client.right - 40, 131 };
+            DrawTextA(hdc, "Hardware block transfer (BitBlt). Eliminates CPU blend loops when HUDs are 100% opaque.", -1, &rc_d1, DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_NOPREFIX);
+            RECT rc_d2 = { 58, 153, rc_client.right - 40, 169 };
+            DrawTextA(hdc, "Caches rendered guide & tools text into persistent surfaces for zero-lag 60+ FPS zoom & scroll.", -1, &rc_d2, DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_NOPREFIX);
+            RECT rc_d3 = { 58, 191, rc_client.right - 40, 207 };
+            DrawTextA(hdc, "Smoothly handles high-frequency wheel ticks on gaming and precision mice.", -1, &rc_d3, DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_NOPREFIX);
+
+            draw_settings_card(hdc, 24, 218, rc_client.right - 48, 120, "ACTION HISTORY BUFFER (UNDO / REDO IN RAM)", th, is_dark);
+            SetTextColor(hdc, th->text_primary);
+            RECT rc_lbl_limit = { 40, 252, 235, 276 };
+            DrawTextA(hdc, "Snapshot History Limit (Turns):", -1, &rc_lbl_limit, DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_NOPREFIX);
+
+            SetTextColor(hdc, th->text_dim);
+            RECT rc_d_hist = { 40, 285, rc_client.right - 40, 325 };
+            DrawTextA(hdc, "Sets maximum undo/redo states retained in memory (Min: 10, Max: 256 turns).\r\nUses zero disk cache. High limits allow deep experimental editing without memory bottlenecks.", -1, &rc_d_hist, DT_WORDBREAK | DT_LEFT);
+
+            draw_settings_card(hdc, 24, 350, rc_client.right - 48, 135, "ENVIRONMENT & WORKSPACE", th, is_dark);
+            SetTextColor(hdc, th->text_primary);
+            RECT rc_lbl_zuma = { 40, 442, 175, 466 };
+            DrawTextA(hdc, "Zuma Deluxe Folder:", -1, &rc_lbl_zuma, DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_NOPREFIX);
+
+            char zuma_disp[MAX_PATH];
+            if (g_has_zuma_dir && g_zuma_levels_dir[0]) {
+                snprintf(zuma_disp, sizeof(zuma_disp), "%s", g_zuma_levels_dir);
+            } else {
+                snprintf(zuma_disp, sizeof(zuma_disp), "(No Zuma Deluxe folder configured)");
+            }
+            SetTextColor(hdc, (g_has_zuma_dir && g_zuma_levels_dir[0]) ? th->text_accent_green : th->text_secondary);
+            SelectObject(hdc, g_font_mono_regular);
+            RECT rc_txt_zuma = { 180, 442, 470, 466 };
+            DrawTextA(hdc, zuma_disp, -1, &rc_txt_zuma, DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_PATH_ELLIPSIS);
+
+            /* 4. Bottom Separator */
+            HPEN sep_pen = CreatePen(PS_SOLID, 1, th->bar_border);
+            HPEN old_sp = (HPEN)SelectObject(hdc, sep_pen);
+            MoveToEx(hdc, 0, rc_client.bottom - 56, NULL);
+            LineTo(hdc, rc_client.right, rc_client.bottom - 56);
+            SelectObject(hdc, old_sp);
+            DeleteObject(sep_pen);
+
+            EndPaint(hwnd, &ps);
+            return 0;
+        }
+
+        case WM_DRAWITEM: {
+            LPDRAWITEMSTRUCT dis = (LPDRAWITEMSTRUCT)lParam;
+            if (dis->CtlType == ODT_BUTTON) {
+                bool is_pressed = (dis->itemState & ODS_SELECTED) != 0;
+                bool is_save = (dis->CtlID == ID_SETTINGS_BTN_SAVE);
+
+                COLORREF bg_col;
+                COLORREF border_col;
+                COLORREF text_col;
+
+                if (is_save) {
+                    bg_col = is_pressed ? RGB(18, 70, 140) : th->text_accent_blue;
+                    border_col = bg_col;
+                    text_col = RGB(255, 255, 255);
+                } else {
+                    bg_col = is_pressed ? th->btn_bg_pressed : th->btn_bg;
+                    border_col = th->btn_border;
+                    text_col = th->btn_text;
+                }
+
+                HBRUSH bg_brush = CreateSolidBrush(bg_col);
+                FillRect(dis->hDC, &dis->rcItem, bg_brush);
+                DeleteObject(bg_brush);
+
+                HPEN pen = CreatePen(PS_SOLID, 1, border_col);
+                HPEN old_pen = (HPEN)SelectObject(dis->hDC, pen);
+                SelectObject(dis->hDC, GetStockObject(NULL_BRUSH));
+                Rectangle(dis->hDC, dis->rcItem.left, dis->rcItem.top, dis->rcItem.right, dis->rcItem.bottom);
+                SelectObject(dis->hDC, old_pen);
+                DeleteObject(pen);
+
+                char text[48] = {0};
+                GetWindowTextA(dis->hwndItem, text, sizeof(text));
+
+                SetBkMode(dis->hDC, TRANSPARENT);
+                SetTextColor(dis->hDC, text_col);
+                HFONT hfont_btn = is_save ? g_font_primary_bold : g_font_primary_regular;
+                if (!hfont_btn) hfont_btn = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
+                HFONT old_font = (HFONT)SelectObject(dis->hDC, hfont_btn);
+
+                RECT rc_t = dis->rcItem;
+                if (is_pressed) { rc_t.left += 1; rc_t.top += 1; }
+                DrawTextA(dis->hDC, text, -1, &rc_t, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
+                SelectObject(dis->hDC, old_font);
+                return TRUE;
+            }
+            break;
+        }
+
+        case WM_COMMAND: {
+            int cmd = LOWORD(wParam);
+            if (cmd == ID_SETTINGS_BTN_UNDO_32) {
+                if (data && data->hwnd_edit_undo_limit) SetWindowTextA(data->hwnd_edit_undo_limit, "32");
+            } else if (cmd == ID_SETTINGS_BTN_UNDO_64) {
+                if (data && data->hwnd_edit_undo_limit) SetWindowTextA(data->hwnd_edit_undo_limit, "64");
+            } else if (cmd == ID_SETTINGS_BTN_UNDO_128) {
+                if (data && data->hwnd_edit_undo_limit) SetWindowTextA(data->hwnd_edit_undo_limit, "128");
+            } else if (cmd == ID_SETTINGS_BTN_UNDO_256) {
+                if (data && data->hwnd_edit_undo_limit) SetWindowTextA(data->hwnd_edit_undo_limit, "256");
+            } else if (cmd == ID_SETTINGS_BTN_CHANGE_ZUMA) {
+                handle_set_zuma_folder(hwnd);
+                InvalidateRect(hwnd, NULL, TRUE);
+            } else if (cmd == ID_SETTINGS_BTN_RESET) {
+                if (data) {
+                    data->chk_direct_blit = true;
+                    data->chk_hud_cache = true;
+                    data->chk_smooth_scroll = true;
+                    data->is_dark_theme = true;
+                    data->show_grid = true;
+                    if (data->hwnd_edit_undo_limit) SetWindowTextA(data->hwnd_edit_undo_limit, "64");
+                    InvalidateRect(hwnd, NULL, TRUE);
+                }
+            } else if (cmd == ID_SETTINGS_BTN_CANCEL) {
+                if (data) data->is_done = true;
+                DestroyWindow(hwnd);
+            } else if (cmd == ID_SETTINGS_BTN_SAVE) {
+                if (data) {
+                    char buf[32] = {0};
+                    if (data->hwnd_edit_undo_limit) {
+                        GetWindowTextA(data->hwnd_edit_undo_limit, buf, sizeof(buf));
+                    }
+                    int lim = atoi(buf);
+                    if (lim < 10) lim = 10;
+                    if (lim > MAX_UNDO_STACK) lim = MAX_UNDO_STACK;
+
+                    g_perf_direct_blit = data->chk_direct_blit;
+                    g_perf_hud_cache = data->chk_hud_cache;
+                    g_perf_smooth_scroll = data->chk_smooth_scroll;
+                    g_show_grid = data->show_grid;
+
+                    HWND parent = GetParent(hwnd);
+                    if (parent && IsWindow(parent)) {
+                        AppTheme new_th = data->is_dark_theme ? THEME_DARK : THEME_LIGHT;
+                        if (g_current_theme != new_th) {
+                            apply_theme(parent, new_th);
+                        }
+                    }
+
+                    undo_set_history_limit(lim);
+                    invalidate_hud_cache();
+                    save_zuma_config();
+
+                    if (parent && IsWindow(parent)) {
+                        create_main_menu(parent);
+                        InvalidateRect(parent, NULL, TRUE);
+                        UpdateWindow(parent);
+                    }
+
+                    data->is_done = true;
+                }
+                DestroyWindow(hwnd);
+            }
+            break;
+        }
+
+        case WM_CLOSE: {
+            if (data) data->is_done = true;
+            DestroyWindow(hwnd);
+            return 0;
+        }
+    }
+    return DefWindowProcA(hwnd, msg, wParam, lParam);
+}
+
+void show_settings_dialog(HWND parent_hwnd) {
+    HINSTANCE hinst = GetModuleHandle(NULL);
+    static bool s_settings_class_registered = false;
+    if (!s_settings_class_registered) {
+        WNDCLASSA wc;
+        memset(&wc, 0, sizeof(wc));
+        wc.style         = CS_DROPSHADOW | CS_DBLCLKS;
+        wc.lpfnWndProc   = SettingsModalWndProc;
+        wc.hInstance     = hinst;
+        wc.lpszClassName = "ZuPatherSettingsModal";
+        wc.hCursor       = LoadCursor(NULL, IDC_ARROW);
+        RegisterClassA(&wc);
+        s_settings_class_registered = true;
+    }
+
+    int dlg_w = 640;
+    int dlg_h = 585;
+
+    RECT rc_parent = {0};
+    if (parent_hwnd && IsWindow(parent_hwnd)) {
+        GetWindowRect(parent_hwnd, &rc_parent);
+    } else {
+        GetWindowRect(GetDesktopWindow(), &rc_parent);
+    }
+
+    int cx = rc_parent.left + ((rc_parent.right - rc_parent.left) - dlg_w) / 2;
+    int cy = rc_parent.top + ((rc_parent.bottom - rc_parent.top) - dlg_h) / 2;
+
+    SettingsModalData data;
+    memset(&data, 0, sizeof(data));
+    data.chk_direct_blit = g_perf_direct_blit;
+    data.chk_hud_cache = g_perf_hud_cache;
+    data.chk_smooth_scroll = g_perf_smooth_scroll;
+    data.undo_limit_val = g_undo_limit;
+    data.is_dark_theme = (g_current_theme == THEME_DARK);
+    data.show_grid = g_show_grid;
+    data.is_done = false;
+
+    HWND prev_modal = g_active_modal_dlg;
+    BOOL parent_was_enabled = TRUE;
+    if (parent_hwnd && IsWindow(parent_hwnd)) {
+        parent_was_enabled = IsWindowEnabled(parent_hwnd);
+        if (parent_was_enabled) {
+            EnableWindow(parent_hwnd, FALSE);
+        }
+    }
+
+    HWND hwnd_dlg = CreateWindowExA(
+        WS_EX_DLGMODALFRAME,
+        "ZuPatherSettingsModal",
+        "Settings & Preferences",
+        WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
+        cx, cy, dlg_w, dlg_h,
+        parent_hwnd, NULL, hinst, &data
+    );
+
+    if (!hwnd_dlg) {
+        if (parent_hwnd && IsWindow(parent_hwnd) && parent_was_enabled) {
+            EnableWindow(parent_hwnd, TRUE);
+        }
+        return;
+    }
+
+    update_window_theme_attributes(hwnd_dlg, g_current_theme == THEME_DARK);
+    g_active_modal_dlg = hwnd_dlg;
+    SetFocus(hwnd_dlg);
+
+    MSG msg;
+    while (!data.is_done && IsWindow(hwnd_dlg) && GetMessageA(&msg, NULL, 0, 0)) {
+        if (data.is_done) break;
+        if (msg.message == WM_KEYDOWN) {
+            if (msg.wParam == VK_ESCAPE) {
+                data.is_done = true;
+                DestroyWindow(hwnd_dlg);
+                break;
+            }
+        }
+        TranslateMessage(&msg);
+        DispatchMessageA(&msg);
+    }
+
+    g_active_modal_dlg = prev_modal;
+    if (parent_hwnd && IsWindow(parent_hwnd)) {
+        if (parent_was_enabled) {
+            EnableWindow(parent_hwnd, TRUE);
+        }
+        SetForegroundWindow(parent_hwnd);
+        SetFocus(parent_hwnd);
     }
 }

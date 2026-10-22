@@ -526,6 +526,21 @@ void undo_redo_init(void) {
     undo_reset();
 }
 
+void undo_set_history_limit(int limit) {
+    if (limit < 10) limit = 10;
+    if (limit > MAX_UNDO_STACK) limit = MAX_UNDO_STACK;
+    g_undo_limit = limit;
+    while (s_undo_count > limit) {
+        free_snapshot_memory(&s_stack[0]);
+        memmove(&s_stack[0], &s_stack[1], (s_undo_count - 1) * sizeof(UndoMemorySnapshot));
+        s_undo_count--;
+        if (s_current_idx > 0) s_current_idx--;
+    }
+    if (g_hwnd_main && IsWindow(g_hwnd_main)) {
+        undo_redo_update_menu(g_hwnd_main);
+    }
+}
+
 void undo_reset(void) {
     for (int i = 0; i < s_undo_count; ++i) {
         free_snapshot_memory(&s_stack[i]);
@@ -568,12 +583,16 @@ void undo_snapshot_capture(const char *action_name) {
         s_undo_count = s_current_idx + 1;
     }
 
-    /* If stack reached capacity (64 turns limit), slide oldest snapshot out */
-    if (s_undo_count >= MAX_UNDO_STACK) {
+    int eff_limit = g_undo_limit;
+    if (eff_limit < 10) eff_limit = 10;
+    if (eff_limit > MAX_UNDO_STACK) eff_limit = MAX_UNDO_STACK;
+
+    /* If stack reached capacity, slide oldest snapshot out */
+    if (s_undo_count >= eff_limit) {
         free_snapshot_memory(&s_stack[0]);
-        memmove(&s_stack[0], &s_stack[1], (MAX_UNDO_STACK - 1) * sizeof(UndoMemorySnapshot));
-        s_undo_count = MAX_UNDO_STACK - 1;
-        s_current_idx = MAX_UNDO_STACK - 2;
+        memmove(&s_stack[0], &s_stack[1], (s_undo_count - 1) * sizeof(UndoMemorySnapshot));
+        s_undo_count = eff_limit - 1;
+        s_current_idx = eff_limit - 2;
     }
 
     /* Record new snapshot */

@@ -115,7 +115,11 @@ typedef void(WINAPI *pfnFlushMenuThemes)(void);
 #define ID_MENU_EDIT_UNDO         210
 #define ID_MENU_EDIT_REDO         211
 #define ID_MENU_ACTION_HISTORY_BASE 7000
-#define ID_MENU_ACTION_HISTORY_MAX  (ID_MENU_ACTION_HISTORY_BASE + 64)
+#define ID_MENU_ACTION_HISTORY_MAX  (ID_MENU_ACTION_HISTORY_BASE + 256)
+#define ID_MENU_SETTINGS_PREFERENCES     340
+#define ID_MENU_SETTINGS_DIRECT_BLIT    341
+#define ID_MENU_SETTINGS_HUD_CACHE      342
+#define ID_MENU_SETTINGS_SMOOTH_SCROLL  343
 #define ID_MENU_VIEW_ZOOMIN       301
 #define ID_MENU_VIEW_ZOOMOUT      302
 #define ID_MENU_VIEW_100          303
@@ -228,6 +232,23 @@ typedef void(WINAPI *pfnFlushMenuThemes)(void);
 #define ID_OPEN_BTN_DELETE        543
 #define ID_OPEN_BTN_REFRESH       544
 #define ID_OPEN_BTN_CANCEL        545
+
+/* Settings / Preferences Modal Control IDs */
+#define ID_SETTINGS_CHK_DIRECT_BLIT     5801
+#define ID_SETTINGS_CHK_HUD_CACHE       5802
+#define ID_SETTINGS_CHK_SMOOTH_SCROLL   5803
+#define ID_SETTINGS_EDIT_UNDO_LIMIT     5804
+#define ID_SETTINGS_BTN_UNDO_32         5805
+#define ID_SETTINGS_BTN_UNDO_64         5806
+#define ID_SETTINGS_BTN_UNDO_128        5807
+#define ID_SETTINGS_BTN_UNDO_256        5808
+#define ID_SETTINGS_RADIO_THEME_DARK    5809
+#define ID_SETTINGS_RADIO_THEME_LIGHT   5810
+#define ID_SETTINGS_CHK_SHOW_GRID       5811
+#define ID_SETTINGS_BTN_SAVE            5812
+#define ID_SETTINGS_BTN_CANCEL          5813
+#define ID_SETTINGS_BTN_RESET           5814
+#define ID_SETTINGS_BTN_CHANGE_ZUMA     5815
 
 /* Rename Canvas Modal Control IDs */
 #define ID_RENAME_EDIT_NAME       550
@@ -794,6 +815,13 @@ void reset_map_and_dev_attributes(void);
 
 extern HWND g_active_modal_dlg;
 
+/* Performance & History Preferences */
+extern bool g_perf_direct_blit;
+extern bool g_perf_hud_cache;
+extern bool g_perf_smooth_scroll;
+extern int  g_undo_limit;
+void invalidate_hud_cache(void);
+
 extern bool  g_show_grid;
 extern float g_zoom;
 extern float g_pan_x;
@@ -810,6 +838,8 @@ const ThemeColors *get_theme(void);
 void draw_menu_nc_bottom_line(HWND hWnd, COLORREF bg_color);
 void update_window_theme_attributes(HWND hwnd, bool is_dark);
 void apply_control_dark_mode(HWND hwnd_ctrl, bool is_dark);
+void apply_theme(HWND hwnd, AppTheme new_theme);
+void create_main_menu(HWND hwnd);
 void load_frog_sprite(void);
 void load_coin_sprite(void);
 void free_cutout(LevelCutout *co);
