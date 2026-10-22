@@ -11338,11 +11338,11 @@ static void draw_settings_card(HDC hdc, int x, int y, int w, int h, const char *
     DeleteObject(pen);
 
     if (title && title[0]) {
-        RECT rc_t = { x + 16, y + 8, x + w - 16, y + 26 };
+        RECT rc_t = { x + 16, y + 12, x + w - 16, y + 28 };
         SetBkMode(hdc, TRANSPARENT);
         SetTextColor(hdc, th->text_accent_blue);
         HFONT old_f = (HFONT)SelectObject(hdc, g_font_primary_bold);
-        DrawTextA(hdc, title, -1, &rc_t, DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_NOPREFIX);
+        DrawTextA(hdc, title, -1, &rc_t, DT_SINGLELINE | DT_LEFT | DT_TOP | DT_NOPREFIX);
         SelectObject(hdc, old_f);
     }
 }
@@ -11471,17 +11471,17 @@ static LRESULT CALLBACK SettingsModalWndProc(HWND hwnd, UINT msg, WPARAM wParam,
 
             /* Section 1: Performance Checkboxes (inside Card 1) */
             MAKE_CHK(ID_SETTINGS_CHK_DIRECT_BLIT, "Direct Blit (Bypass CPU AlphaBlend on opaque HUDs)",
-                     36, 90, 448, 20, &data->chk_direct_blit);
+                     36, 104, 468, 18, &data->chk_direct_blit);
             MAKE_CHK(ID_SETTINGS_CHK_HUD_CACHE, "Offscreen HUD Surface Caching (60+ FPS Viewport)",
-                     36, 130, 448, 20, &data->chk_hud_cache);
+                     36, 149, 468, 18, &data->chk_hud_cache);
             MAKE_CHK(ID_SETTINGS_CHK_SMOOTH_SCROLL, "Smooth Mouse Wheel & Precision Event Coalescing",
-                     36, 170, 448, 20, &data->chk_smooth_scroll);
+                     36, 194, 468, 18, &data->chk_smooth_scroll);
 
             /* Section 2: Action History Edit (inside Card 2) */
             data->hwnd_edit_undo_limit = CreateWindowExA(
                 WS_EX_CLIENTEDGE, "EDIT", "64",
                 WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_NUMBER | ES_CENTER,
-                196, 260, 60, 24, hwnd, (HMENU)ID_SETTINGS_EDIT_UNDO_LIMIT, hinst, NULL
+                196, 289, 60, 24, hwnd, (HMENU)ID_SETTINGS_EDIT_UNDO_LIMIT, hinst, NULL
             );
             SendMessage(data->hwnd_edit_undo_limit, WM_SETFONT, (WPARAM)g_font_mono_bold, TRUE);
             char cur_limit_str[32];
@@ -11490,27 +11490,27 @@ static LRESULT CALLBACK SettingsModalWndProc(HWND hwnd, UINT msg, WPARAM wParam,
 
             /* Section 3: Workspace & Environment (inside Card 3) */
             MAKE_CHK(ID_SETTINGS_RADIO_THEME_DARK, "Dark Mode Color Theme (High-Contrast Slate)",
-                     36, 360, 448, 20, &data->is_dark_theme);
+                     36, 394, 468, 18, &data->is_dark_theme);
             MAKE_CHK(ID_SETTINGS_CHK_SHOW_GRID, "Show Canvas Coordinate Grid by Default",
-                     36, 384, 448, 20, &data->show_grid);
+                     36, 420, 468, 18, &data->show_grid);
 
             data->hwnd_btn_change_zuma = CreateWindowA(
                 "BUTTON", "Change...", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW | WS_TABSTOP,
-                414, 410, 90, 26, hwnd, (HMENU)ID_SETTINGS_BTN_CHANGE_ZUMA, hinst, NULL
+                414, 448, 90, 26, hwnd, (HMENU)ID_SETTINGS_BTN_CHANGE_ZUMA, hinst, NULL
             );
 
             /* Bottom Action Buttons (No line above them) */
             data->hwnd_btn_reset = CreateWindowA(
                 "BUTTON", "Reset Defaults", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW | WS_TABSTOP,
-                20, 466, 110, 30, hwnd, (HMENU)ID_SETTINGS_BTN_RESET, hinst, NULL
+                20, 500, 110, 30, hwnd, (HMENU)ID_SETTINGS_BTN_RESET, hinst, NULL
             );
             data->hwnd_btn_cancel = CreateWindowA(
                 "BUTTON", "Cancel", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW | WS_TABSTOP,
-                312, 466, 86, 30, hwnd, (HMENU)ID_SETTINGS_BTN_CANCEL, hinst, NULL
+                312, 500, 86, 30, hwnd, (HMENU)ID_SETTINGS_BTN_CANCEL, hinst, NULL
             );
             data->hwnd_btn_save = CreateWindowA(
                 "BUTTON", "Save & Apply", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW | WS_TABSTOP,
-                408, 466, 112, 30, hwnd, (HMENU)ID_SETTINGS_BTN_SAVE, hinst, NULL
+                408, 500, 112, 30, hwnd, (HMENU)ID_SETTINGS_BTN_SAVE, hinst, NULL
             );
 
             #undef MAKE_CHK
@@ -11553,45 +11553,45 @@ static LRESULT CALLBACK SettingsModalWndProc(HWND hwnd, UINT msg, WPARAM wParam,
             SetBkMode(hdc, TRANSPARENT);
 
             /* 2. Header Banner */
-            RECT rc_title = { 20, 14, rc.right - 20, 36 };
+            RECT rc_title = { 20, 16, rc.right - 20, 36 };
             SetTextColor(hdc, th->text_primary);
             SelectObject(hdc, g_font_primary_bold);
             DrawTextA(hdc, "Settings & Preferences", -1, &rc_title, DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_NOPREFIX);
 
-            RECT rc_sub = { 20, 36, rc.right - 20, 56 };
+            RECT rc_sub = { 20, 38, rc.right - 20, 54 };
             SetTextColor(hdc, th->text_secondary);
             SelectObject(hdc, g_font_primary_regular);
             DrawTextA(hdc, "Configure viewport optimizations, action history, and workspace.", -1, &rc_sub, DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_NOPREFIX);
 
-            /* 3. Card 1: PERFORMANCE */
-            draw_settings_card(hdc, 20, 62, rc.right - 40, 160, "PERFORMANCE & GPU ACCELERATION", th, is_dark);
+            /* 3. Card 1: PERFORMANCE (y: 66 to 241 -> h = 175, top pad: 12, btm pad: 12) */
+            draw_settings_card(hdc, 20, 66, rc.right - 40, 175, "PERFORMANCE & GPU ACCELERATION", th, is_dark);
             SelectObject(hdc, g_font_primary_regular);
             SetTextColor(hdc, th->text_dim);
-            RECT rc_d1 = { 56, 110, rc.right - 40, 126 };
+            RECT rc_d1 = { 56, 124, rc.right - 40, 139 };
             DrawTextA(hdc, "Hardware block transfer (BitBlt). Eliminates CPU blend loops on opaque HUDs.", -1, &rc_d1, DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_NOPREFIX);
-            RECT rc_d2 = { 56, 150, rc.right - 40, 166 };
+            RECT rc_d2 = { 56, 169, rc.right - 40, 184 };
             DrawTextA(hdc, "Caches rendered HUD surfaces for zero-lag 60+ FPS zoom & scroll.", -1, &rc_d2, DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_NOPREFIX);
-            RECT rc_d3 = { 56, 190, rc.right - 40, 206 };
+            RECT rc_d3 = { 56, 214, rc.right - 40, 229 };
             DrawTextA(hdc, "Smoothly handles high-frequency wheel ticks on gaming and precision mice.", -1, &rc_d3, DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_NOPREFIX);
 
-            /* 4. Card 2: ACTION HISTORY */
-            draw_settings_card(hdc, 20, 232, rc.right - 40, 92, "ACTION HISTORY", th, is_dark);
-            RECT rc_lbl_hist = { 36, 260, 190, 284 };
+            /* 4. Card 2: ACTION HISTORY (y: 251 to 346 -> h = 95, top pad: 12, btm pad: 12) */
+            draw_settings_card(hdc, 20, 251, rc.right - 40, 95, "ACTION HISTORY", th, is_dark);
+            RECT rc_lbl_hist = { 36, 289, 190, 313 };
             SetTextColor(hdc, th->text_primary);
             SelectObject(hdc, g_font_primary_regular);
             DrawTextA(hdc, "Snapshot History Limit:", -1, &rc_lbl_hist, DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_NOPREFIX);
 
-            RECT rc_unit_hist = { 266, 260, rc.right - 40, 284 };
+            RECT rc_unit_hist = { 266, 289, rc.right - 40, 313 };
             SetTextColor(hdc, th->text_secondary);
             DrawTextA(hdc, "actions", -1, &rc_unit_hist, DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_NOPREFIX);
 
-            RECT rc_sub_hist = { 36, 292, rc.right - 40, 310 };
+            RECT rc_sub_hist = { 36, 319, rc.right - 40, 334 };
             SetTextColor(hdc, th->text_dim);
             DrawTextA(hdc, "Maximum undo/redo states retained in memory (zero disk cache).", -1, &rc_sub_hist, DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_NOPREFIX);
 
-            /* 5. Card 3: WORKSPACE & ENVIRONMENT */
-            draw_settings_card(hdc, 20, 334, rc.right - 40, 118, "WORKSPACE & ENVIRONMENT", th, is_dark);
-            RECT rc_lbl_zuma = { 36, 412, 126, 436 };
+            /* 5. Card 3: WORKSPACE & ENVIRONMENT (y: 356 to 486 -> h = 130, top pad: 12, btm pad: 12) */
+            draw_settings_card(hdc, 20, 356, rc.right - 40, 130, "WORKSPACE & ENVIRONMENT", th, is_dark);
+            RECT rc_lbl_zuma = { 36, 448, 126, 474 };
             SetTextColor(hdc, th->text_primary);
             SelectObject(hdc, g_font_primary_regular);
             DrawTextA(hdc, "Zuma Folder:", -1, &rc_lbl_zuma, DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_NOPREFIX);
@@ -11604,7 +11604,7 @@ static LRESULT CALLBACK SettingsModalWndProc(HWND hwnd, UINT msg, WPARAM wParam,
             }
             SetTextColor(hdc, (g_has_zuma_dir && g_zuma_levels_dir[0]) ? th->text_accent_green : th->text_secondary);
             SelectObject(hdc, g_font_mono_regular);
-            RECT rc_txt_zuma = { 128, 412, 406, 436 };
+            RECT rc_txt_zuma = { 128, 448, 406, 474 };
             DrawTextA(hdc, zuma_disp, -1, &rc_txt_zuma, DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_PATH_ELLIPSIS);
 
             /* Notice: NO horizontal line above the bottom buttons! */
@@ -11744,7 +11744,7 @@ void show_settings_dialog(HWND parent_hwnd) {
         s_settings_class_registered = true;
     }
 
-    RECT rc_dlg = { 0, 0, 540, 512 };
+    RECT rc_dlg = { 0, 0, 540, 544 };
     AdjustWindowRectEx(&rc_dlg, WS_POPUP | WS_CAPTION | WS_SYSMENU, FALSE, WS_EX_DLGMODALFRAME);
     int dlg_w = rc_dlg.right - rc_dlg.left;
     int dlg_h = rc_dlg.bottom - rc_dlg.top;
