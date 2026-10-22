@@ -5,6 +5,48 @@
 #include <ctype.h>
 #include <math.h>
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
+#define SVG_MAX_GROUP_DEPTH 64
+
+/* 2D Affine Transformation Matrix:
+ * | a  c  e |
+ * | b  d  f |
+ * | 0  0  1 |
+ * Transformed point: x' = a*x + c*y + e, y' = b*x + d*y + f
+ */
+typedef struct {
+    float a, b, c, d, e, f;
+} SvgMatrix;
+
+static inline SvgMatrix svg_matrix_identity(void) {
+    SvgMatrix m = { 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f };
+    return m;
+}
+
+static inline SvgMatrix svg_matrix_multiply(SvgMatrix m1, SvgMatrix m2) {
+    SvgMatrix res;
+    res.a = m1.a * m2.a + m1.c * m2.b;
+    res.b = m1.b * m2.a + m1.d * m2.b;
+    res.c = m1.a * m2.c + m1.c * m2.d;
+    res.d = m1.b * m2.c + m1.d * m2.d;
+    res.e = m1.a * m2.e + m1.c * m2.f + m1.e;
+    res.f = m1.b * m2.e + m1.d * m2.f + m1.f;
+    return res;
+}
+
+static inline void svg_matrix_transform_point(SvgMatrix m, float x, float y, float *ox, float *oy) {
+    if (ox) *ox = m.a * x + m.c * y + m.e;
+    if (oy) *oy = m.b * x + m.d * y + m.f;
+}
+
+static inline void svg_matrix_transform_vec(SvgMatrix m, float vx, float vy, float *ovx, float *ovy) {
+    if (ovx) *ovx = m.a * vx + m.c * vy;
+    if (ovy) *ovy = m.b * vx + m.d * vy;
+}
+
 /* Skip SVG delimiters: spaces, commas, newlines */
 static void skip_svg_whitespace(const char **p) {
     while (**p && (isspace((unsigned char)**p) || **p == ',')) {
@@ -25,6 +67,188 @@ static bool parse_svg_coord(const char **p, float *out_val) {
     *out_val = val;
     *p = endptr;
     return true;
+}
+
+/* Parse SVG transform attribute list, chaining transforms:
+ * matrix(a, b, c, d, e, f)
+ * translate(tx [, ty])
+ * scale(sx [, sy])
+ * rotate(angle [, cx, cy])
+ * skewX(angle)
+ * skewY(angle)
+ */
+static SvgMatrix parse_svg_transform_list(const char *t_str) {
+    SvgMatrix current = svg_matrix_identity();
+    if (!t_str) return current;
+
+    const char *p = t_str;
+    while (*p) {
+        skip_svg_whitespace(&p);
+        if (!*p) break;
+
+        char fname[32];
+        int fidx = 0;
+        while (*p && isalpha((unsigned char)*p) && fidx < (int)sizeof(fname) - 1) {
+            fname[fidx++] = *p++;
+        }
+        fname[fidx] = '\0';
+
+        skip_svg_whitespace(&p);
+        if (*p != '(') {
+            if (*p) p++;
+            continue;
+        }
+        p++;
+
+        float args[8];
+        int arg_count = 0;
+        while (*p && *p != ')' && arg_count < 8) {
+            float v = 0.0f;
+            if (parse_svg_coord(&p, &v)) {
+                args[arg_count++] = v;
+            } else {
+                if (*p != ')') p++;
+            }
+            skip_svg_whitespace(&p);
+        }
+
+        if (*p == ')') p++;
+
+        SvgMatrix fn_m = svg_matrix_identity();
+        bool valid_fn = false;
+
+        if (_stricmp(fname, "matrix") == 0 && arg_count >= 6) {
+            fn_m.a = args[0];
+            fn_m.b = args[1];
+            fn_m.c = args[2];
+            fn_m.d = args[3];
+            fn_m.e = args[4];
+            fn_m.f = args[5];
+            valid_fn = true;
+        } else if (_stricmp(fname, "translate") == 0 && arg_count >= 1) {
+            float tx = args[0];
+            float ty = (arg_count >= 2) ? args[1] : 0.0f;
+            fn_m.e = tx;
+            fn_m.f = ty;
+            valid_fn = true;
+        } else if (_stricmp(fname, "scale") == 0 && arg_count >= 1) {
+            float sx = args[0];
+            float sy = (arg_count >= 2) ? args[1] : sx;
+            fn_m.a = sx;
+            fn_m.d = sy;
+            valid_fn = true;
+        } else if (_stricmp(fname, "rotate") == 0 && arg_count >= 1) {
+            float angle_deg = args[0];
+            float rad = angle_deg * (float)(M_PI / 180.0);
+            float cos_a = cosf(rad);
+            float sin_a = sinf(rad);
+            if (arg_count >= 3) {
+                float cx = args[1];
+                float cy = args[2];
+                fn_m.a = cos_a;
+                fn_m.b = sin_a;
+                fn_m.c = -sin_a;
+                fn_m.d = cos_a;
+                fn_m.e = cx * (1.0f - cos_a) + cy * sin_a;
+                fn_m.f = cy * (1.0f - cos_a) - cx * sin_a;
+            } else {
+                fn_m.a = cos_a;
+                fn_m.b = sin_a;
+                fn_m.c = -sin_a;
+                fn_m.d = cos_a;
+            }
+            valid_fn = true;
+        } else if (_stricmp(fname, "skewX") == 0 && arg_count >= 1) {
+            float rad = args[0] * (float)(M_PI / 180.0);
+            fn_m.c = tanf(rad);
+            valid_fn = true;
+        } else if (_stricmp(fname, "skewY") == 0 && arg_count >= 1) {
+            float rad = args[0] * (float)(M_PI / 180.0);
+            fn_m.b = tanf(rad);
+            valid_fn = true;
+        }
+
+        if (valid_fn) {
+            current = svg_matrix_multiply(current, fn_m);
+        }
+    }
+
+    return current;
+}
+
+/* Extract named attribute value from XML element tag string */
+static char *extract_xml_attribute(const char *tag_start, const char *tag_end, const char *attr_name) {
+    if (!tag_start || !tag_end || !attr_name) return NULL;
+    size_t attr_len = strlen(attr_name);
+
+    const char *p = tag_start;
+    while (p < tag_end) {
+        const char *found = strstr(p, attr_name);
+        if (!found || found >= tag_end) return NULL;
+
+        if (found > tag_start && !isspace((unsigned char)*(found - 1))) {
+            p = found + attr_len;
+            continue;
+        }
+
+        const char *eq = found + attr_len;
+        while (eq < tag_end && isspace((unsigned char)*eq)) eq++;
+        if (eq >= tag_end || *eq != '=') {
+            p = found + attr_len;
+            continue;
+        }
+        eq++;
+        while (eq < tag_end && isspace((unsigned char)*eq)) eq++;
+        if (eq >= tag_end) return NULL;
+
+        char quote = *eq;
+        if (quote != '"' && quote != '\'') {
+            p = eq;
+            continue;
+        }
+        eq++;
+
+        const char *val_end = memchr(eq, quote, (size_t)(tag_end - eq));
+        if (!val_end) return NULL;
+
+        size_t val_len = (size_t)(val_end - eq);
+        char *val = (char *)malloc(val_len + 1);
+        if (!val) return NULL;
+        memcpy(val, eq, val_len);
+        val[val_len] = '\0';
+        return val;
+    }
+    return NULL;
+}
+
+/* Apply 2D affine transformation matrix to all nodes & handles in a BezierPath */
+static void apply_matrix_to_bezier_path(BezierPath *path, SvgMatrix m) {
+    if (!path || path->node_count <= 0) return;
+
+    for (int i = 0; i < path->node_count; ++i) {
+        BezierNode *n = &path->nodes[i];
+        float old_x = n->x;
+        float old_y = n->y;
+
+        svg_matrix_transform_point(m, old_x, old_y, &n->x, &n->y);
+
+        if (n->hin_x != 0.0f || n->hin_y != 0.0f) {
+            float hx, hy;
+            svg_matrix_transform_vec(m, n->hin_x, n->hin_y, &hx, &hy);
+            n->hin_x = hx;
+            n->hin_y = hy;
+        }
+
+        if (n->hout_x != 0.0f || n->hout_y != 0.0f) {
+            float hx, hy;
+            svg_matrix_transform_vec(m, n->hout_x, n->hout_y, &hx, &hy);
+            n->hout_x = hx;
+            n->hout_y = hy;
+        }
+    }
+
+    path_cache_invalidate(path);
+    path_cache_update(path);
 }
 
 /* Extract SVG dimensions from <svg ... width="..." height="..." viewBox="..."> */
@@ -79,6 +303,7 @@ static void extract_svg_dimensions(const char *svg, SvgDimensions *out_dims) {
 /* Parse a single SVG path data string (contents of d="...") into BezierPath array */
 static void parse_d_string(
     const char *d,
+    const char *id_name,
     BezierPath *out_paths,
     int max_paths,
     int *inout_count
@@ -95,6 +320,7 @@ static void parse_d_string(
 
     BezierPath *cur_path = NULL;
     int cur_idx = *inout_count;
+    int subpath_idx = 0;
 
     while (*p) {
         skip_svg_whitespace(&p);
@@ -132,16 +358,25 @@ static void parse_d_string(
                         path_cache_invalidate(cur_path);
                         path_cache_update(cur_path);
                         cur_idx++;
+                        subpath_idx++;
                         cur_path = &out_paths[cur_idx];
                         char name[64];
-                        snprintf(name, sizeof(name), "curve-%d", cur_idx + 1);
+                        if (id_name && id_name[0]) {
+                            snprintf(name, sizeof(name), "%s-%d", id_name, subpath_idx + 1);
+                        } else {
+                            snprintf(name, sizeof(name), "curve-%d", cur_idx + 1);
+                        }
                         bezier_path_init(cur_path, name);
                     }
                 } else if (!cur_path) {
                     if (cur_idx < max_paths) {
                         cur_path = &out_paths[cur_idx];
                         char name[64];
-                        snprintf(name, sizeof(name), "curve-%d", cur_idx + 1);
+                        if (id_name && id_name[0]) {
+                            snprintf(name, sizeof(name), "%s", id_name);
+                        } else {
+                            snprintf(name, sizeof(name), "curve-%d", cur_idx + 1);
+                        }
                         bezier_path_init(cur_path, name);
                     } else {
                         return; /* reached max paths */
@@ -151,8 +386,8 @@ static void parse_d_string(
                 if (cur_path) {
                     BezierNode n;
                     memset(&n, 0, sizeof(BezierNode));
-                    n.x = roundf(cur_x);
-                    n.y = roundf(cur_y);
+                    n.x = cur_x;
+                    n.y = cur_y;
                     n.type = NODE_CORNER;
                     bezier_path_add_node(cur_path, &n);
                 }
@@ -187,15 +422,15 @@ static void parse_d_string(
 
                 if (cur_path && cur_path->node_count > 0) {
                     BezierNode *prev_n = &cur_path->nodes[cur_path->node_count - 1];
-                    prev_n->hout_x = roundf(cp1x - prev_n->x);
-                    prev_n->hout_y = roundf(cp1y - prev_n->y);
+                    prev_n->hout_x = cp1x - prev_n->x;
+                    prev_n->hout_y = cp1y - prev_n->y;
 
                     BezierNode new_n;
                     memset(&new_n, 0, sizeof(BezierNode));
-                    new_n.x = roundf(endx);
-                    new_n.y = roundf(endy);
-                    new_n.hin_x = roundf(cp2x - new_n.x);
-                    new_n.hin_y = roundf(cp2y - new_n.y);
+                    new_n.x = endx;
+                    new_n.y = endy;
+                    new_n.hin_x = cp2x - new_n.x;
+                    new_n.hin_y = cp2y - new_n.y;
                     new_n.type = NODE_SMOOTH;
                     bezier_path_add_node(cur_path, &new_n);
                 }
@@ -233,15 +468,15 @@ static void parse_d_string(
 
                 if (cur_path && cur_path->node_count > 0) {
                     BezierNode *prev_n = &cur_path->nodes[cur_path->node_count - 1];
-                    prev_n->hout_x = roundf(cp1x - prev_n->x);
-                    prev_n->hout_y = roundf(cp1y - prev_n->y);
+                    prev_n->hout_x = cp1x - prev_n->x;
+                    prev_n->hout_y = cp1y - prev_n->y;
 
                     BezierNode new_n;
                     memset(&new_n, 0, sizeof(BezierNode));
-                    new_n.x = roundf(endx);
-                    new_n.y = roundf(endy);
-                    new_n.hin_x = roundf(cp2x - new_n.x);
-                    new_n.hin_y = roundf(cp2y - new_n.y);
+                    new_n.x = endx;
+                    new_n.y = endy;
+                    new_n.hin_x = cp2x - new_n.x;
+                    new_n.hin_y = cp2y - new_n.y;
                     new_n.type = NODE_SMOOTH;
                     bezier_path_add_node(cur_path, &new_n);
                 }
@@ -277,15 +512,15 @@ static void parse_d_string(
 
                 if (cur_path && cur_path->node_count > 0) {
                     BezierNode *prev_n = &cur_path->nodes[cur_path->node_count - 1];
-                    prev_n->hout_x = roundf(cp1x - prev_n->x);
-                    prev_n->hout_y = roundf(cp1y - prev_n->y);
+                    prev_n->hout_x = cp1x - prev_n->x;
+                    prev_n->hout_y = cp1y - prev_n->y;
 
                     BezierNode new_n;
                     memset(&new_n, 0, sizeof(BezierNode));
-                    new_n.x = roundf(endx);
-                    new_n.y = roundf(endy);
-                    new_n.hin_x = roundf(cp2x - new_n.x);
-                    new_n.hin_y = roundf(cp2y - new_n.y);
+                    new_n.x = endx;
+                    new_n.y = endy;
+                    new_n.hin_x = cp2x - new_n.x;
+                    new_n.hin_y = cp2y - new_n.y;
                     new_n.type = NODE_SMOOTH;
                     bezier_path_add_node(cur_path, &new_n);
                 }
@@ -326,15 +561,15 @@ static void parse_d_string(
 
                 if (cur_path && cur_path->node_count > 0) {
                     BezierNode *prev_n = &cur_path->nodes[cur_path->node_count - 1];
-                    prev_n->hout_x = roundf(cp1x - prev_n->x);
-                    prev_n->hout_y = roundf(cp1y - prev_n->y);
+                    prev_n->hout_x = cp1x - prev_n->x;
+                    prev_n->hout_y = cp1y - prev_n->y;
 
                     BezierNode new_n;
                     memset(&new_n, 0, sizeof(BezierNode));
-                    new_n.x = roundf(endx);
-                    new_n.y = roundf(endy);
-                    new_n.hin_x = roundf(cp2x - new_n.x);
-                    new_n.hin_y = roundf(cp2y - new_n.y);
+                    new_n.x = endx;
+                    new_n.y = endy;
+                    new_n.hin_x = cp2x - new_n.x;
+                    new_n.hin_y = cp2y - new_n.y;
                     new_n.type = NODE_SMOOTH;
                     bezier_path_add_node(cur_path, &new_n);
                 }
@@ -367,8 +602,8 @@ static void parse_d_string(
                 if (cur_path) {
                     BezierNode n;
                     memset(&n, 0, sizeof(BezierNode));
-                    n.x = roundf(cur_x);
-                    n.y = roundf(cur_y);
+                    n.x = cur_x;
+                    n.y = cur_y;
                     n.type = NODE_CORNER;
                     bezier_path_add_node(cur_path, &n);
                 }
@@ -396,8 +631,8 @@ static void parse_d_string(
                 if (cur_path) {
                     BezierNode n;
                     memset(&n, 0, sizeof(BezierNode));
-                    n.x = roundf(cur_x);
-                    n.y = roundf(cur_y);
+                    n.x = cur_x;
+                    n.y = cur_y;
                     n.type = NODE_CORNER;
                     bezier_path_add_node(cur_path, &n);
                 }
@@ -425,8 +660,8 @@ static void parse_d_string(
                 if (cur_path) {
                     BezierNode n;
                     memset(&n, 0, sizeof(BezierNode));
-                    n.x = roundf(cur_x);
-                    n.y = roundf(cur_y);
+                    n.x = cur_x;
+                    n.y = cur_y;
                     n.type = NODE_CORNER;
                     bezier_path_add_node(cur_path, &n);
                 }
@@ -483,7 +718,9 @@ static void parse_d_string(
     *inout_count = cur_idx;
 }
 
-/* Parse all <path d="..."> elements across an entire SVG string */
+/* Parse all <path d="..."> elements across an entire SVG string, honoring
+ * hierarchical <g transform="..."> groups and path transforms.
+ */
 bool svg_path_import_from_memory(
     const char *svg_content,
     size_t length,
@@ -499,44 +736,164 @@ bool svg_path_import_from_memory(
     *out_count = 0;
     extract_svg_dimensions(svg_content, out_dims);
 
+    SvgMatrix matrix_stack[SVG_MAX_GROUP_DEPTH];
+    int stack_depth = 0;
+    matrix_stack[0] = svg_matrix_identity();
+
+    int ignore_depth = 0;
+
     const char *p = svg_content;
-    while (*p && *out_count < max_paths) {
-        /* Find next '<path' tag */
-        const char *tag_start = strstr(p, "<path");
-        if (!tag_start) tag_start = strstr(p, "<PATH");
-        if (!tag_start) break;
+    const char *doc_end = svg_content + length;
 
-        /* Find closing tag or '>' */
+    while (p < doc_end && *out_count < max_paths) {
+        const char *tag_start = strchr(p, '<');
+        if (!tag_start || tag_start >= doc_end) break;
+
+        /* Skip XML comments: <!-- ... --> */
+        if (strncmp(tag_start, "<!--", 4) == 0) {
+            const char *comment_end = strstr(tag_start + 4, "-->");
+            p = comment_end ? comment_end + 3 : doc_end;
+            continue;
+        }
+
+        /* Skip CDATA: <![CDATA[ ... ]]> */
+        if (strncmp(tag_start, "<![CDATA[", 9) == 0) {
+            const char *cdata_end = strstr(tag_start + 9, "]]>");
+            p = cdata_end ? cdata_end + 3 : doc_end;
+            continue;
+        }
+
+        /* Skip processing instructions: <? ... ?> and doctype: <!DOCTYPE ... > */
+        if (tag_start[1] == '?' || (tag_start[1] == '!' && strncmp(tag_start, "<!DOCTYPE", 9) == 0)) {
+            const char *pi_end = strchr(tag_start, '>');
+            p = pi_end ? pi_end + 1 : doc_end;
+            continue;
+        }
+
+        /* Find closing '>' for this tag */
         const char *tag_end = strchr(tag_start, '>');
-        if (!tag_end) break;
+        if (!tag_end || tag_end >= doc_end) break;
 
-        /* Find d="..." or d='...' inside this tag */
-        const char *d_attr = strstr(tag_start, " d=");
-        if (!d_attr || d_attr > tag_end) {
-            d_attr = strstr(tag_start, "\td=");
-        }
-        if (!d_attr || d_attr > tag_end) {
-            d_attr = strstr(tag_start, "\nd=");
-        }
+        /* Check if closing tag: </tagname> */
+        if (tag_start[1] == '/') {
+            const char *cname_start = tag_start + 2;
+            skip_svg_whitespace(&cname_start);
+            char cname[64];
+            int cidx = 0;
+            while (cname_start < tag_end && !isspace((unsigned char)*cname_start) && *cname_start != '>' && cidx < (int)sizeof(cname) - 1) {
+                cname[cidx++] = *cname_start++;
+            }
+            cname[cidx] = '\0';
 
-        if (d_attr && d_attr < tag_end) {
-            d_attr += 3;
-            skip_svg_whitespace(&d_attr);
-            char quote = *d_attr;
-            if (quote == '"' || quote == '\'') {
-                d_attr++;
-                const char *val_end = strchr(d_attr, quote);
-                if (val_end && val_end <= tag_end + 1) {
-                    size_t val_len = (size_t)(val_end - d_attr);
-                    char *d_buf = (char *)malloc(val_len + 1);
-                    if (d_buf) {
-                        memcpy(d_buf, d_attr, val_len);
-                        d_buf[val_len] = '\0';
-                        parse_d_string(d_buf, out_paths, max_paths, out_count);
-                        free(d_buf);
-                    }
+            /* Strip namespace prefix if any (e.g. "svg:g" -> "g") */
+            char *colon = strchr(cname, ':');
+            const char *tag_name = colon ? colon + 1 : cname;
+
+            if (_stricmp(tag_name, "defs") == 0 ||
+                _stricmp(tag_name, "clipPath") == 0 ||
+                _stricmp(tag_name, "mask") == 0 ||
+                _stricmp(tag_name, "style") == 0 ||
+                _stricmp(tag_name, "metadata") == 0) {
+                if (ignore_depth > 0) ignore_depth--;
+            } else if (ignore_depth > 0) {
+                ignore_depth--;
+            } else if (_stricmp(tag_name, "g") == 0) {
+                if (stack_depth > 0) {
+                    stack_depth--;
                 }
             }
+
+            p = tag_end + 1;
+            continue;
+        }
+
+        /* Opening tag */
+        bool is_self_closing = false;
+        if (tag_end > tag_start && *(tag_end - 1) == '/') {
+            is_self_closing = true;
+        }
+
+        /* Extract tag name */
+        const char *tname_start = tag_start + 1;
+        skip_svg_whitespace(&tname_start);
+        char tname[64];
+        int tidx = 0;
+        while (tname_start < tag_end && !isspace((unsigned char)*tname_start) && *tname_start != '/' && *tname_start != '>' && tidx < (int)sizeof(tname) - 1) {
+            tname[tidx++] = *tname_start++;
+        }
+        tname[tidx] = '\0';
+
+        char *colon = strchr(tname, ':');
+        const char *tag_name = colon ? colon + 1 : tname;
+
+        /* If we are currently inside an ignored block (<defs>, <clipPath>, etc.) */
+        if (ignore_depth > 0) {
+            if (!is_self_closing) {
+                ignore_depth++;
+            }
+            p = tag_end + 1;
+            continue;
+        }
+
+        /* Check for tags that start an ignored block */
+        if (_stricmp(tag_name, "defs") == 0 ||
+            _stricmp(tag_name, "clipPath") == 0 ||
+            _stricmp(tag_name, "mask") == 0 ||
+            _stricmp(tag_name, "style") == 0 ||
+            _stricmp(tag_name, "metadata") == 0) {
+            if (!is_self_closing) {
+                ignore_depth++;
+            }
+            p = tag_end + 1;
+            continue;
+        }
+
+        /* Group element <g> */
+        if (_stricmp(tag_name, "g") == 0) {
+            if (!is_self_closing) {
+                SvgMatrix cur_m = matrix_stack[stack_depth];
+                char *t_attr = extract_xml_attribute(tag_start, tag_end, "transform");
+                if (t_attr) {
+                    SvgMatrix g_m = parse_svg_transform_list(t_attr);
+                    cur_m = svg_matrix_multiply(cur_m, g_m);
+                    free(t_attr);
+                }
+                if (stack_depth + 1 < SVG_MAX_GROUP_DEPTH) {
+                    stack_depth++;
+                    matrix_stack[stack_depth] = cur_m;
+                }
+            }
+            p = tag_end + 1;
+            continue;
+        }
+
+        /* Path element <path> */
+        if (_stricmp(tag_name, "path") == 0) {
+            char *d_attr = extract_xml_attribute(tag_start, tag_end, "d");
+            if (d_attr) {
+                SvgMatrix eff_m = matrix_stack[stack_depth];
+                char *t_attr = extract_xml_attribute(tag_start, tag_end, "transform");
+                if (t_attr) {
+                    SvgMatrix p_m = parse_svg_transform_list(t_attr);
+                    eff_m = svg_matrix_multiply(eff_m, p_m);
+                    free(t_attr);
+                }
+
+                char *id_attr = extract_xml_attribute(tag_start, tag_end, "id");
+
+                int prev_count = *out_count;
+                parse_d_string(d_attr, id_attr, out_paths, max_paths, out_count);
+
+                /* Apply effective hierarchical transform to all newly created subpaths */
+                for (int i = prev_count; i < *out_count; ++i) {
+                    apply_matrix_to_bezier_path(&out_paths[i], eff_m);
+                }
+
+                if (id_attr) free(id_attr);
+                free(d_attr);
+            }
+            p = tag_end + 1;
+            continue;
         }
 
         p = tag_end + 1;

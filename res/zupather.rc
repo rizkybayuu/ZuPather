@@ -21,8 +21,8 @@
 120 RCDATA "assets/media/baBallCream.png"
 
 1 VERSIONINFO
-FILEVERSION 0,1,4,1
-PRODUCTVERSION 0,1,4,1
+FILEVERSION 0,1,4,2
+PRODUCTVERSION 0,1,4,2
 FILEFLAGSMASK 0x3fL
 FILEFLAGS 0x0L
 FILEOS 0x40004L
@@ -35,12 +35,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Rizky Bayuu"
             VALUE "FileDescription", "ZuPather - Zuma Deluxe Path & Level Editor"
-            VALUE "FileVersion", "0.1.4.1"
+            VALUE "FileVersion", "0.1.4.2"
             VALUE "InternalName", "ZuPather"
             VALUE "LegalCopyright", "Copyright (C) 2026 Rizky Bayuu. MIT License."
             VALUE "OriginalFilename", "ZuPather.exe"
             VALUE "ProductName", "ZuPather"
-            VALUE "ProductVersion", "0.1.4.1"
+            VALUE "ProductVersion", "0.1.4.2"
         END
     END
     BLOCK "VarFileInfo"

@@ -2416,7 +2416,7 @@ void render_splash_elements(HDC mem_dc, int view_w, int view_h, const ThemeColor
         SelectObject(mem_dc, old_pen);
         DeleteObject(img_pen);
 
-        /* Version badge "v0.1.4.1" at bottom-right corner of splash banner image (Adaptive Dark/Light) */
+        /* Version badge "v0.1.4.2" at bottom-right corner of splash banner image (Adaptive Dark/Light) */
         int ver_w = 60;
         int ver_h = 20;
         int ver_x = banner_x + banner_w - ver_w - 8;

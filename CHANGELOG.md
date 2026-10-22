@@ -5,6 +5,32 @@ All notable changes to the **ZuPather** level design suite will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4.2] - 2026-10-23
+
+Targeted maintenance release introducing the **Hierarchical SVG Transform Engine** with full 2D affine matrix transformation support (`matrix`, `translate`, `scale`, `rotate`, `skewX`, `skewY`), nested group `<g transform="...">` tree propagation, sub-pixel floating-point curve ingestion, and non-renderable block isolation.
+
+### Fixed
+- **SVG Transform Hierarchy & Matrix Stacking (`src/svg_path.c`)**:
+  - Re-architected SVG path ingestion from a flat `<path>` scanner into a stack-based XML tree walker (supporting up to 64 levels of nested `<g>` elements).
+  - Implemented 2D affine transformation matrices ($3 \times 3$ homogeneous coordinates) with full parent-to-child matrix concatenation ($M_{\text{eff}} = M_{\text{parent}} \times M_{\text{child}}$).
+  - Added support for all SVG 1.1/2.0 transform operations: `matrix(a,b,c,d,e,f)`, `translate(tx[, ty])`, `scale(sx[, sy])`, `rotate(angle[, cx, cy])` with custom rotation centers, `skewX(angle)`, and `skewY(angle)`, including multi-transform chains within a single attribute.
+  - Resolved an issue where cloned, rotated, or translated paths exported from vector suites like **Affinity Designer** and **Adobe Illustrator** (such as radial pinwheels or multi-spiral tracks in `spiralof8.svg`) were stripped of their transforms and stacked directly on top of each other.
+  - Resolved coordinate offset distortion in artboard-relative SVG exports (e.g. `longrangetest.svg`), ensuring artboard translations correctly map paths into project canvas world coordinates.
+- **Bézier Node & Handle Vector Transformation**:
+  - Transformed both anchor positions $(x, y)$ as spatial points and tangent handles (`hin_x, hin_y`, `hout_x, hout_y`) as relative direction vectors under any affine mapping (including non-uniform scaling, reflection, and rotation).
+  - Maintained full sub-pixel floating-point precision throughout parser stages without premature integer truncation.
+- **Non-Renderable Block Isolation**:
+  - Added parsing filters to automatically skip paths declared inside definition blocks (`<defs>`, `<clipPath>`, `<mask>`, `<style>`, and `<metadata>`), preventing masks or clip geometries from being erroneously imported as playable Zuma curve tracks.
+
+### Changed
+- **Version & Metadata Alignment**:
+  - Updated in-app splash screen version indicator badge to `v0.1.4.2`.
+  - Updated Windows PE resource metadata (`res/zupather.rc`) to File Version `0.1.4.2` and Product Version `0.1.4.2`.
+  - Updated CMake project configuration to `0.1.4.2`.
+  - Updated `README.md` documentation and version header to `v0.1.4.2`.
+
+---
+
 ## [0.1.4.1] - 2026-10-20
 
 Targeted maintenance hotfix aligning compatibility notices and dialog modals with the **ZuCompleluxe** engine patcher framework (`modules\zumaextrapath.dll`, `modules\zumawebp.dll`) and the upcoming **Zuma Compleluxe** total conversion mod, accurately reflecting vanilla Zuma Deluxe curve limits.

@@ -1,6 +1,6 @@
-# ZuPather (v0.1.4.1)
+# ZuPather (v0.1.4.2)
 
-> **Version:** 0.1.4.1 (ZuCompleluxe Compatibility & Multi-Track Dialog Alignment Hotfix)  
+> **Version:** 0.1.4.2 (Hierarchical SVG Transform Engine & Multi-Track Vector Ingestion Release)  
 > **Target Game:** *Zuma Deluxe* v1.0.0.1 & *ZuCompleluxe* Multi-Curve Framework  
 > **Project Scope:** High-Precision Vector Path Editor, Asset Composer & Direct-to-Engine Exporter  
 > **Core Language:** Pure C (C99 / Win32 API)  
@@ -64,6 +64,7 @@ In the *Zuma Deluxe* engine, rolling balls must traverse paths at a strictly uni
   - Direct 1-click exporter: updates `<Graphics>` definitions in `levels.xml`, writes `.dat` binaries, registers progression, and creates timestamped safety backups (`levels.xml.bak`).
 - **Bi-Directional Vector Exchange & Headless CLI**:
   - Full SVG import/export compatibility with vector design suites (Affinity Designer, Canva, Adobe Illustrator).
+  - **Hierarchical SVG Transform Engine**: 2D affine matrix stack parsing (`matrix`, `translate`, `scale`, `rotate`, `skewX`, `skewY`) supporting deeply nested `<g transform="...">` groups, artboard offsets, and multi-track rotational patterns without curve stacking.
   - Headless CLI suite for batch compilation, conversion, and inspection (`svg2dat`, `dat2svg`, `genxml`, `info`).
 - **Zero-Dependency Win32 Native Executable**:
   - Pure C99 compiled into a standalone 2.3 MB binary with embedded assets and fonts, requiring no external runtimes or DLLs.
