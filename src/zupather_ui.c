@@ -1213,6 +1213,7 @@ void apply_theme_preference(HWND hwnd, AppThemePreference pref) {
 
 void apply_theme(HWND hwnd, AppTheme new_theme) {
     g_current_theme = new_theme;
+    g_theme_preference = (new_theme == THEME_DARK) ? THEME_PREF_DARK : THEME_PREF_LIGHT;
     save_zuma_config();
 
     HMENU hmenu = GetMenu(hwnd);

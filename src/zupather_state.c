@@ -59,8 +59,8 @@ const ThemeColors g_theme_dark = {
 };
 
 /* Active Application State */
-AppThemePreference g_theme_preference = THEME_PREF_SYSTEM;
-AppTheme g_current_theme = THEME_LIGHT;
+AppThemePreference g_theme_preference = THEME_PREF_DARK;
+AppTheme g_current_theme = THEME_DARK;
 
 /* Canvas State (Initial launch has NO canvas) */
 bool        g_has_canvas       = false;
