@@ -11472,7 +11472,7 @@ static LRESULT CALLBACK SettingsThemedComboSubclassProc(HWND hwnd, UINT msg, WPA
         SelectObject(hdc, old_pen);
         DeleteObject(pen);
 
-        int btn_w = 18;
+        int btn_w = 14;
         int arrow_cx = rc.right - btn_w / 2 - 1;
         int arrow_cy = (rc.bottom - rc.top) / 2;
 
@@ -11484,8 +11484,8 @@ static LRESULT CALLBACK SettingsThemedComboSubclassProc(HWND hwnd, UINT msg, WPA
         DeleteObject(sep_pen);
 
         POINT pts[3];
-        pts[0].x = arrow_cx - 4; pts[0].y = arrow_cy - 2;
-        pts[1].x = arrow_cx + 4; pts[1].y = arrow_cy - 2;
+        pts[0].x = arrow_cx - 3; pts[0].y = arrow_cy - 2;
+        pts[1].x = arrow_cx + 3; pts[1].y = arrow_cy - 2;
         pts[2].x = arrow_cx;     pts[2].y = arrow_cy + 2;
 
         HBRUSH ar_br = CreateSolidBrush(arrow_col);
@@ -11504,7 +11504,7 @@ static LRESULT CALLBACK SettingsThemedComboSubclassProc(HWND hwnd, UINT msg, WPA
         else if (sel == 1) disp_text = "Dark";
         else if (sel == 2) disp_text = "System";
 
-        RECT rc_text = { rc.left + 8, rc.top, rc.right - btn_w - 2, rc.bottom };
+        RECT rc_text = { rc.left + 6, rc.top, rc.right - btn_w - 2, rc.bottom };
         SetBkMode(hdc, TRANSPARENT);
         SetTextColor(hdc, text_col);
         HFONT font = g_font_primary_regular ? g_font_primary_regular : (HFONT)GetStockObject(DEFAULT_GUI_FONT);
@@ -11550,11 +11550,11 @@ static LRESULT CALLBACK SettingsModalWndProc(HWND hwnd, UINT msg, WPARAM wParam,
                      34, 152, 472, 17, &data->chk_smooth_scroll);
 
             /* Section 2: Action History Edit (inside Card 2: y=200, h=76) */
-            /* Control Box: exactly 80x24 px */
+            /* Control Box: exactly 60x24 px (compact numeric input) */
             data->hwnd_edit_undo_limit = CreateWindowExA(
                 WS_EX_CLIENTEDGE, "EDIT", "64",
                 WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_NUMBER | ES_CENTER,
-                194, 227, 80, 24, hwnd, (HMENU)ID_SETTINGS_EDIT_UNDO_LIMIT, hinst, NULL
+                194, 227, 60, 24, hwnd, (HMENU)ID_SETTINGS_EDIT_UNDO_LIMIT, hinst, NULL
             );
             SendMessage(data->hwnd_edit_undo_limit, WM_SETFONT, (WPARAM)g_font_mono_bold, TRUE);
             char cur_limit_str[32];
@@ -11562,11 +11562,11 @@ static LRESULT CALLBACK SettingsModalWndProc(HWND hwnd, UINT msg, WPARAM wParam,
             SetWindowTextA(data->hwnd_edit_undo_limit, cur_limit_str);
 
             /* Section 3: Workspace & Environment (inside Card 3: y=284, h=114) */
-            /* Control Box: exactly 80x24 px */
+            /* Control Box: exactly 60x24 px (matching Action History width and height) */
             data->hwnd_combo_theme = CreateWindowA(
                 "COMBOBOX", "",
                 WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | CBS_OWNERDRAWFIXED | CBS_HASSTRINGS | WS_VSCROLL | WS_TABSTOP,
-                122, 308, 80, 120, hwnd, (HMENU)ID_SETTINGS_COMBO_THEME, hinst, NULL
+                122, 308, 60, 120, hwnd, (HMENU)ID_SETTINGS_COMBO_THEME, hinst, NULL
             );
             SendMessage(data->hwnd_combo_theme, WM_SETFONT, (WPARAM)g_font_primary_regular, TRUE);
             s_orig_settings_combo_proc = (WNDPROC)SetWindowLongPtrA(data->hwnd_combo_theme, GWLP_WNDPROC, (LONG_PTR)SettingsThemedComboSubclassProc);
@@ -11584,24 +11584,24 @@ static LRESULT CALLBACK SettingsModalWndProc(HWND hwnd, UINT msg, WPARAM wParam,
             MAKE_CHK(ID_SETTINGS_CHK_SHOW_GRID, "Show Canvas Coordinate Grid by Default",
                      34, 338, 472, 17, &data->show_grid);
 
-            /* Control Box: exactly 80x24 px */
+            /* Control Box: 80x24 px */
             data->hwnd_btn_change_zuma = CreateWindowA(
                 "BUTTON", "Change...", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW | WS_TABSTOP,
                 424, 362, 80, 24, hwnd, (HMENU)ID_SETTINGS_BTN_CHANGE_ZUMA, hinst, NULL
             );
 
-            /* Bottom Action Buttons (tightly placed) */
+            /* Bottom Action Buttons: perfectly equal margins (20px top, 20px bottom, 20px left, 20px right) */
             data->hwnd_btn_reset = CreateWindowA(
                 "BUTTON", "Reset Defaults", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW | WS_TABSTOP,
-                20, 408, 105, 28, hwnd, (HMENU)ID_SETTINGS_BTN_RESET, hinst, NULL
+                20, 418, 105, 28, hwnd, (HMENU)ID_SETTINGS_BTN_RESET, hinst, NULL
             );
             data->hwnd_btn_cancel = CreateWindowA(
                 "BUTTON", "Cancel", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW | WS_TABSTOP,
-                322, 408, 80, 28, hwnd, (HMENU)ID_SETTINGS_BTN_CANCEL, hinst, NULL
+                320, 418, 80, 28, hwnd, (HMENU)ID_SETTINGS_BTN_CANCEL, hinst, NULL
             );
             data->hwnd_btn_save = CreateWindowA(
                 "BUTTON", "Save & Apply", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW | WS_TABSTOP,
-                410, 408, 110, 28, hwnd, (HMENU)ID_SETTINGS_BTN_SAVE, hinst, NULL
+                410, 418, 110, 28, hwnd, (HMENU)ID_SETTINGS_BTN_SAVE, hinst, NULL
             );
 
             #undef MAKE_CHK
@@ -11611,7 +11611,7 @@ static LRESULT CALLBACK SettingsModalWndProc(HWND hwnd, UINT msg, WPARAM wParam,
         case WM_MEASUREITEM: {
             LPMEASUREITEMSTRUCT mis = (LPMEASUREITEMSTRUCT)lParam;
             if (mis->CtlType == ODT_COMBOBOX && mis->CtlID == ID_SETTINGS_COMBO_THEME) {
-                mis->itemHeight = 22;
+                mis->itemHeight = 18;
                 return TRUE;
             }
             break;
@@ -11681,7 +11681,7 @@ static LRESULT CALLBACK SettingsModalWndProc(HWND hwnd, UINT msg, WPARAM wParam,
             SelectObject(hdc, g_font_primary_regular);
             DrawTextA(hdc, "Snapshot History Limit:", -1, &rc_lbl_hist, DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_NOPREFIX);
 
-            RECT rc_unit_hist = { 282, 227, rc.right - 40, 251 };
+            RECT rc_unit_hist = { 262, 227, rc.right - 40, 251 };
             SetTextColor(hdc, th->text_secondary);
             DrawTextA(hdc, "actions", -1, &rc_unit_hist, DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_NOPREFIX);
 
@@ -11887,7 +11887,7 @@ void show_settings_dialog(HWND parent_hwnd) {
         s_settings_class_registered = true;
     }
 
-    RECT rc_dlg = { 0, 0, 540, 446 };
+    RECT rc_dlg = { 0, 0, 540, 466 };
     AdjustWindowRectEx(&rc_dlg, WS_POPUP | WS_CAPTION | WS_SYSMENU, FALSE, WS_EX_DLGMODALFRAME);
     int dlg_w = rc_dlg.right - rc_dlg.left;
     int dlg_h = rc_dlg.bottom - rc_dlg.top;
