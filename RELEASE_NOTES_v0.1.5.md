@@ -48,14 +48,14 @@ ZuPather **v0.1.5** is a major milestone release delivering significant enhancem
 
 ### Fixed
 - **SVG Transform Hierarchy & Matrix Stacking (`src/svg_path.c`)**:
-  - Stack-based XML tree walker (supporting up to 64 levels of nested `<g>` elements) with 2D affine transformation matrices ($3 \times 3$ homogeneous coordinates) and full parent-to-child matrix concatenation ($M_{\text{eff}} = M_{\text{parent}} \times M_{\text{child}}$).
+  - Stack-based XML tree walker (supporting up to 64 levels of nested `<g>` elements) with 2D affine transformation matrices (3x3 homogeneous coordinates) and full parent-to-child matrix concatenation (M_eff = M_parent * M_child).
   - Full support for `matrix`, `translate`, `scale`, `rotate`, `skewX`, and `skewY`.
   - Resolved curve stacking issues on radial pinwheels and multi-spiral paths exported from Affinity Designer and Adobe Illustrator.
   - Corrected artboard coordinate offsets, mapping paths accurately into project canvas world coordinates.
 - **Bézier Node & Handle Vector Transformation**:
-  - Transformed both anchor positions $(x, y)$ as spatial points and tangent handles as relative direction vectors under any affine mapping with full sub-pixel floating-point precision.
+  - Transformed both anchor positions (x, y) as spatial points and tangent handles as relative direction vectors under any affine mapping with full sub-pixel floating-point precision.
 - **Non-Renderable Block Isolation**:
-  - Automatically skipped definition blocks (`<defs>`, `<clipPath>`, `<mask`, `<style>`, `<metadata>`), preventing masks and clip geometries from being imported as playable Zuma curve tracks.
+  - Automatically skipped definition blocks (`<defs>`, `<clipPath>`, `<mask>`, `<style>`, `<metadata>`), preventing masks and clip geometries from being imported as playable Zuma curve tracks.
 
 ---
 

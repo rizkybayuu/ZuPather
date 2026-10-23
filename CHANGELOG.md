@@ -31,12 +31,12 @@ Major maintenance and feature release introducing the **Hierarchical SVG Transfo
 ### Fixed
 - **SVG Transform Hierarchy & Matrix Stacking (`src/svg_path.c`)**:
   - Re-architected SVG path ingestion from a flat `<path>` scanner into a stack-based XML tree walker (supporting up to 64 levels of nested `<g>` elements).
-  - Implemented 2D affine transformation matrices ($3 \times 3$ homogeneous coordinates) with full parent-to-child matrix concatenation ($M_{\text{eff}} = M_{\text{parent}} \times M_{\text{child}}$).
+  - Implemented 2D affine transformation matrices (3x3 homogeneous coordinates) with full parent-to-child matrix concatenation (M_eff = M_parent * M_child).
   - Added support for all SVG 1.1/2.0 transform operations: `matrix(a,b,c,d,e,f)`, `translate(tx[, ty])`, `scale(sx[, sy])`, `rotate(angle[, cx, cy])` with custom rotation centers, `skewX(angle)`, and `skewY(angle)`, including multi-transform chains within a single attribute.
   - Resolved an issue where cloned, rotated, or translated paths exported from vector suites like **Affinity Designer** and **Adobe Illustrator** (such as radial pinwheels or multi-spiral tracks in `spiralof8.svg`) were stripped of their transforms and stacked directly on top of each other.
   - Resolved coordinate offset distortion in artboard-relative SVG exports (e.g. `longrangetest.svg`), ensuring artboard translations correctly map paths into project canvas world coordinates.
 - **Bézier Node & Handle Vector Transformation**:
-  - Transformed both anchor positions $(x, y)$ as spatial points and tangent handles (`hin_x, hin_y`, `hout_x, hout_y`) as relative direction vectors under any affine mapping (including non-uniform scaling, reflection, and rotation).
+  - Transformed both anchor positions (x, y) as spatial points and tangent handles (`hin_x, hin_y`, `hout_x, hout_y`) as relative direction vectors under any affine mapping (including non-uniform scaling, reflection, and rotation).
   - Maintained full sub-pixel floating-point precision throughout parser stages without premature integer truncation.
 - **Non-Renderable Block Isolation**:
   - Added parsing filters to automatically skip paths declared inside definition blocks (`<defs>`, `<clipPath>`, `<mask>`, `<style>`, and `<metadata>`), preventing masks or clip geometries from being erroneously imported as playable Zuma curve tracks.
