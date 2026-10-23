@@ -11472,7 +11472,7 @@ static LRESULT CALLBACK SettingsThemedComboSubclassProc(HWND hwnd, UINT msg, WPA
         SelectObject(hdc, old_pen);
         DeleteObject(pen);
 
-        int btn_w = 11;
+        int btn_w = 16;
         int arrow_cx = rc.right - btn_w / 2 - 1;
         int arrow_cy = (rc.bottom - rc.top) / 2;
 
@@ -11484,9 +11484,9 @@ static LRESULT CALLBACK SettingsThemedComboSubclassProc(HWND hwnd, UINT msg, WPA
         DeleteObject(sep_pen);
 
         POINT pts[3];
-        pts[0].x = arrow_cx - 2; pts[0].y = arrow_cy - 2;
-        pts[1].x = arrow_cx + 2; pts[1].y = arrow_cy - 2;
-        pts[2].x = arrow_cx;     pts[2].y = arrow_cy + 1;
+        pts[0].x = arrow_cx - 3; pts[0].y = arrow_cy - 2;
+        pts[1].x = arrow_cx + 3; pts[1].y = arrow_cy - 2;
+        pts[2].x = arrow_cx;     pts[2].y = arrow_cy + 2;
 
         HBRUSH ar_br = CreateSolidBrush(arrow_col);
         HPEN ar_pen = CreatePen(PS_SOLID, 1, arrow_col);
@@ -11499,12 +11499,12 @@ static LRESULT CALLBACK SettingsThemedComboSubclassProc(HWND hwnd, UINT msg, WPA
         DeleteObject(ar_pen);
 
         int sel = (int)CallWindowProcA(orig_proc, hwnd, CB_GETCURSEL, 0, 0);
-        const char *disp_text = "Dark";
-        if (sel == 0) disp_text = "Light";
-        else if (sel == 1) disp_text = "Dark";
-        else if (sel == 2) disp_text = "Auto";
+        char disp_text[64] = "Dark";
+        if (sel >= 0) {
+            CallWindowProcA(orig_proc, hwnd, CB_GETLBTEXT, sel, (LPARAM)disp_text);
+        }
 
-        RECT rc_text = { rc.left + 4, rc.top, rc.right - btn_w - 1, rc.bottom };
+        RECT rc_text = { rc.left + 8, rc.top, rc.right - btn_w - 4, rc.bottom };
         SetBkMode(hdc, TRANSPARENT);
         SetTextColor(hdc, text_col);
         HFONT font = g_font_primary_regular ? g_font_primary_regular : (HFONT)GetStockObject(DEFAULT_GUI_FONT);
@@ -11562,11 +11562,11 @@ static LRESULT CALLBACK SettingsModalWndProc(HWND hwnd, UINT msg, WPARAM wParam,
             SetWindowTextA(data->hwnd_edit_undo_limit, cur_limit_str);
 
             /* Section 3: Workspace & Environment (inside Card 3: y=284, h=114) */
-            /* Control Box: compact mini badge 46x24 px */
+            /* Control Box: 150x24 px (accommodates full 'Use System Default' string cleanly) */
             data->hwnd_combo_theme = CreateWindowA(
                 "COMBOBOX", "",
                 WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | CBS_OWNERDRAWFIXED | CBS_HASSTRINGS | WS_VSCROLL | WS_TABSTOP,
-                122, 308, 46, 120, hwnd, (HMENU)ID_SETTINGS_COMBO_THEME, hinst, NULL
+                122, 308, 150, 120, hwnd, (HMENU)ID_SETTINGS_COMBO_THEME, hinst, NULL
             );
             SendMessage(data->hwnd_combo_theme, WM_SETFONT, (WPARAM)g_font_primary_regular, TRUE);
             s_orig_settings_combo_proc = (WNDPROC)SetWindowLongPtrA(data->hwnd_combo_theme, GWLP_WNDPROC, (LONG_PTR)SettingsThemedComboSubclassProc);
