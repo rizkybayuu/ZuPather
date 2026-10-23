@@ -5,9 +5,28 @@ All notable changes to the **ZuPather** level design suite will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.4.2] - 2026-10-23
+## [0.1.5] - 2026-10-23
 
-Targeted maintenance release introducing the **Hierarchical SVG Transform Engine** with full 2D affine matrix transformation support (`matrix`, `translate`, `scale`, `rotate`, `skewX`, `skewY`), nested group `<g transform="...">` tree propagation, sub-pixel floating-point curve ingestion, and non-renderable block isolation.
+Major maintenance and feature release introducing the **Hierarchical SVG Transform Engine** with full 2D affine matrix transformation support (`matrix`, `translate`, `scale`, `rotate`, `skewX`, `skewY`), nested group `<g transform="...">` tree propagation, sub-pixel floating-point curve ingestion, a dedicated **Settings & Preferences Suite** (`Ctrl+,`), **Viewport GPU Acceleration & 60+ FPS Surface Caching**, **Three-Way Color Theme Architecture** (`Light`, `Dark`, `Use System Default`), and configurable **Action History Limit**.
+
+### Added
+- **Settings & Preferences Architecture (`src/dialog_modals.c`, `src/zupather_ui.c`)**:
+  - Added dedicated top-level `Settings` menu bar between `Edit` and `View` with shortcut `Ctrl+,`.
+  - Added quick-toggle menu items for direct hardware blit, HUD surface caching, and smooth wheel throttling without opening the dialog modal.
+  - Symmetrically balanced modal dialog design with flat container cards (`PERFORMANCE & GPU ACCELERATION`, `ACTION HISTORY`, `WORKSPACE & ENVIRONMENT`), eliminating redundant horizontal divider lines.
+  - Enforced uniform 20px margins across all four boundaries (top, bottom, left, and right) for bottom action buttons (*Reset Defaults*, *Cancel*, *Save & Apply*).
+- **Performance & Viewport GPU Acceleration (`src/canvas_render.c`, `src/zupather_state.c`)**:
+  - **Direct Blit (Hardware Optimization)**: Fast-path GDI `BitBlt` block transfers bypassing CPU AlphaBlend loops on fully opaque HUD surfaces and background buffers.
+  - **Offscreen HUD Surface Caching**: Pre-renders and caches HUD elements and overlays into offscreen DIB surfaces, eliminating redundant per-frame drawing for zero-lag 60+ FPS zoom, pan, and scroll operations.
+  - **Smooth Mouse Wheel & Precision Event Coalescing**: Smooth handling of high-frequency mouse wheel ticks on gaming and precision mice, preventing event queue backlog during rapid zooming.
+- **Three-Way Color Theme System (`src/zupather_state.c`, `src/zupather_ui.c`)**:
+  - Implemented 3 theme choices: `Light`, `Dark`, and `Use System Default` (serving as default on initial launch when no configuration exists).
+  - Implemented real-time bi-directional synchronization between the live application theme and the Settings modal, ensuring the dropdown always accurately displays the active theme.
+  - Custom owner-drawn combobox with 150px width accommodating full text `Use System Default` without clipping and 24px height matching numeric inputs.
+  - Persistent theme configuration saved to `zupathconf.inf` under `Theme=`.
+- **Configurable Action History Capacity (`src/undo_redo.c`, `src/dialog_modals.c`)**:
+  - Added configurable undo/redo snapshot limit (default: 64 actions) via a compact numeric input box with memory boundary validation.
+  - Maintained zero disk cache overhead with pure in-memory state retention.
 
 ### Fixed
 - **SVG Transform Hierarchy & Matrix Stacking (`src/svg_path.c`)**:
@@ -24,10 +43,10 @@ Targeted maintenance release introducing the **Hierarchical SVG Transform Engine
 
 ### Changed
 - **Version & Metadata Alignment**:
-  - Updated in-app splash screen version indicator badge to `v0.1.4.2`.
-  - Updated Windows PE resource metadata (`res/zupather.rc`) to File Version `0.1.4.2` and Product Version `0.1.4.2`.
-  - Updated CMake project configuration to `0.1.4.2`.
-  - Updated `README.md` documentation and version header to `v0.1.4.2`.
+  - Updated in-app splash screen version indicator badge to `v0.1.5`.
+  - Updated Windows PE resource metadata (`res/zupather.rc`) to File Version `0.1.5` and Product Version `0.1.5`.
+  - Updated CMake project configuration to `0.1.5`.
+  - Updated `README.md` documentation and version header to `v0.1.5`.
 
 ---
 

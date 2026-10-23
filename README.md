@@ -1,6 +1,6 @@
-# ZuPather (v0.1.4.2)
+# ZuPather (v0.1.5)
 
-> **Version:** 0.1.4.2 (Hierarchical SVG Transform Engine & Multi-Track Vector Ingestion Release)  
+> **Version:** 0.1.5 (Hierarchical SVG Engine, Viewport GPU Acceleration & Settings Suite Release)  
 > **Target Game:** *Zuma Deluxe* v1.0.0.1 & *ZuCompleluxe* Multi-Curve Framework  
 > **Project Scope:** High-Precision Vector Path Editor, Asset Composer & Direct-to-Engine Exporter  
 > **Core Language:** Pure C (C99 / Win32 API)  
@@ -66,9 +66,14 @@ In the *Zuma Deluxe* engine, rolling balls must traverse paths at a strictly uni
   - Full SVG import/export compatibility with vector design suites (Affinity Designer, Canva, Adobe Illustrator).
   - **Hierarchical SVG Transform Engine**: 2D affine matrix stack parsing (`matrix`, `translate`, `scale`, `rotate`, `skewX`, `skewY`) supporting deeply nested `<g transform="...">` groups, artboard offsets, and multi-track rotational patterns without curve stacking.
   - Headless CLI suite for batch compilation, conversion, and inspection (`svg2dat`, `dat2svg`, `genxml`, `info`).
+- **Dedicated Settings & Preferences Suite (`Ctrl+,`)**:
+  - Dedicated top-level `Settings` menu bar for configuring viewport optimizations, memory limits, and workspace defaults.
+  - **Viewport GPU Acceleration & 60+ FPS Surface Caching**: Fast-path hardware block transfer (`BitBlt`) bypassing CPU blend loops, offscreen DIB HUD surface caching for instantaneous high-framerate viewport panning/zooming, and smooth mouse wheel precision event coalescing.
+  - **Configurable Action History**: User-definable memory-backed undo/redo history capacity (default: 64 actions) with pure in-memory ring buffers and zero disk overhead.
+  - **Three-Way Color Theme Architecture**: Instant runtime switching between `Light`, `Dark`, and `Use System Default` with live bi-directional dialog synchronization and 150px dropped width.
 - **Zero-Dependency Win32 Native Executable**:
-  - Pure C99 compiled into a standalone 2.3 MB binary with embedded assets and fonts, requiring no external runtimes or DLLs.
-  - Custom owner-drawn Dark and Light themes with instant runtime switching.
+  - Pure C99 compiled into a standalone 2.7 MB binary with embedded assets and fonts, requiring no external runtimes or DLLs.
+  - High-performance double-buffered GDI rendering engine supporting Windows 7, 8, 10, and 11.
 
 ---
 
