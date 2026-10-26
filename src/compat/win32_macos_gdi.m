@@ -682,6 +682,68 @@ BOOL PolyBezierTo(HDC hdc, const POINT *apt, DWORD cpt) {
     return TRUE;
 }
 
+BOOL BeginPath(HDC hdc) {
+    CGContextRef ctx = zp_macos_get_hdc_cgcontext(hdc);
+    if (!ctx) return FALSE;
+    CGContextBeginPath(ctx);
+    return TRUE;
+}
+
+BOOL CloseFigure(HDC hdc) {
+    CGContextRef ctx = zp_macos_get_hdc_cgcontext(hdc);
+    if (!ctx) return FALSE;
+    CGContextClosePath(ctx);
+    return TRUE;
+}
+
+BOOL EndPath(HDC hdc) {
+    (void)hdc;
+    return TRUE;
+}
+
+BOOL FillPath(HDC hdc) {
+    struct ZP_HDC__ *dc = (struct ZP_HDC__*)hdc;
+    if (!dc || !dc->ctx) return FALSE;
+    if (dc->selectedBrush && dc->selectedBrush != &g_stock_null_brush) {
+        CGColorRef fillCol = create_cgcolor_from_colorref(dc->selectedBrush->color, 1.0f);
+        CGContextSetFillColorWithColor(dc->ctx, fillCol);
+        CGContextFillPath(dc->ctx);
+        CGColorRelease(fillCol);
+    }
+    return TRUE;
+}
+
+BOOL StrokePath(HDC hdc) {
+    struct ZP_HDC__ *dc = (struct ZP_HDC__*)hdc;
+    if (!dc || !dc->ctx) return FALSE;
+    if (dc->selectedPen && dc->selectedPen != &g_stock_null_pen) {
+        CGColorRef strokeCol = create_cgcolor_from_colorref(dc->selectedPen->color, 1.0f);
+        CGContextSetStrokeColorWithColor(dc->ctx, strokeCol);
+        CGContextSetLineWidth(dc->ctx, (CGFloat)dc->selectedPen->width);
+        CGContextStrokePath(dc->ctx);
+        CGColorRelease(strokeCol);
+    }
+    return TRUE;
+}
+
+BOOL StrokeAndFillPath(HDC hdc) {
+    struct ZP_HDC__ *dc = (struct ZP_HDC__*)hdc;
+    if (!dc || !dc->ctx) return FALSE;
+    if (dc->selectedBrush && dc->selectedBrush != &g_stock_null_brush) {
+        CGColorRef fillCol = create_cgcolor_from_colorref(dc->selectedBrush->color, 1.0f);
+        CGContextSetFillColorWithColor(dc->ctx, fillCol);
+        CGColorRelease(fillCol);
+    }
+    if (dc->selectedPen && dc->selectedPen != &g_stock_null_pen) {
+        CGColorRef strokeCol = create_cgcolor_from_colorref(dc->selectedPen->color, 1.0f);
+        CGContextSetStrokeColorWithColor(dc->ctx, strokeCol);
+        CGContextSetLineWidth(dc->ctx, (CGFloat)dc->selectedPen->width);
+        CGColorRelease(strokeCol);
+    }
+    CGContextDrawPath(dc->ctx, kCGPathFillStroke);
+    return TRUE;
+}
+
 COLORREF SetPixel(HDC hdc, int x, int y, COLORREF color) {
     if (!hdc) return 0;
     struct ZP_HDC__ *dc = (struct ZP_HDC__*)hdc;

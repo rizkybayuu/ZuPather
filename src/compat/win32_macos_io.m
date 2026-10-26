@@ -543,4 +543,149 @@ BOOL MessageBeep(UINT uType) {
     return TRUE;
 }
 
+DWORD GetPrivateProfileStringA(LPCSTR lpAppName, LPCSTR lpKeyName, LPCSTR lpDefault, LPSTR lpReturnedString, DWORD nSize, LPCSTR lpFileName) {
+    if (!lpReturnedString || nSize == 0) return 0;
+    if (lpDefault) {
+        strncpy(lpReturnedString, lpDefault, nSize - 1);
+        lpReturnedString[nSize - 1] = '\0';
+    } else {
+        lpReturnedString[0] = '\0';
+    }
+    if (!lpFileName || !lpAppName || !lpKeyName) return (DWORD)strlen(lpReturnedString);
+
+    FILE *f = fopen(lpFileName, "r");
+    if (!f) return (DWORD)strlen(lpReturnedString);
+
+    char line[1024];
+    bool in_section = false;
+    char target_section[256];
+    snprintf(target_section, sizeof(target_section), "[%s]", lpAppName);
+
+    while (fgets(line, sizeof(line), f)) {
+        char *p = line;
+        while (*p == ' ' || *p == '\t') p++;
+        if (*p == '[') {
+            char *end = strchr(p, ']');
+            if (end) {
+                size_t len = end - p + 1;
+                in_section = (strncasecmp(p, target_section, len) == 0);
+            }
+            continue;
+        }
+        if (in_section) {
+            char *eq = strchr(p, '=');
+            if (eq) {
+                *eq = '\0';
+                char *k = p;
+                char *v = eq + 1;
+                while (*k == ' ' || *k == '\t') k++;
+                char *kend = k + strlen(k) - 1;
+                while (kend >= k && (*kend == ' ' || *kend == '\t' || *kend == '\r' || *kend == '\n')) *kend-- = '\0';
+
+                if (strcasecmp(k, lpKeyName) == 0) {
+                    while (*v == ' ' || *v == '\t') v++;
+                    char *vend = v + strlen(v) - 1;
+                    while (vend >= v && (*vend == '\r' || *vend == '\n' || *vend == ' ' || *vend == '\t')) *vend-- = '\0';
+                    strncpy(lpReturnedString, v, nSize - 1);
+                    lpReturnedString[nSize - 1] = '\0';
+                    fclose(f);
+                    return (DWORD)strlen(lpReturnedString);
+                }
+            }
+        }
+    }
+    fclose(f);
+    return (DWORD)strlen(lpReturnedString);
+}
+
+UINT GetPrivateProfileIntA(LPCSTR lpAppName, LPCSTR lpKeyName, INT nDefault, LPCSTR lpFileName) {
+    char buf[64];
+    GetPrivateProfileStringA(lpAppName, lpKeyName, "", buf, sizeof(buf), lpFileName);
+    if (buf[0] == '\0') return (UINT)nDefault;
+    return (UINT)atoi(buf);
+}
+
+BOOL WritePrivateProfileStringA(LPCSTR lpAppName, LPCSTR lpKeyName, LPCSTR lpString, LPCSTR lpFileName) {
+    if (!lpFileName || !lpAppName) return FALSE;
+    FILE *f = fopen(lpFileName, "r");
+    char **lines = NULL;
+    int line_count = 0;
+    int section_idx = -1;
+    int key_idx = -1;
+
+    char target_section[256];
+    snprintf(target_section, sizeof(target_section), "[%s]", lpAppName);
+
+    if (f) {
+        char buf[1024];
+        bool in_sec = false;
+        while (fgets(buf, sizeof(buf), f)) {
+            lines = (char **)realloc(lines, sizeof(char *) * (line_count + 1));
+            lines[line_count] = strdup(buf);
+            char *p = buf;
+            while (*p == ' ' || *p == '\t') p++;
+            if (*p == '[') {
+                char *end = strchr(p, ']');
+                if (end && strncasecmp(p, target_section, end - p + 1) == 0) {
+                    in_sec = true;
+                    section_idx = line_count;
+                } else {
+                    in_sec = false;
+                }
+            } else if (in_sec && lpKeyName) {
+                char *eq = strchr(p, '=');
+                if (eq) {
+                    char kbuf[256];
+                    size_t klen = eq - p;
+                    if (klen >= sizeof(kbuf)) klen = sizeof(kbuf) - 1;
+                    strncpy(kbuf, p, klen);
+                    kbuf[klen] = '\0';
+                    char *k = kbuf;
+                    while (*k == ' ' || *k == '\t') k++;
+                    char *kend = k + strlen(k) - 1;
+                    while (kend >= k && (*kend == ' ' || *kend == '\t')) *kend-- = '\0';
+                    if (strcasecmp(k, lpKeyName) == 0) {
+                        key_idx = line_count;
+                    }
+                }
+            }
+            line_count++;
+        }
+        fclose(f);
+    }
+
+    FILE *out = fopen(lpFileName, "w");
+    if (!out) {
+        for (int i = 0; i < line_count; ++i) free(lines[i]);
+        free(lines);
+        return FALSE;
+    }
+
+    if (section_idx < 0) {
+        for (int i = 0; i < line_count; ++i) fprintf(out, "%s", lines[i]);
+        if (line_count > 0 && lines[line_count - 1][strlen(lines[line_count - 1]) - 1] != '\n') {
+            fprintf(out, "\n");
+        }
+        fprintf(out, "[%s]\n", lpAppName);
+        if (lpKeyName && lpString) fprintf(out, "%s=%s\n", lpKeyName, lpString);
+    } else if (key_idx >= 0) {
+        for (int i = 0; i < line_count; ++i) {
+            if (i == key_idx) {
+                if (lpString) fprintf(out, "%s=%s\n", lpKeyName, lpString);
+            } else {
+                fprintf(out, "%s", lines[i]);
+            }
+        }
+    } else {
+        for (int i = 0; i <= section_idx; ++i) fprintf(out, "%s", lines[i]);
+        if (lpKeyName && lpString) fprintf(out, "%s=%s\n", lpKeyName, lpString);
+        for (int i = section_idx + 1; i < line_count; ++i) fprintf(out, "%s", lines[i]);
+    }
+
+    fclose(out);
+    for (int i = 0; i < line_count; ++i) free(lines[i]);
+    free(lines);
+    return TRUE;
+}
+
 #endif /* __APPLE__ */

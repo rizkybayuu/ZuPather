@@ -19,6 +19,10 @@
 #include <ctype.h>
 #include <wchar.h>
 
+DWORD   GetPrivateProfileStringA(LPCSTR lpAppName, LPCSTR lpKeyName, LPCSTR lpDefault, LPSTR lpReturnedString, DWORD nSize, LPCSTR lpFileName);
+UINT    GetPrivateProfileIntA(LPCSTR lpAppName, LPCSTR lpKeyName, INT nDefault, LPCSTR lpFileName);
+BOOL    WritePrivateProfileStringA(LPCSTR lpAppName, LPCSTR lpKeyName, LPCSTR lpString, LPCSTR lpFileName);
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -1128,6 +1132,22 @@ typedef struct _SYSTEMTIME {
 #define CLIP_DEFAULT_PRECIS      0
 #define DEFAULT_QUALITY          0
 #define DEFAULT_PITCH            0
+#define FIXED_PITCH              1
+#define VARIABLE_PITCH           2
+#define FF_DONTCARE              (0<<4)
+#define FF_ROMAN                 (1<<4)
+#define FF_SWISS                 (2<<4)
+#define FF_MODERN                (3<<4)
+#define FF_SCRIPT                (4<<4)
+#define FF_DECORATIVE            (5<<4)
+
+#define DRAFT_QUALITY            1
+#define PROOF_QUALITY            2
+#define NONANTIALIASED_QUALITY   3
+#define ANTIALIASED_QUALITY      4
+#define CLEARTYPE_QUALITY        5
+
+#define SYSTEM_FIXED_FONT        16
 
 #define GWLP_WNDPROC             (-4)
 #define GWLP_USERDATA            (-21)
@@ -1242,6 +1262,12 @@ BOOL    Ellipse(HDC hdc, int left, int top, int right, int bottom);
 BOOL    Polygon(HDC hdc, const POINT *apt, int cpt);
 BOOL    PolyBezier(HDC hdc, const POINT *apt, DWORD cpt);
 BOOL    PolyBezierTo(HDC hdc, const POINT *apt, DWORD cpt);
+BOOL    BeginPath(HDC hdc);
+BOOL    EndPath(HDC hdc);
+BOOL    CloseFigure(HDC hdc);
+BOOL    FillPath(HDC hdc);
+BOOL    StrokePath(HDC hdc);
+BOOL    StrokeAndFillPath(HDC hdc);
 COLORREF SetPixel(HDC hdc, int x, int y, COLORREF color);
 COLORREF GetPixel(HDC hdc, int x, int y);
 int     GetDIBits(HDC hdc, HBITMAP hbm, UINT start, UINT cLines, LPVOID lpvBits, LPBITMAPINFO lpbmi, UINT usage);
@@ -1504,6 +1530,10 @@ void      zp_macos_install_crash_handler(void);
     CreateWindowExA(0, cls, name, style, x, y, w, h, parent, menu, inst, param)
 #define CreateWindow(cls, name, style, x, y, w, h, parent, menu, inst, param) \
     CreateWindowExA(0, cls, name, style, x, y, w, h, parent, menu, inst, param)
+
+DWORD   GetPrivateProfileStringA(LPCSTR lpAppName, LPCSTR lpKeyName, LPCSTR lpDefault, LPSTR lpReturnedString, DWORD nSize, LPCSTR lpFileName);
+UINT    GetPrivateProfileIntA(LPCSTR lpAppName, LPCSTR lpKeyName, INT nDefault, LPCSTR lpFileName);
+BOOL    WritePrivateProfileStringA(LPCSTR lpAppName, LPCSTR lpKeyName, LPCSTR lpString, LPCSTR lpFileName);
 
 #ifdef __cplusplus
 }
