@@ -5,6 +5,16 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#ifndef _WIN32
+#include <strings.h>
+#ifndef _stricmp
+#define _stricmp strcasecmp
+#endif
+#ifndef _strnicmp
+#define _strnicmp strncasecmp
+#endif
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif

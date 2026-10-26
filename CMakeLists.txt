@@ -184,6 +184,10 @@ if(MSVC)
         /SUBSYSTEM:WINDOWS
     )
 elseif(APPLE OR CMAKE_C_COMPILER_ID MATCHES "AppleClang")
+    target_compile_definitions(ZuPather PRIVATE
+        _stricmp=strcasecmp
+        _strnicmp=strncasecmp
+    )
     target_compile_options(ZuPather PRIVATE
         -O2
         -Wall
