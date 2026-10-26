@@ -5,6 +5,16 @@
 #include <ctype.h>
 #include <math.h>
 
+#if defined(__has_include)
+  #if __has_include(<zstd.h>)
+    #include <zstd.h>
+    #define HAVE_ZSTD 1
+  #endif
+#else
+  #include <zstd.h>
+  #define HAVE_ZSTD 1
+#endif
+
 /* ============================================================================
  * 2D Affine Transformation Matrix
  * ============================================================================ */
@@ -58,6 +68,7 @@ VectorFileFormat vector_path_detect_format(const char *filepath, const uint8_t *
         if (memcmp(header, "8BPS", 4) == 0) return VECTOR_FMT_PSD;
         if (memcmp(header, "%PDF", 4) == 0) return VECTOR_FMT_PDF;
         if (memcmp(header, "%!PS", 4) == 0) return VECTOR_FMT_AI;
+        if (header[0] == 0x00 && header[1] == 0xFF && header[2] == 'K' && header[3] == 'A') return VECTOR_FMT_AFFINITY;
     }
 
     if (ext) {
@@ -570,6 +581,255 @@ static bool parse_psd_paths(
 }
 
 /* ============================================================================
+ * Serif Affinity (.af, .afdesign, .afphoto, .afpub) Native Curve Parser
+ * Parses proprietary Zstandard-compressed compound document archives, extracting
+ * PolyCurve ("PCrv" / "Crvs") 18-byte knot records and 2D transformation matrices.
+ * ============================================================================ */
+#ifdef HAVE_ZSTD
+static bool parse_affinity_paths(
+    const uint8_t *data, size_t length,
+    BezierPath *out_paths, int max_paths, int *out_count,
+    SvgDimensions *out_dims
+) {
+    if (!data || length < 64 || !out_paths || !out_count) return false;
+    int initial_count = *out_count;
+
+    /* Verify Affinity compound document magic: 00 FF 4B 41 ("\0\xFFKA") */
+    if (data[0] != 0x00 || data[1] != 0xFF || data[2] != 'K' || data[3] != 'A') {
+        return false;
+    }
+
+    ZSTD_DCtx *dctx = ZSTD_createDCtx();
+    if (!dctx) return false;
+
+    uint8_t *latest_dom = NULL;
+    size_t latest_dom_len = 0;
+
+    /* Scan for Zstandard frames, retaining the latest active DOM frame (starts with "sreP" / Persona) */
+    for (size_t i = 0; i + 4 < length; ++i) {
+        if (data[i] == 0x28 && data[i+1] == 0xB5 && data[i+2] == 0x2F && data[i+3] == 0xFD) {
+            ZSTD_inBuffer in = { data + i, length - i, 0 };
+            size_t out_cap = 4 * 1024 * 1024;
+            uint8_t *out_buf = (uint8_t*)malloc(out_cap);
+            if (!out_buf) continue;
+            ZSTD_outBuffer out = { out_buf, out_cap, 0 };
+
+            ZSTD_DCtx_reset(dctx, ZSTD_reset_session_only);
+            size_t ret = ZSTD_decompressStream(dctx, &out, &in);
+            if (!ZSTD_isError(ret) && out.pos > 100) {
+                bool is_dom = false;
+                for (size_t k = 0; k < 64 && k + 4 < out.pos; ++k) {
+                    if (memcmp(out_buf + k, "sreP", 4) == 0) {
+                        is_dom = true;
+                        break;
+                    }
+                }
+
+                if (is_dom) {
+                    if (latest_dom) free(latest_dom);
+                    latest_dom = out_buf;
+                    latest_dom_len = out.pos;
+                    out_buf = NULL;
+                }
+            }
+            if (out_buf) free(out_buf);
+        }
+    }
+
+    ZSTD_freeDCtx(dctx);
+
+    if (!latest_dom || latest_dom_len == 0) {
+        if (latest_dom) free(latest_dom);
+        return false;
+    }
+
+    /* Detect Artboard / Canvas dimensions */
+    float doc_w = 640.0f, doc_h = 480.0f;
+    bool found_dim = false;
+    for (size_t i = 0; i + 32 < latest_dom_len; ++i) {
+        if (memcmp(latest_dom + i, "nArT", 4) == 0 || memcmp(latest_dom + i, "+cseD", 5) == 0) {
+            size_t start_scan = (i > 128 ? i - 128 : 0);
+            for (size_t p = start_scan; p + 16 < i + 256 && p + 16 < latest_dom_len; ++p) {
+                double w_val, h_val;
+                memcpy(&w_val, latest_dom + p, 8);
+                memcpy(&h_val, latest_dom + p + 8, 8);
+                if (w_val >= 100.0 && w_val <= 8000.0 && h_val >= 100.0 && h_val <= 8000.0) {
+                    if (w_val == (double)(int)w_val && h_val == (double)(int)h_val) {
+                        doc_w = (float)w_val;
+                        doc_h = (float)h_val;
+                        found_dim = true;
+                        break;
+                    }
+                }
+            }
+            if (found_dim) break;
+        }
+    }
+
+    if (out_dims) {
+        out_dims->view_w = doc_w;
+        out_dims->view_h = doc_h;
+        out_dims->has_viewbox = found_dim;
+    }
+
+    /* Parse all curve objects: search for "svrC\x01DvCP" ("Crvs \x01 PCvD") */
+    for (size_t i = 0; i + 32 < latest_dom_len; ++i) {
+        if (memcmp(latest_dom + i, "svrC", 4) == 0 && latest_dom[i+4] == 0x01 && memcmp(latest_dom + i + 5, "DvCP", 4) == 0) {
+            if (*out_count >= max_paths) break;
+
+            /* 1. Nearest name before this curve */
+            char name[64] = "curve";
+            size_t back_limit = i > 4096 ? i - 4096 : 0;
+            for (size_t b = i; b > back_limit; --b) {
+                if (memcmp(latest_dom + b, "+cseD", 5) == 0) {
+                    uint32_t nlen = latest_dom[b+5] | (latest_dom[b+6] << 8) | (latest_dom[b+7] << 16) | (latest_dom[b+8] << 24);
+                    if (nlen > 0 && nlen < 60 && b + 9 + nlen <= latest_dom_len) {
+                        memcpy(name, latest_dom + b + 9, nlen);
+                        name[nlen] = '\0';
+                        break;
+                    }
+                }
+            }
+
+            /* 2. Nearest 2D transform matrix before this curve: "(mrfX" ("Xfrm(") */
+            VectorMatrix cur_mat = vec_matrix_identity();
+            size_t xf_limit = i > 2048 ? i - 2048 : 0;
+            for (size_t b = i; b > xf_limit; --b) {
+                if (memcmp(latest_dom + b, "(mrfX", 5) == 0) {
+                    size_t mp = b + 5;
+                    if (mp + 48 <= i) {
+                        double a, c, tx, b_val, d, ty;
+                        memcpy(&a, latest_dom + mp, 8);
+                        memcpy(&c, latest_dom + mp + 8, 8);
+                        memcpy(&tx, latest_dom + mp + 16, 8);
+                        memcpy(&b_val, latest_dom + mp + 24, 8);
+                        memcpy(&d, latest_dom + mp + 32, 8);
+                        memcpy(&ty, latest_dom + mp + 40, 8);
+                        if (!isnan(a) && !isnan(b_val) && !isnan(c) && !isnan(d) && !isnan(tx) && !isnan(ty)) {
+                            cur_mat.a = (float)a;
+                            cur_mat.b = (float)b_val;
+                            cur_mat.c = (float)c;
+                            cur_mat.d = (float)d;
+                            cur_mat.e = (float)tx;
+                            cur_mat.f = (float)ty;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            /* 3. Locate points: look for "&BsvC" (end of subpath) */
+            size_t end_p = i;
+            while (end_p + 5 < latest_dom_len && memcmp(latest_dom + end_p, "&BsvC", 5) != 0) end_p++;
+            if (end_p + 5 >= latest_dom_len) continue;
+
+            size_t pt_end = end_p - 2;
+            size_t start_p = i;
+            while (start_p + 16 < end_p && memcmp(latest_dom + start_p, "0ataD", 5) != 0) start_p++;
+            if (start_p + 16 >= end_p) continue;
+            start_p += 5;
+
+            /* Locate the first valid point */
+            size_t p = start_p;
+            while (p + 18 <= pt_end) {
+                uint16_t flag = latest_dom[p+16] | (latest_dom[p+17] << 8);
+                if (flag == 0x0200 || flag == 0x0002) {
+                    double x, y;
+                    memcpy(&x, latest_dom + p, 8);
+                    memcpy(&y, latest_dom + p + 8, 8);
+                    if (!isnan(x) && !isnan(y) && fabs(x) < 50000.0 && fabs(y) < 50000.0) {
+                        break;
+                    }
+                }
+                p++;
+            }
+
+            if (p + 18 > pt_end) continue;
+
+            /* Initialize new BezierPath */
+            BezierPath path;
+            char path_name[64];
+            snprintf(path_name, sizeof(path_name), "%s-%d", name[0] ? name : "curve", *out_count + 1);
+            bezier_path_init(&path, path_name);
+
+            /* Parse knots in triplets of 18 bytes each:
+             * Point 0: flag 0x0200 = Control point 1 (incoming handle in world space)
+             * Point 1: flag 0x0002 / 0x0001 = Anchor point
+             * Point 2: flag 0x0100 = Control point 2 (outgoing handle in world space)
+             */
+            for (size_t cur = p; cur + 18 <= pt_end; cur += 54) {
+                if (cur + 18 > pt_end) break;
+
+                double raw_in_x = 0, raw_in_y = 0;
+                double raw_ax = 0, raw_ay = 0;
+                double raw_out_x = 0, raw_out_y = 0;
+                uint16_t in_flag = 0, a_flag = 0, out_flag = 0;
+
+                /* Point 0: InHandle */
+                memcpy(&raw_in_x, latest_dom + cur, 8);
+                memcpy(&raw_in_y, latest_dom + cur + 8, 8);
+                in_flag = latest_dom[cur+16] | (latest_dom[cur+17] << 8);
+
+                /* Point 1: Anchor */
+                if (cur + 36 <= pt_end) {
+                    memcpy(&raw_ax, latest_dom + cur + 18, 8);
+                    memcpy(&raw_ay, latest_dom + cur + 26, 8);
+                    a_flag = latest_dom[cur+34] | (latest_dom[cur+35] << 8);
+                } else {
+                    raw_ax = raw_in_x; raw_ay = raw_in_y;
+                    a_flag = in_flag;
+                }
+
+                /* Point 2: OutHandle */
+                if (cur + 54 <= pt_end) {
+                    memcpy(&raw_out_x, latest_dom + cur + 36, 8);
+                    memcpy(&raw_out_y, latest_dom + cur + 44, 8);
+                    out_flag = latest_dom[cur+52] | (latest_dom[cur+53] << 8);
+                }
+
+                /* Apply affine transform matrix */
+                float ax, ay, in_x, in_y, out_x, out_y;
+                vec_matrix_transform_point(cur_mat, (float)raw_ax, (float)raw_ay, &ax, &ay);
+                vec_matrix_transform_point(cur_mat, (float)raw_in_x, (float)raw_in_y, &in_x, &in_y);
+                vec_matrix_transform_point(cur_mat, (float)raw_out_x, (float)raw_out_y, &out_x, &out_y);
+
+                BezierNodeType ntype = (a_flag == 0x0002) ? NODE_SMOOTH : NODE_CORNER;
+                BezierNode *n = append_node(&path, ax, ay, ntype);
+                if (n) {
+                    if (path.node_count > 1 && in_flag == 0x0200) {
+                        n->hin_x = in_x - ax;
+                        n->hin_y = in_y - ay;
+                    } else {
+                        n->hin_x = 0.0f;
+                        n->hin_y = 0.0f;
+                    }
+
+                    if (out_flag == 0x0100) {
+                        n->hout_x = out_x - ax;
+                        n->hout_y = out_y - ay;
+                    } else {
+                        n->hout_x = 0.0f;
+                        n->hout_y = 0.0f;
+                    }
+                }
+            }
+
+            if (path.node_count >= 2) {
+                path_cache_invalidate(&path);
+                path_cache_update(&path);
+                out_paths[(*out_count)++] = path;
+            } else {
+                bezier_path_free(&path);
+            }
+        }
+    }
+
+    free(latest_dom);
+    return (*out_count > initial_count);
+}
+#endif
+
+/* ============================================================================
  * Unified Vector Curve Importer (AI, PSD, PDF, SVG, Affinity)
  * ============================================================================ */
 bool vector_path_import_from_memory(
@@ -585,32 +845,14 @@ bool vector_path_import_from_memory(
 
     VectorFileFormat fmt = vector_path_detect_format(hint_ext, data, length > 256 ? 256 : length);
 
-    /* 1. Try Adobe Photoshop PSD */
-    if (fmt == VECTOR_FMT_PSD || (length >= 4 && memcmp(data, "8BPS", 4) == 0)) {
-        if (parse_psd_paths(data, length, out_paths, max_paths, out_count, out_dims)) {
+    /* 1. Try Affinity Designer / Photo / Publisher Native File (.af, .afdesign, .afphoto, .afpub) */
+    if (fmt == VECTOR_FMT_AFFINITY || (length >= 4 && data[0] == 0x00 && data[1] == 0xFF && data[2] == 'K' && data[3] == 'A')) {
+#ifdef HAVE_ZSTD
+        if (parse_affinity_paths(data, length, out_paths, max_paths, out_count, out_dims)) {
             return true;
         }
-    }
-
-    /* 2. Try SVG directly if SVG format */
-    if (fmt == VECTOR_FMT_SVG) {
-        if (svg_path_import_from_memory((const char*)data, length, out_paths, max_paths, out_count, out_dims)) {
-            return true;
-        }
-    }
-
-    /* 3. Try Adobe Illustrator PostScript / PDF Stream */
-    if (fmt == VECTOR_FMT_AI || fmt == VECTOR_FMT_PDF ||
-        memcmp(data, "%!PS", 4) == 0 || memcmp(data, "%PDF", 4) == 0 ||
-        strstr((const char*)data, "%%BoundingBox") || strstr((const char*)data, "%AI")) {
-        if (parse_ai_postscript_paths((const char*)data, length, out_paths, max_paths, out_count, out_dims)) {
-            return true;
-        }
-    }
-
-    /* 4. Affinity File: Scan for embedded PDF or SVG stream */
-    if (fmt == VECTOR_FMT_AFFINITY || (hint_ext && (_stricmp(hint_ext, ".af") == 0 || _stricmp(hint_ext, ".afdesign") == 0))) {
-        /* Look for embedded %PDF- */
+#endif
+        /* Fallback: scan for embedded PDF or SVG streams if any */
         for (size_t i = 0; i + 1024 < length; ++i) {
             if (data[i] == '%' && memcmp(data + i, "%PDF-", 5) == 0) {
                 if (parse_ai_postscript_paths((const char*)(data + i), length - i, out_paths, max_paths, out_count, out_dims)) {
@@ -618,14 +860,35 @@ bool vector_path_import_from_memory(
                 }
             }
         }
-
-        /* Look for embedded <svg */
         for (size_t i = 0; i + 1024 < length; ++i) {
             if (data[i] == '<' && (memcmp(data + i, "<svg", 4) == 0 || memcmp(data + i, "<SVG", 4) == 0)) {
                 if (svg_path_import_from_memory((const char*)(data + i), length - i, out_paths, max_paths, out_count, out_dims)) {
                     return true;
                 }
             }
+        }
+    }
+
+    /* 2. Try Adobe Photoshop PSD */
+    if (fmt == VECTOR_FMT_PSD || (length >= 4 && memcmp(data, "8BPS", 4) == 0)) {
+        if (parse_psd_paths(data, length, out_paths, max_paths, out_count, out_dims)) {
+            return true;
+        }
+    }
+
+    /* 3. Try SVG directly if SVG format */
+    if (fmt == VECTOR_FMT_SVG) {
+        if (svg_path_import_from_memory((const char*)data, length, out_paths, max_paths, out_count, out_dims)) {
+            return true;
+        }
+    }
+
+    /* 4. Try Adobe Illustrator PostScript / PDF Stream */
+    if (fmt == VECTOR_FMT_AI || fmt == VECTOR_FMT_PDF ||
+        memcmp(data, "%!PS", 4) == 0 || memcmp(data, "%PDF", 4) == 0 ||
+        strstr((const char*)data, "%%BoundingBox") || strstr((const char*)data, "%AI")) {
+        if (parse_ai_postscript_paths((const char*)data, length, out_paths, max_paths, out_count, out_dims)) {
+            return true;
         }
     }
 
