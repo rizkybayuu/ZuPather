@@ -28,7 +28,6 @@ Major milestone architecture release establishing native **macOS compatibility**
     - Path normalization helper automatically resolving Windows backslashes (`\`) to POSIX forward slashes (`/`).
 - **Decoupled Dual-OS Build Pipeline**:
   - `build_windows.bat`: Standalone, auto-adaptive Windows builder supporting MSVC and MinGW-w64 with icon resource compilation.
-  - `build.bat`: Clean forwarder invoking `build_windows.bat %*` to ensure legacy scripts and continuous integration workflows remain backward-compatible.
   - `build_macos.sh`: Self-contained shell script building native `ZuPather.app` bundles with Apple Silicon/Intel detection, Homebrew flag resolution, `Info.plist` generation, and ad-hoc code signing.
   - `build_macos.command`: Double-clickable terminal runner enabling one-click builds directly from macOS Finder.
 - **Cross-Platform CMake Architecture (`CMakeLists.txt`)**:
