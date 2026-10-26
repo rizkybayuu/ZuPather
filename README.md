@@ -121,8 +121,7 @@ ZuPather/
 │   └── zupather_ui.c             # Win32 window procedure, message dispatcher & CLI entry point
 ├── .gitignore                    # Comprehensive Git exclusion rules
 ├── build_windows.bat             # Dedicated Windows 1-click build script
-├── build_macos.sh                # Dedicated macOS terminal build script
-├── build_macos.command           # Double-clickable macOS Finder runner
+├── build_macos.command           # Dedicated macOS double-clickable console builder
 ├── CHANGELOG.md                  # Detailed version release notes
 ├── LICENSE.md                    # Legal notices, disclaimers & MIT license
 └── README.md                     # Project documentation
