@@ -3938,7 +3938,10 @@ static char *replace_string_all(const char *src, const char *old_str, const char
     }
 
     if (count == 0) {
-        return _strdup(src);
+        size_t slen = strlen(src);
+        char *dup = (char *)malloc(slen + 1);
+        if (dup) memcpy(dup, src, slen + 1);
+        return dup;
     }
 
     size_t src_len = strlen(src);

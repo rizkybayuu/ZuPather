@@ -110,6 +110,10 @@ typedef void*          HDWP;
 #define _strnicmp strncasecmp
 #endif
 
+#ifndef _strdup
+#define _strdup strdup
+#endif
+
 /* Generic Opaque Handles */
 typedef void*          HANDLE;
 typedef void*          HINSTANCE;
