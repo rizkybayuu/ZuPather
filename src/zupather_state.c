@@ -911,6 +911,15 @@ void apply_control_dark_mode(HWND hwnd_ctrl, bool is_dark) {
     }
     SetWindowTheme(hwnd_ctrl, is_dark ? L"DarkMode_Explorer" : L"Explorer", NULL);
 }
+#else
+void update_window_theme_attributes(HWND hwnd, bool is_dark) {
+    (void)hwnd; (void)is_dark;
+    DrawMenuBar(hwnd);
+}
+void apply_control_dark_mode(HWND hwnd_ctrl, bool is_dark) {
+    (void)hwnd_ctrl; (void)is_dark;
+}
+#endif
 
 void load_frog_sprite(void) {
     if (g_has_frog_img) return;
@@ -3225,15 +3234,7 @@ void log_app_error(const char *category, const char *fmt, ...) {
     fclose(f);
 }
 
-#else
-void update_window_theme_attributes(HWND hwnd, bool is_dark) {
-    (void)hwnd; (void)is_dark;
-    DrawMenuBar(hwnd);
-}
-void apply_control_dark_mode(HWND hwnd_ctrl, bool is_dark) {
-    (void)hwnd_ctrl; (void)is_dark;
-}
-#endif
+
 
 #if defined(_WIN32) && !defined(__APPLE__)
 static LONG WINAPI crash_exception_filter(EXCEPTION_POINTERS *ep) {
