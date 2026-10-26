@@ -1,0 +1,50 @@
+1 ICON "assets/media/ZUpather.ico"
+101 RCDATA "assets/media/ZuSPLASHscreen.jpg"
+102 RCDATA "assets/media/github.svg"
+103 RCDATA "assets/fonts/AtkinsonHyperlegible-Regular.ttf"
+104 RCDATA "assets/fonts/AtkinsonHyperlegible-Bold.ttf"
+105 RCDATA "assets/fonts/JetBrainsMono-Regular.ttf"
+106 RCDATA "assets/fonts/JetBrainsMono-Bold.ttf"
+107 RCDATA "assets/media/SMALLFROGonPAD.png"
+108 RCDATA "assets/media/COIN.png"
+109 RCDATA "assets/media/SKULL.png"
+110 RCDATA "assets/media/baBallBlue.png"
+111 RCDATA "assets/media/baBallYellow.png"
+112 RCDATA "assets/media/baBallRed.png"
+113 RCDATA "assets/media/baBallGreen.png"
+114 RCDATA "assets/media/baBallPurple.png"
+115 RCDATA "assets/media/baBallWhite.png"
+116 RCDATA "assets/media/baBallOrange.png"
+117 RCDATA "assets/media/baBallNavy.png"
+118 RCDATA "assets/media/baBallCyan.png"
+119 RCDATA "assets/media/baBallBlack.png"
+120 RCDATA "assets/media/baBallCream.png"
+
+1 VERSIONINFO
+FILEVERSION 0,2,0,0
+PRODUCTVERSION 0,2,0,0
+FILEFLAGSMASK 0x3fL
+FILEFLAGS 0x0L
+FILEOS 0x40004L
+FILETYPE 0x1L
+FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "CompanyName", "Rizky Bayuu"
+            VALUE "FileDescription", "ZuPather - Zuma Deluxe Path & Level Editor"
+            VALUE "FileVersion", "0.2.0"
+            VALUE "InternalName", "ZuPather"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Rizky Bayuu. MIT License."
+            VALUE "OriginalFilename", "ZuPather.exe"
+            VALUE "ProductName", "ZuPather"
+            VALUE "ProductVersion", "0.2.0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 1200
+    END
+END
