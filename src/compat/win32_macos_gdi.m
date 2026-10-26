@@ -1162,6 +1162,11 @@ BOOL Polyline(HDC hdc, const POINT *apt, int cpt) {
     return TRUE;
 }
 
+int SetPolyFillMode(HDC hdc, int mode) {
+    (void)hdc;
+    return mode;
+}
+
 int SetStretchBltMode(HDC hdc, int mode) {
     (void)hdc;
     return mode;

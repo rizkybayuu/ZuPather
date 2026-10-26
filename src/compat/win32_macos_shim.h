@@ -1122,6 +1122,9 @@ typedef struct _SYSTEMTIME {
 #define RGN_DIFF                 4
 #define RGN_COPY                 5
 
+#define ALTERNATE                1
+#define WINDING                  2
+
 #define FW_NORMAL                400
 #define FW_BOLD                  700
 #define DEFAULT_CHARSET          1
@@ -1249,6 +1252,7 @@ BOOL    AlphaBlend(HDC hdcDest, int xoriginDest, int yoriginDest, int wDest, int
                    BLENDFUNCTION ftn);
 #define GdiAlphaBlend AlphaBlend
 int     SetStretchBltMode(HDC hdc, int mode);
+int     SetPolyFillMode(HDC hdc, int mode);
 
 BOOL    MoveToEx(HDC hdc, int x, int y, LPPOINT lppt);
 BOOL    LineTo(HDC hdc, int x, int y);
