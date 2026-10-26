@@ -17,6 +17,8 @@
 #include <math.h>
 #include "image_loader.h"
 
+extern void log_app_error(const char *category, const char *fmt, ...);
+
 struct VideoPlaybackCtx {
     IMFSourceReader *reader;
     int              disp_width;
@@ -27,6 +29,7 @@ struct VideoPlaybackCtx {
     int              fps;
     int              frame_interval_ms;
     DWORD            last_tick;
+    uint8_t         *frame_buf;
 };
 
 struct WebPPlaybackCtx {
@@ -39,7 +42,10 @@ struct WebPPlaybackCtx {
     int                 cur_frame_idx;
     int                 cur_frame_delay_ms;
     int                 prev_timestamp_ms;
+    uint8_t            *premul_buf;
 };
+
+static void scale_bgra_buffer(const uint8_t *src, int src_w, int src_h, uint8_t *dst, int dst_w, int dst_h, bool is_premultiplied);
 
 static const GUID k_GUID_NULL = { 0, 0, 0, { 0, 0, 0, 0, 0, 0, 0, 0 } };
 
@@ -281,6 +287,15 @@ static bool load_webp_internal(const char *filepath, CanvasImage *out_img) {
 
             /* Save still frame copy of frame 0 */
             out_img->first_frame_hbm = create_premultiplied_dib(w, h, first_buf, &out_img->first_frame_bits, &out_img->first_frame_hdc);
+
+            if (bits && w > 0 && h > 0) {
+                out_img->orig_bits = malloc((size_t)w * h * 4);
+                if (out_img->orig_bits) {
+                    memcpy(out_img->orig_bits, bits, (size_t)w * h * 4);
+                    out_img->orig_width = w;
+                    out_img->orig_height = h;
+                }
+            }
 
             strncpy(out_img->filepath, filepath, sizeof(out_img->filepath) - 1);
             const char *last_slash = strrchr(filepath, '\\');
@@ -807,6 +822,11 @@ bool image_load_from_file(const char *filepath, CanvasImage *out_img) {
         }
     }
 
+    if (!ok) {
+        log_app_error("IMAGE_LOAD", "Failed to load image from file: '%s'", filepath);
+        return false;
+    }
+
     if (ok) {
         if (out_img->bits && out_img->width > 0 && out_img->height > 0 && !out_img->orig_bits) {
             out_img->orig_bits = malloc((size_t)out_img->width * out_img->height * 4);
@@ -977,14 +997,33 @@ bool image_advance_animation(CanvasImage *img) {
             }
 
             if (buf && img->bits) {
-                uint8_t *dst = (uint8_t*)img->bits;
-                int total_px = wctx->canvas_w * wctx->canvas_h;
-                for (int p = 0; p < total_px; ++p) {
-                    uint8_t a = buf[p * 4 + 3];
-                    dst[p * 4 + 0] = (uint8_t)(((int)buf[p * 4 + 0] * a) / 255);
-                    dst[p * 4 + 1] = (uint8_t)(((int)buf[p * 4 + 1] * a) / 255);
-                    dst[p * 4 + 2] = (uint8_t)(((int)buf[p * 4 + 2] * a) / 255);
-                    dst[p * 4 + 3] = a;
+                if (img->width == wctx->canvas_w && img->height == wctx->canvas_h) {
+                    uint8_t *dst = (uint8_t*)img->bits;
+                    int total_px = wctx->canvas_w * wctx->canvas_h;
+                    for (int p = 0; p < total_px; ++p) {
+                        uint8_t a = buf[p * 4 + 3];
+                        dst[p * 4 + 0] = (uint8_t)(((int)buf[p * 4 + 0] * a) / 255);
+                        dst[p * 4 + 1] = (uint8_t)(((int)buf[p * 4 + 1] * a) / 255);
+                        dst[p * 4 + 2] = (uint8_t)(((int)buf[p * 4 + 2] * a) / 255);
+                        dst[p * 4 + 3] = a;
+                    }
+                } else if (img->width > 0 && img->height > 0) {
+                    /* Scaled animated WebP overlay - decode to full frame then resample */
+                    if (!wctx->premul_buf) {
+                        wctx->premul_buf = (uint8_t*)malloc((size_t)wctx->canvas_w * wctx->canvas_h * 4);
+                    }
+                    if (wctx->premul_buf) {
+                        int total_px = wctx->canvas_w * wctx->canvas_h;
+                        for (int p = 0; p < total_px; ++p) {
+                            uint8_t a = buf[p * 4 + 3];
+                            wctx->premul_buf[p * 4 + 0] = (uint8_t)(((int)buf[p * 4 + 0] * a) / 255);
+                            wctx->premul_buf[p * 4 + 1] = (uint8_t)(((int)buf[p * 4 + 1] * a) / 255);
+                            wctx->premul_buf[p * 4 + 2] = (uint8_t)(((int)buf[p * 4 + 2] * a) / 255);
+                            wctx->premul_buf[p * 4 + 3] = a;
+                        }
+                        scale_bgra_buffer(wctx->premul_buf, wctx->canvas_w, wctx->canvas_h,
+                                          (uint8_t*)img->bits, img->width, img->height, true);
+                    }
                 }
             }
 
@@ -1052,7 +1091,18 @@ bool image_advance_animation(CanvasImage *img) {
 
             if (sample) {
                 if (img->bits) {
-                    extract_sample_to_dib(sample, img->bits, vc->disp_width, vc->disp_height, vc->stride, NULL);
+                    if (img->width == vc->disp_width && img->height == vc->disp_height) {
+                        extract_sample_to_dib(sample, img->bits, vc->disp_width, vc->disp_height, vc->stride, NULL);
+                    } else if (img->width > 0 && img->height > 0) {
+                        if (!vc->frame_buf) {
+                            vc->frame_buf = (uint8_t*)malloc((size_t)vc->disp_width * vc->disp_height * 4);
+                        }
+                        if (vc->frame_buf) {
+                            extract_sample_to_dib(sample, vc->frame_buf, vc->disp_width, vc->disp_height, vc->stride, NULL);
+                            scale_bgra_buffer(vc->frame_buf, vc->disp_width, vc->disp_height,
+                                              (uint8_t*)img->bits, img->width, img->height, false);
+                        }
+                    }
                 }
                 sample->lpVtbl->Release(sample);
             }
@@ -1073,6 +1123,10 @@ void image_free(CanvasImage *img) {
             img->video_ctx->reader->lpVtbl->Release(img->video_ctx->reader);
             img->video_ctx->reader = NULL;
         }
+        if (img->video_ctx->frame_buf) {
+            free(img->video_ctx->frame_buf);
+            img->video_ctx->frame_buf = NULL;
+        }
         free(img->video_ctx);
         img->video_ctx = NULL;
     }
@@ -1085,6 +1139,10 @@ void image_free(CanvasImage *img) {
         if (img->webp_ctx->file_data) {
             free(img->webp_ctx->file_data);
             img->webp_ctx->file_data = NULL;
+        }
+        if (img->webp_ctx->premul_buf) {
+            free(img->webp_ctx->premul_buf);
+            img->webp_ctx->premul_buf = NULL;
         }
         free(img->webp_ctx);
         img->webp_ctx = NULL;
@@ -1319,6 +1377,30 @@ bool image_resize_in_place(CanvasImage *img, int new_w, int new_h) {
     if (new_h > 4096) new_h = 4096;
 
     if (img->width == new_w && img->height == new_h && img->hbm) {
+        return true;
+    }
+
+    /* Resize multi-frame GIF frames if present */
+    if (img->frames && img->frame_count > 1) {
+        for (int i = 0; i < img->frame_count; ++i) {
+            void *f_bits = NULL;
+            HDC f_dc = NULL;
+            HBITMAP f_hbm = create_premultiplied_dib(new_w, new_h, NULL, &f_bits, &f_dc);
+            if (f_hbm && f_bits) {
+                scale_bgra_buffer((const uint8_t*)img->frames[i].bits, img->width, img->height,
+                                  (uint8_t*)f_bits, new_w, new_h, true);
+                if (img->frames[i].hdc_mem) DeleteDC(img->frames[i].hdc_mem);
+                if (img->frames[i].hbm) DeleteObject(img->frames[i].hbm);
+                img->frames[i].hbm = f_hbm;
+                img->frames[i].hdc_mem = f_dc;
+                img->frames[i].bits = f_bits;
+            }
+        }
+        img->hbm = img->frames[img->cur_frame_idx].hbm;
+        img->hdc_mem = img->frames[img->cur_frame_idx].hdc_mem;
+        img->bits = img->frames[img->cur_frame_idx].bits;
+        img->width = new_w;
+        img->height = new_h;
         return true;
     }
 

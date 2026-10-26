@@ -991,4 +991,10 @@ extern RECT g_splash_rc_open;
 extern RECT g_splash_rc_map;
 extern int g_splash_hover_item; /* 0=none, 1=github, 2=new, 3=open, 4=map */
 
+/* ============================================================================
+ * Application Error Logging & Crash Handling
+ * ============================================================================ */
+void init_error_handler(void);
+void log_app_error(const char *category, const char *fmt, ...);
+
 #endif /* ZUPATHER_STATE_H */

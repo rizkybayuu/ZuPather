@@ -4,6 +4,7 @@
 
 set(ZUPATHER_SOURCES
     src/bezier_path.c
+    src/ai_psd_path.c
     src/canvas_render.c
     src/dialog_modals.c
     src/hud_overlay.c
@@ -18,6 +19,7 @@ set(ZUPATHER_SOURCES
 
 set(ZUPATHER_HEADERS
     src/bezier_path.h
+    src/ai_psd_path.h
     src/canvas_render.h
     src/dialog_modals.h
     src/hud_overlay.h

@@ -2,16 +2,24 @@
 #include "hud_overlay.h"
 #include "dialog_modals.h"
 #include "undo_redo.h"
+#include "ai_psd_path.h"
 #include <shobjidl.h>
 
-/* Handle Universal Path Import (.dat & .svg) */
+/* Handle Universal Path Import (.dat, .svg, .ai, .eps, .psd, .af) */
 void handle_import_path(HWND hwnd) {
     char file_buf[MAX_PATH] = {0};
     OPENFILENAMEA ofn;
     memset(&ofn, 0, sizeof(ofn));
     ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner = hwnd;
-    ofn.lpstrFilter = "All Supported Curve Paths (*.dat;*.svg)\0*.dat;*.svg\0Zuma Deluxe Path (*.dat)\0*.dat\0Scalable Vector Graphics (*.svg)\0*.svg\0All Files (*.*)\0*.*\0";
+    ofn.lpstrFilter =
+        "All Supported Curve Paths (*.dat;*.svg;*.ai;*.eps;*.psd;*.pdf;*.af;*.afdesign)\0*.dat;*.svg;*.ai;*.eps;*.psd;*.pdf;*.af;*.afdesign\0"
+        "Adobe Illustrator Path (*.ai;*.eps)\0*.ai;*.eps\0"
+        "Photoshop Document with Paths (*.psd)\0*.psd\0"
+        "Affinity Vector Design (*.af;*.afdesign)\0*.af;*.afdesign\0"
+        "Scalable Vector Graphics (*.svg)\0*.svg\0"
+        "Zuma Deluxe Path (*.dat)\0*.dat\0"
+        "All Files (*.*)\0*.*\0";
     ofn.lpstrFile = file_buf;
     ofn.nMaxFile = sizeof(file_buf);
     ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST;
@@ -22,17 +30,14 @@ void handle_import_path(HWND hwnd) {
     /* Detect file format from extension or binary signature */
     const char *ext = strrchr(file_buf, '.');
     bool is_dat = (ext && _stricmp(ext, ".dat") == 0);
-    bool is_svg = (ext && _stricmp(ext, ".svg") == 0);
 
-    if (!is_dat && !is_svg) {
+    if (!is_dat) {
         /* Sniff file signature */
         FILE *tf = fopen(file_buf, "rb");
         if (tf) {
             char magic[5] = {0};
             if (fread(magic, 1, 4, tf) == 4 && memcmp(magic, "CURV", 4) == 0) {
                 is_dat = true;
-            } else {
-                is_svg = true;
             }
             fclose(tf);
         }
@@ -169,7 +174,16 @@ void handle_import_path(HWND hwnd) {
         return;
     }
 
-    /* SVG Import Pipeline */
+    /* Universal Vector Curve Import Pipeline (SVG, AI, EPS, PSD, Affinity) */
+    const char *fmt_name = "Vector";
+    if (ext) {
+        if (_stricmp(ext, ".ai") == 0 || _stricmp(ext, ".eps") == 0) fmt_name = "Adobe Illustrator (.ai)";
+        else if (_stricmp(ext, ".psd") == 0) fmt_name = "Photoshop (.psd)";
+        else if (_stricmp(ext, ".af") == 0 || _stricmp(ext, ".afdesign") == 0 || _stricmp(ext, ".afphoto") == 0) fmt_name = "Affinity";
+        else if (_stricmp(ext, ".pdf") == 0) fmt_name = "PDF Vector";
+        else if (_stricmp(ext, ".svg") == 0) fmt_name = "SVG";
+    }
+
     int max_import = 2048;
     BezierPath *imported = (BezierPath *)calloc(max_import, sizeof(BezierPath));
     if (!imported) return;
@@ -177,25 +191,38 @@ void handle_import_path(HWND hwnd) {
     SvgDimensions dims;
     memset(&dims, 0, sizeof(dims));
 
-    if (!svg_path_import_from_file(file_buf, imported, max_import, &imported_count, &dims) || imported_count == 0) {
+    if (!vector_path_import_from_file(file_buf, imported, max_import, &imported_count, &dims) || imported_count == 0) {
         free(imported);
-        char err_body[512];
-        snprintf(err_body, sizeof(err_body),
-            "Could not find or parse any valid path data in the selected SVG file.\n\n"
-            "File: %s\n\n"
-            "Please check that the SVG contains standard <path d=\"...\"> elements.",
-            file_buf);
+        char err_body[600];
+        if (ext && (_stricmp(ext, ".af") == 0 || _stricmp(ext, ".afdesign") == 0 || _stricmp(ext, ".afphoto") == 0)) {
+            snprintf(err_body, sizeof(err_body),
+                "Could not extract curve paths from the selected Affinity file.\n\n"
+                "File: %s\n\n"
+                "Affinity Tip: In Affinity Designer or Photo, choose File > Export > SVG (or EPS / PDF / AI), "
+                "then import that vector file into ZuPather.",
+                file_buf);
+        } else {
+            snprintf(err_body, sizeof(err_body),
+                "Could not find or parse any valid curve path data in the selected %s file.\n\n"
+                "File: %s\n\n"
+                "Supported vector formats:\n"
+                "  - Adobe Illustrator (.ai, .eps, including Photoshop 'Paths to Illustrator')\n"
+                "  - Adobe Photoshop Document (.psd workpaths & vector masks)\n"
+                "  - Scalable Vector Graphics (.svg)\n"
+                "  - Affinity Designer / Photo (.af, .afdesign with vector streams)",
+                fmt_name, file_buf);
+        }
         show_themed_notice_dialog(
             hwnd,
-            "Import SVG Failed - ZuPather",
+            "Import Path Failed - ZuPather",
             "No Valid Path Data Found",
             err_body,
-            540, 260
+            560, 290
         );
         return;
     }
 
-    /* If canvas is not open yet, auto-create transparent canvas from SVG dimensions */
+    /* If canvas is not open yet, auto-create transparent canvas from dimensions */
     if (!g_has_canvas) {
         g_canvas_w = dims.has_viewbox ? (int)roundf(dims.view_w) : 640;
         g_canvas_h = dims.has_viewbox ? (int)roundf(dims.view_h) : 480;
@@ -216,21 +243,22 @@ void handle_import_path(HWND hwnd) {
         if (g_path_count == 1) {
             snprintf(choice_body, sizeof(choice_body),
                 "A curve path already exists in this project.\n\n"
-                "Choose 'Replace' to overwrite existing project paths with the imported SVG,\n"
-                "or 'Append' to add them as additional tracks alongside existing paths."
+                "Choose 'Replace' to overwrite existing project paths with the imported %s curves,\n"
+                "or 'Append' to add them as additional tracks alongside existing paths.",
+                fmt_name
             );
         } else {
             snprintf(choice_body, sizeof(choice_body),
                 "Curve paths already exist in this project (%d paths).\n\n"
-                "Choose 'Replace' to overwrite existing project paths with the imported SVG,\n"
+                "Choose 'Replace' to overwrite existing project paths with the imported %s curves,\n"
                 "or 'Append' to add them as additional tracks alongside existing paths.",
-                g_path_count
+                g_path_count, fmt_name
             );
         }
 
         int res = show_themed_choice_dialog(
             hwnd,
-            "Import SVG Path - ZuPather",
+            "Import Curve Path - ZuPather",
             "Existing Curve Paths Detected",
             choice_body,
             "Replace",
@@ -302,29 +330,30 @@ void handle_import_path(HWND hwnd) {
         if (!replace) {
             snprintf(msg, sizeof(msg),
                 "Import complete.\n\n"
-                "Preserved %d existing canvas track%s and added first %d track%s from SVG (10 tracks total).\n"
-                "(%d excess track%s from SVG discarded due to ZuCompleluxe limit).",
+                "Preserved %d existing canvas track%s and added first %d track%s from %s (10 tracks total).\n"
+                "(%d excess track%s from %s discarded due to ZuCompleluxe limit).",
                 old_canvas_count, old_canvas_count > 1 ? "s" : "",
-                to_add, to_add > 1 ? "s" : "",
-                imported_count - to_add, (imported_count - to_add) > 1 ? "s" : ""
+                to_add, to_add > 1 ? "s" : "", fmt_name,
+                imported_count - to_add, (imported_count - to_add) > 1 ? "s" : "", fmt_name
             );
         } else {
             snprintf(msg, sizeof(msg),
                 "Import complete.\n\n"
-                "Imported first 10 tracks from SVG.\n"
-                "(%d excess track%s from SVG discarded due to ZuCompleluxe limit).",
-                imported_count - 10, (imported_count - 10) > 1 ? "s" : ""
+                "Imported first 10 tracks from %s.\n"
+                "(%d excess track%s from %s discarded due to ZuCompleluxe limit).",
+                fmt_name,
+                imported_count - 10, (imported_count - 10) > 1 ? "s" : "", fmt_name
             );
         }
     } else {
         snprintf(msg, sizeof(msg),
-            "Successfully imported %d path%s from SVG.",
-            to_add, to_add > 1 ? "s" : "");
+            "Successfully imported %d path%s from %s.",
+            to_add, to_add > 1 ? "s" : "", fmt_name);
     }
     show_themed_notice_dialog(
         hwnd,
         "Import Complete - ZuPather",
-        "SVG Import Succeeded",
+        "Vector Import Succeeded",
         msg,
         500, 250
     );
@@ -358,7 +387,7 @@ void handle_export_path(HWND hwnd) {
     memset(&ofn, 0, sizeof(ofn));
     ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner = hwnd;
-    ofn.lpstrFilter = "Zuma Deluxe Path (*.dat)\0*.dat\0Scalable Vector Graphics (*.svg)\0*.svg\0All Files (*.*)\0*.*\0";
+    ofn.lpstrFilter = "Zuma Deluxe Path (*.dat)\0*.dat\0Scalable Vector Graphics (*.svg)\0*.svg\0Adobe Illustrator Path (*.ai;*.eps)\0*.ai;*.eps\0All Files (*.*)\0*.*\0";
     ofn.lpstrFile = file_buf;
     ofn.nMaxFile = sizeof(file_buf);
     ofn.lpstrDefExt = "dat";
@@ -369,6 +398,51 @@ void handle_export_path(HWND hwnd) {
 
     const char *ext = strrchr(file_buf, '.');
     bool is_svg = (ext && _stricmp(ext, ".svg") == 0);
+    bool is_ai = (ext && (_stricmp(ext, ".ai") == 0 || _stricmp(ext, ".eps") == 0));
+
+    if (is_ai) {
+        int cw = (g_has_canvas && g_canvas_w > 0) ? g_canvas_w : 640;
+        int ch = (g_has_canvas && g_canvas_h > 0) ? g_canvas_h : 480;
+
+        DWORD attrs = GetFileAttributesA(file_buf);
+        bool file_already_exists = (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY));
+        if (file_already_exists) {
+            bool do_overwrite = show_themed_confirm_dialog(
+                hwnd,
+                "Export Illustrator Path - ZuPather",
+                "Overwrite Existing File?",
+                "The selected file already exists.\n\nWould you like to replace it with the exported Adobe Illustrator curve path?",
+                false
+            );
+            if (!do_overwrite) return;
+        }
+
+        if (ai_path_export_to_file(file_buf, g_paths, g_path_count, cw, ch)) {
+            char msg[512];
+            snprintf(msg, sizeof(msg),
+                "Export complete.\n\n"
+                "Successfully exported %d curve path%s to Adobe Illustrator format (.ai).\n\n"
+                "File: %s\n\n"
+                "Compatible with Adobe Illustrator, Adobe Photoshop ('Paths to Illustrator'), Affinity Designer, and Inkscape.",
+                g_path_count, g_path_count > 1 ? "s" : "", file_buf);
+            show_themed_notice_dialog(
+                hwnd,
+                "Export Complete - ZuPather",
+                "Illustrator Export Succeeded",
+                msg,
+                560, 280
+            );
+        } else {
+            show_themed_notice_dialog(
+                hwnd,
+                "Export Failed - ZuPather",
+                "File Write Error",
+                "Failed to write Adobe Illustrator (.ai) file.\n\nPlease check write permissions for the destination folder.",
+                500, 250
+            );
+        }
+        return;
+    }
 
     if (!is_svg) {
         /* Zuma Deluxe Binary .dat Export */

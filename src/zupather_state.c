@@ -3154,3 +3154,185 @@ void draw_github_svg_logo(HDC hdc, int dest_x, int dest_y, int dest_size, COLORR
 
 
 
+
+
+/* ============================================================================
+ * Application Error Logging & Crash Handling Implementation
+ * ============================================================================ */
+static bool s_error_log_session_active = false;
+
+static void get_error_log_path(char *out_path, size_t max_len) {
+    char exe_path[MAX_PATH] = {0};
+    GetModuleFileNameA(NULL, exe_path, MAX_PATH);
+    char *p_slash = strrchr(exe_path, '\\');
+    if (!p_slash) p_slash = strrchr(exe_path, '/');
+    if (p_slash) {
+        *p_slash = '\0';
+        snprintf(out_path, max_len, "%s\\error.txt", exe_path);
+    } else {
+        snprintf(out_path, max_len, "error.txt");
+    }
+}
+
+static FILE* open_session_error_log(void) {
+    char log_path[MAX_PATH];
+    get_error_log_path(log_path, sizeof(log_path));
+
+    const char *mode = s_error_log_session_active ? "a" : "w";
+    FILE *f = fopen(log_path, mode);
+    if (!f) return NULL;
+
+    if (!s_error_log_session_active) {
+        s_error_log_session_active = true;
+        SYSTEMTIME st;
+        GetLocalTime(&st);
+        fprintf(f, "=======================================================\n");
+        fprintf(f, " ZuPather Error & Crash Diagnostic Log\n");
+        fprintf(f, " Session Started : %04d-%02d-%02d %02d:%02d:%02d\n",
+                st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
+        fprintf(f, " Version         : v0.1.5\n");
+#if defined(_WIN64)
+        fprintf(f, " Architecture    : 64-bit (x64)\n");
+#else
+        fprintf(f, " Architecture    : 32-bit (x86)\n");
+#endif
+        fprintf(f, " File Location   : %s\n", log_path);
+        fprintf(f, "=======================================================\n\n");
+    }
+    return f;
+}
+
+void log_app_error(const char *category, const char *fmt, ...) {
+    FILE *f = open_session_error_log();
+    if (!f) return;
+
+    SYSTEMTIME st;
+    GetLocalTime(&st);
+    fprintf(f, "[%04d-%02d-%02d %02d:%02d:%02d] [%s] ",
+            st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond,
+            category ? category : "ERROR");
+
+    va_list args;
+    va_start(args, fmt);
+    vfprintf(f, fmt, args);
+    va_end(args);
+    fprintf(f, "\n");
+    fflush(f);
+    fclose(f);
+}
+
+static LONG WINAPI crash_exception_filter(EXCEPTION_POINTERS *ep) {
+    FILE *f = open_session_error_log();
+    if (f) {
+        SYSTEMTIME st;
+        GetLocalTime(&st);
+
+        DWORD code = ep->ExceptionRecord ? ep->ExceptionRecord->ExceptionCode : 0;
+        void *addr = ep->ExceptionRecord ? ep->ExceptionRecord->ExceptionAddress : NULL;
+
+        fprintf(f, "\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+        fprintf(f, " FATAL CRASH / UNHANDLED EXCEPTION DETECTED\n");
+        fprintf(f, " Time: %04d-%02d-%02d %02d:%02d:%02d\n",
+                st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
+        fprintf(f, " Exception Code: 0x%08lX", (unsigned long)code);
+
+        switch (code) {
+            case EXCEPTION_ACCESS_VIOLATION:
+                fprintf(f, " (EXCEPTION_ACCESS_VIOLATION)");
+                if (ep->ExceptionRecord && ep->ExceptionRecord->NumberParameters >= 2) {
+                    ULONG_PTR access_type = ep->ExceptionRecord->ExceptionInformation[0];
+                    ULONG_PTR target_addr = ep->ExceptionRecord->ExceptionInformation[1];
+                    const char *op = (access_type == 0) ? "read" : (access_type == 1 ? "write" : "execute");
+                    fprintf(f, "\n Access Violation Detail: Attempted to %s memory address 0x%p", op, (void*)target_addr);
+                }
+                break;
+            case EXCEPTION_ARRAY_BOUNDS_EXCEEDED: fprintf(f, " (EXCEPTION_ARRAY_BOUNDS_EXCEEDED)"); break;
+            case EXCEPTION_DATATYPE_MISALIGNMENT: fprintf(f, " (EXCEPTION_DATATYPE_MISALIGNMENT)"); break;
+            case EXCEPTION_FLT_DIVIDE_BY_ZERO: fprintf(f, " (EXCEPTION_FLT_DIVIDE_BY_ZERO)"); break;
+            case EXCEPTION_INT_DIVIDE_BY_ZERO: fprintf(f, " (EXCEPTION_INT_DIVIDE_BY_ZERO)"); break;
+            case EXCEPTION_ILLEGAL_INSTRUCTION: fprintf(f, " (EXCEPTION_ILLEGAL_INSTRUCTION)"); break;
+            case EXCEPTION_IN_PAGE_ERROR: fprintf(f, " (EXCEPTION_IN_PAGE_ERROR)"); break;
+            case EXCEPTION_NONCONTINUABLE_EXCEPTION: fprintf(f, " (EXCEPTION_NONCONTINUABLE_EXCEPTION)"); break;
+            case EXCEPTION_STACK_OVERFLOW: fprintf(f, " (EXCEPTION_STACK_OVERFLOW)"); break;
+            default: break;
+        }
+        fprintf(f, "\n Faulting Instruction Address: 0x%p\n", addr);
+
+        /* Context Record (CPU Registers) */
+        if (ep->ContextRecord) {
+            CONTEXT *ctx = ep->ContextRecord;
+#if defined(_WIN64)
+            fprintf(f, "\nCPU Registers (x64):\n");
+            fprintf(f, " RAX: 0x%016llX  RBX: 0x%016llX  RCX: 0x%016llX  RDX: 0x%016llX\n",
+                    (unsigned long long)ctx->Rax, (unsigned long long)ctx->Rbx,
+                    (unsigned long long)ctx->Rcx, (unsigned long long)ctx->Rdx);
+            fprintf(f, " RSI: 0x%016llX  RDI: 0x%016llX  RBP: 0x%016llX  RSP: 0x%016llX\n",
+                    (unsigned long long)ctx->Rsi, (unsigned long long)ctx->Rdi,
+                    (unsigned long long)ctx->Rbp, (unsigned long long)ctx->Rsp);
+            fprintf(f, " RIP: 0x%016llX  EFLAGS: 0x%08X\n",
+                    (unsigned long long)ctx->Rip, (unsigned int)ctx->EFlags);
+#elif defined(_M_IX86) || defined(__i386__)
+            fprintf(f, "\nCPU Registers (x86):\n");
+            fprintf(f, " EAX: 0x%08lX  EBX: 0x%08lX  ECX: 0x%08lX  EDX: 0x%08lX\n",
+                    (unsigned long)ctx->Eax, (unsigned long)ctx->Ebx,
+                    (unsigned long)ctx->Ecx, (unsigned long)ctx->Edx);
+            fprintf(f, " ESI: 0x%08lX  EDI: 0x%08lX  EBP: 0x%08lX  ESP: 0x%08lX\n",
+                    (unsigned long)ctx->Esi, (unsigned long)ctx->Edi,
+                    (unsigned long)ctx->Ebp, (unsigned long)ctx->Esp);
+            fprintf(f, " EIP: 0x%08lX  EFLAGS: 0x%08lX\n",
+                    (unsigned long)ctx->Eip, (unsigned long)ctx->EFlags);
+#endif
+        }
+
+        /* Stack Backtrace */
+        void *stack_addrs[32];
+        WORD captured = CaptureStackBackTrace(0, 32, stack_addrs, NULL);
+        if (captured > 0) {
+            fprintf(f, "\nStack Backtrace (%u frames):\n", captured);
+            for (WORD i = 0; i < captured; ++i) {
+                fprintf(f, "  [%02u] 0x%p\n", i, stack_addrs[i]);
+            }
+        }
+
+        /* Application Context Diagnostics */
+        fprintf(f, "\nApplication State at Time of Crash:\n");
+        fprintf(f, " Active Canvas Name  : %s\n", g_canvas_name[0] ? g_canvas_name : "(none)");
+        fprintf(f, " Active Canvas Title : %s\n", g_canvas_title[0] ? g_canvas_title : "(none)");
+        fprintf(f, " Canvas Dimensions   : %d x %d\n", g_canvas_w, g_canvas_h);
+        fprintf(f, " Paths Count         : %d\n", g_path_count);
+        fprintf(f, " Cutouts Count       : %d\n", g_cutout_count);
+        fprintf(f, " Sprites Count       : %d\n", g_sprite_count);
+        fprintf(f, " BG Alphas Count     : %d\n", g_bg_alpha_count);
+        fprintf(f, " Mode: Canvas=%s, Overlay=%s, Element=%s, Curve=%s\n",
+                g_mode_canvas ? "true" : "false",
+                g_mode_overlay ? "true" : "false",
+                g_mode_element ? "true" : "false",
+                g_mode_curve ? "true" : "false");
+        fprintf(f, " Affect Overlay      : %s\n", g_cv_affect_overlay ? "true" : "false");
+        fprintf(f, " Zoom Level          : %.2f%%\n", g_zoom * 100.0f);
+        fprintf(f, " Pan Coordinates     : (%.1f, %.1f)\n", g_pan_x, g_pan_y);
+        fprintf(f, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n\n");
+        fflush(f);
+        fclose(f);
+    }
+
+    char log_path[MAX_PATH];
+    get_error_log_path(log_path, sizeof(log_path));
+
+    char alert_msg[600];
+    snprintf(alert_msg, sizeof(alert_msg),
+        "ZuPather encountered an unhandled exception (0x%08lX).\n\n"
+        "A detailed error log has been generated at:\n"
+        "%s\n\n"
+        "The application will now safely terminate.",
+        (unsigned long)(ep->ExceptionRecord ? ep->ExceptionRecord->ExceptionCode : 0),
+        log_path
+    );
+    MessageBoxA(NULL, alert_msg, "ZuPather - Fatal Application Error", MB_ICONERROR | MB_OK | MB_TASKMODAL);
+
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+void init_error_handler(void) {
+    SetUnhandledExceptionFilter(crash_exception_filter);
+}

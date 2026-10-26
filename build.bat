@@ -272,7 +272,7 @@ if "!COMPILER_TYPE!"=="MSVC" (
             echo [RESOURCE] Embedded res\zupather.res (assets\media\ZUpather.ico)
         )
     )
-    cl /O2 /Fe:ZuPather.exe src\zupather_ui.c src\zupather_state.c src\undo_redo.c src\level_io.c src\dialog_modals.c src\hud_overlay.c src\canvas_render.c src\image_loader.c src\bezier_path.c src\svg_path.c src\level_progression.c !RES_OBJ! user32.lib gdi32.lib comdlg32.lib comctl32.lib msimg32.lib windowscodecs.lib ole32.lib shell32.lib uxtheme.lib dwmapi.lib mfplat.lib mfreadwrite.lib mfuuid.lib winmm.lib /link /SUBSYSTEM:WINDOWS
+    cl /O2 /Fe:ZuPather.exe src\zupather_ui.c src\zupather_state.c src\undo_redo.c src\level_io.c src\dialog_modals.c src\hud_overlay.c src\canvas_render.c src\image_loader.c src\bezier_path.c src\svg_path.c src\level_progression.c src\ai_psd_path.c !RES_OBJ! user32.lib gdi32.lib comdlg32.lib comctl32.lib msimg32.lib windowscodecs.lib ole32.lib shell32.lib uxtheme.lib dwmapi.lib mfplat.lib mfreadwrite.lib mfuuid.lib winmm.lib /link /SUBSYSTEM:WINDOWS
 ) else (
     echo [COMPILING] via GCC: "!COMPILER_BIN!"
     set "RES_OBJ="
@@ -297,7 +297,7 @@ if "!COMPILER_TYPE!"=="MSVC" (
             exit /b 1
         )
     )
-    "!COMPILER_BIN!" -O2 -mwindows -o "ZuPather.exe" src\zupather_ui.c src\zupather_state.c src\undo_redo.c src\level_io.c src\dialog_modals.c src\hud_overlay.c src\canvas_render.c src\image_loader.c src\bezier_path.c src\svg_path.c src\level_progression.c !RES_OBJ! -lwindowscodecs -lole32 -lshell32 -lmfplat -lmfreadwrite -lmfuuid -Wl,-Bstatic -lwebpmux -lwebpdemux -lwebp -lsharpyuv -Wl,-Bdynamic -lmsimg32 -lgdi32 -lcomdlg32 -lcomctl32 -luxtheme -ldwmapi -ladvapi32 -lwinmm -lm
+    "!COMPILER_BIN!" -O2 -mwindows -o "ZuPather.exe" src\zupather_ui.c src\zupather_state.c src\undo_redo.c src\level_io.c src\dialog_modals.c src\hud_overlay.c src\canvas_render.c src\image_loader.c src\bezier_path.c src\svg_path.c src\level_progression.c src\ai_psd_path.c !RES_OBJ! -lwindowscodecs -lole32 -lshell32 -lmfplat -lmfreadwrite -lmfuuid -Wl,-Bstatic -lwebpmux -lwebpdemux -lwebp -lsharpyuv -Wl,-Bdynamic -lmsimg32 -lgdi32 -lcomdlg32 -lcomctl32 -luxtheme -ldwmapi -ladvapi32 -lwinmm -lm
 )
 
 if !ERRORLEVEL! neq 0 (

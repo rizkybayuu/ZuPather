@@ -5260,6 +5260,11 @@ bool show_themed_notice_dialog_ex(
         s_class_registered = true;
     }
 
+    if ((title && (strstr(title, "Error") || strstr(title, "Failed") || strstr(title, "Corrupted") || strstr(title, "Malformed") || strstr(title, "Invalid"))) ||
+        (header && (strstr(header, "Error") || strstr(header, "Failed") || strstr(header, "Corrupted") || strstr(header, "Malformed") || strstr(header, "Invalid")))) {
+        log_app_error("DIALOG", "%s | %s - %s", title ? title : "", header ? header : "", body ? body : "");
+    }
+
     if (dlg_w <= 0) dlg_w = 560;
 
     /* Measure header and body to fit dialog height perfectly with balanced button distance */

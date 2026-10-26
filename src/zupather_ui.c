@@ -8063,6 +8063,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     (void)hPrevInstance;
     (void)lpCmdLine;
 
+    init_error_handler();
+
     timeBeginPeriod(1);
 
     /* Resolve absolute path to assets\media\ZUpather.ico next to executable */

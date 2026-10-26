@@ -17,6 +17,7 @@ ZuPather.exe
 
 # Intermediate Build Artifacts & Logs
 build.log
+error.txt
 *.log
 *.tmp
 *.bak
