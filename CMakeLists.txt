@@ -112,6 +112,11 @@ else()
 endif()
 
 # Compiler & Linker Flag Optimizations
+target_compile_definitions(ZuPather PRIVATE
+    _stricmp=strcasecmp
+    _strnicmp=strncasecmp
+)
+
 if(APPLE OR CMAKE_C_COMPILER_ID MATCHES "AppleClang")
     target_compile_options(ZuPather PRIVATE
         -O2

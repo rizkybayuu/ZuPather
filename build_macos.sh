@@ -105,6 +105,8 @@ echo "[COMPILING] Building native binary with Apple Clang..."
 
 clang -O2 \
     -D__APPLE__ \
+    -D_stricmp=strcasecmp \
+    -D_strnicmp=strncasecmp \
     -I"$SCRIPT_DIR/src" \
     -I"$SCRIPT_DIR/src/compat" \
     $BREW_CFLAGS \
