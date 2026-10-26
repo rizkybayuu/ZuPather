@@ -1,6 +1,6 @@
-# ZuPather (v0.1.5)
+# ZuPather (v0.1.6)
 
-> **Version:** 0.1.5 (Hierarchical SVG Engine, Viewport GPU Acceleration & Settings Suite Release)  
+> **Version:** 0.1.6 (Unified Vector Import/Export, Affinity & Adobe Suite Engine & Resampling Stability Release)  
 > **Target Game:** *Zuma Deluxe* v1.0.0.1 & *ZuCompleluxe* Multi-Curve Framework  
 > **Project Scope:** High-Precision Vector Path Editor, Asset Composer & Direct-to-Engine Exporter  
 > **Core Language:** Pure C (C99 / Win32 API)  
@@ -62,15 +62,20 @@ In the *Zuma Deluxe* engine, rolling balls must traverse paths at a strictly uni
   - Dual-pane manager synchronizing local Canvas Projects (`.zupath`) with detected Zuma Deluxe game installations.
   - Tri-state level categorization with core vanilla level protection (prevents accidental overwriting or deletion of official progression maps).
   - Direct 1-click exporter: updates `<Graphics>` definitions in `levels.xml`, writes `.dat` binaries, registers progression, and creates timestamped safety backups (`levels.xml.bak`).
-- **Bi-Directional Vector Exchange & Headless CLI**:
-  - Full SVG import/export compatibility with vector design suites (Affinity Designer, Canva, Adobe Illustrator).
+- **Universal Vector Exchange & Headless CLI**:
+  - Full SVG import/export compatibility with vector design suites (Affinity Designer, Canva, Adobe Illustrator, Inkscape).
   - **Hierarchical SVG Transform Engine**: 2D affine matrix stack parsing (`matrix`, `translate`, `scale`, `rotate`, `skewX`, `skewY`) supporting deeply nested `<g transform="...">` groups, artboard offsets, and multi-track rotational patterns without curve stacking.
+  - **Native Serif Affinity Compound Document Ingestion**: Ingests vector curves directly from `.af`, `.afdesign`, `.afphoto`, and `.afpub` files with embedded Zstandard DOM decompression, Artboard dimension deduction, and row-major 2D affine transform matrix application.
+  - **Adobe Illustrator (.ai, .eps) & Photoshop Paths-to-Illustrator Ingestion**: Parses PostScript Bézier paths (`m`, `l`, `c`, `v`, `y`, `cm`), bounding boxes (`%%BoundingBox`), and coordinate normalization directly into curves.
+  - **Adobe Photoshop Document (.psd) WorkPath Knot Extraction**: Scans Image Resource Blocks for IDs 2000-2998 and extracts high-precision 32-bit fixed-point Bézier WorkPaths and Vector Masks.
+  - **Direct Adobe Illustrator (.ai) Curve Export**: Exports level trajectories directly to Adobe Illustrator PostScript format for seamless vector graphic manipulation.
   - Headless CLI suite for batch compilation, conversion, and inspection (`svg2dat`, `dat2svg`, `genxml`, `info`).
-- **Dedicated Settings & Preferences Suite (`Ctrl+,`)**:
+- **Dedicated Settings & Preferences Suite (`Ctrl+,`) & Diagnostic Logging**:
   - Dedicated top-level `Settings` menu bar for configuring viewport optimizations, memory limits, and workspace defaults.
   - **Viewport GPU Acceleration & 60+ FPS Surface Caching**: Fast-path hardware block transfer (`BitBlt`) bypassing CPU blend loops, offscreen DIB HUD surface caching for instantaneous high-framerate viewport panning/zooming, and smooth mouse wheel precision event coalescing.
   - **Configurable Action History**: User-definable memory-backed undo/redo history capacity (default: 64 actions) with pure in-memory ring buffers and zero disk overhead.
   - **Three-Way Color Theme Architecture**: Instant runtime switching between `Light`, `Dark`, and `Use System Default` with live bi-directional dialog synchronization and 150px dropped width.
+  - **Per-Session Diagnostic Error Logging (`error.txt`)**: Automatically creates an adjacent diagnostic log per application session, recording caught Win32 SEH exceptions, register state, stack backtraces, and image parsing warnings without historical disk bloat.
 - **Zero-Dependency Win32 Native Executable**:
   - Pure C99 compiled into a standalone 2.7 MB binary with embedded assets and fonts, requiring no external runtimes or DLLs.
   - High-performance double-buffered GDI rendering engine supporting Windows 7, 8, 10, and 11.
@@ -102,6 +107,7 @@ ZuPather/
 ├── res/                          # Win32 resource definitions & compiler scripts
 │   └── zupather.rc               # Resource script (icons, fonts, manifests)
 ├── src/                          # Modular C99 source files & headers
+│   ├── ai_psd_path.c / .h        # Serif Affinity, Adobe AI/EPS & Photoshop PSD vector parser/exporter
 │   ├── bezier_path.c / .h        # Bézier math, arc-length integration & delta quantization
 │   ├── canvas_render.c / .h      # High-performance GDI canvas renderer & double-buffer
 │   ├── dialog_modals.c / .h      # Themed modal dialogues, map manager & export workflows
@@ -240,4 +246,5 @@ ZuPather embeds and utilizes the following open-source libraries and typefaces:
 - **[Atkinson Hyperlegible](https://fonts.google.com/specimen/Atkinson+Hyperlegible)**: Copyright (c) 2020-2021, Braille Institute of America, Inc., with Reserved Font Name "Atkinson Hyperlegible". Licensed under the [SIL Open Font License 1.1](assets/fonts/OFL.txt). Engineered to provide maximum character distinction for UI labels, menus, and viewport controls.
 - **[JetBrains Mono](https://www.jetbrains.com/lp/mono/)**: Copyright (c) 2020 JetBrains s.r.o., with Reserved Font Name "JetBrains Mono". Licensed under the [SIL Open Font License 1.1](assets/fonts/OFL.txt). Utilized for monospace coordinate readouts, attribute inspector tables, and numerical telemetry.
 - **[stb_image & stb_image_write](https://github.com/nothings/stb)**: Authored by Sean T. Barrett (nothings) and contributors. Released into the Public Domain / MIT Dual License. Provides C99 image raster ingestion.
+- **[Zstandard (zstd)](https://facebook.github.io/zstd/)**: Developed by Yann Collet and Meta Platforms, Inc. Licensed under the BSD 3-Clause License. Statically linked (`libzstd`) for fast decompression of Serif Affinity binary chunk streams with zero runtime DLL footprint.
 

@@ -5,6 +5,49 @@ All notable changes to the **ZuPather** level design suite will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.6] - 2026-10-26
+
+Major vector interoperability, stability, and diagnostic logging release introducing native **Serif Affinity compound document parsing** (`.af`, `.afdesign`, `.afphoto`, `.afpub`), **Adobe Illustrator PostScript parsing** (`.ai`, `.eps` / Photoshop "Paths to Illustrator..."), **Adobe Photoshop Document WorkPath knot extraction** (`.psd`), direct **Adobe Illustrator curve export** (`.ai`), **Animated WebP canvas resize crash elimination**, and **per-session diagnostic error logging** (`error.txt`).
+
+### Added
+- **Native Serif Affinity Compound Document Parser (`src/ai_psd_path.c`, `src/ai_psd_path.h`)**:
+  - Implemented a native parser for Serif Affinity binary compound archives (`.af`, `.afdesign`, `.afphoto`, `.afpub`) with signature `\0\xFFKA`.
+  - Decompresses internal document object model (DOM) streams using statically linked Zstandard (`libzstd`) with zero external runtime DLL dependencies.
+  - Automatically detects and parses Artboard bounds and canvas dimensions (e.g. $1200 \times 675$ in `spiralof8.af`).
+  - Extracts PolyCurve geometry blocks (`svrC\x01DvCP` / `PCrv`), reading 18-byte knot triplets (incoming control handle `0x0200`, anchor point `0x0002`/`0x0001`, outgoing control handle `0x0100`).
+  - Decodes row-major 2D affine transformation matrices `(mrfX` (`Xfrm(` `[a, c, tx, b, d, ty]`), applying scaling, rotation, and translation directly to anchors and Bézier tangent handles without distortion.
+- **Adobe Illustrator (.ai, .eps) & Photoshop "Paths to Illustrator" Parser (`src/ai_psd_path.c`, `src/ai_psd_path.h`)**:
+  - Added support for Adobe Illustrator PostScript formats and Photoshop's *Export > Paths to Illustrator...*.
+  - Parses header bounding boxes (`%%BoundingBox`, `%%HiResBoundingBox`, `%AI3_Cropmarks`) for canvas dimension initialization.
+  - Supports PostScript path operators: `m` (moveto), `l` (lineto), `c` (curveto), `v` (smooth curveto with start coinciding), `y` (curveto with end coinciding), `h` (closepath), `cm` (concatmatrix 2D affine transform), and path strokers/terminators `S`, `s`, `F`, `f`, `B`, `b`, `N`, `n`.
+  - Accurately converts bottom-up PostScript coordinate space to top-down canvas coordinate space: $y_{\text{canvas}} = y_{\text{bbox\_top}} - y_{\text{ps}}$.
+- **Adobe Photoshop Document (.psd) WorkPath Knot Extraction (`src/ai_psd_path.c`, `src/ai_psd_path.h`)**:
+  - Added native reading of Adobe Photoshop `.psd` documents with magic `8BPS`.
+  - Scans Image Resource Blocks for IDs 2000 through 2998 (*WorkPath* and *Vector Masks*).
+  - Parses 26-byte path records and 32-bit fixed-point coordinates (24-bit fraction, normalized to image dimensions).
+- **Adobe Illustrator (.ai) Curve Exporter (`src/ai_psd_path.c`, `src/level_io.c`)**:
+  - Added `Adobe Illustrator Path (*.ai;*.eps)` export filter in the **Export Curve Path** dialog.
+  - Generates standard EPSF-3.0 Adobe Illustrator PostScript format with layer separation, fully compatible with Adobe Illustrator, Photoshop, Affinity Designer, and Inkscape.
+- **Per-Session Diagnostic Error Logging (`src/zupather_state.c`, `src/zupather_state.h`, `src/zupather_ui.c`, `src/dialog_modals.c`)**:
+  - Implemented an automated single-file per-session error log (`error.txt`) created adjacent to the executable.
+  - Replaces the log cleanly upon each application run without appending stale logs across sessions.
+  - Captures structured warnings, modal failure dialogs, image decoding failures, and unhandled Win32 SEH exceptions with CPU register dumps and stack backtraces.
+- **Build System Static ZSTD Integration (`build.bat`, `cmake/sources.cmake`, `.gitignore`)**:
+  - Statically links `libzstd` (`-Wl,-Bstatic -lzstd -Wl,-Bdynamic`) to preserve the single-binary zero-dependency architecture.
+  - Added `error.txt` to `.gitignore`.
+
+### Fixed
+- **Animated WebP Resize Crash in Canvas Affect Transform (`src/image_loader.c`)**:
+  - Fixed an unhandled memory access violation / crash when resizing animated WebP background images in Canvas Mode with *Affect Transform* enabled.
+  - Implemented frame-by-frame bilinear resampling allocating dedicated pre-multiplied decode buffers (`premul_buf`) matched to canvas dimensions.
+
+### Changed
+- **Version & Metadata Alignment**:
+  - Updated in-app splash screen version indicator badge to `v0.1.6`.
+  - Updated Windows PE resource metadata (`res/zupather.rc`) to File Version `0.1.6.0` and Product Version `0.1.6`.
+  - Updated CMake project configuration to `0.1.6`.
+  - Updated `README.md` documentation and version header to `v0.1.6`.
+
 ## [0.1.5] - 2026-10-23
 
 Major maintenance and feature release introducing the **Hierarchical SVG Transform Engine** with full 2D affine matrix transformation support (`matrix`, `translate`, `scale`, `rotate`, `skewX`, `skewY`), nested group `<g transform="...">` tree propagation, sub-pixel floating-point curve ingestion, a dedicated **Settings & Preferences Suite** (`Ctrl+,`), **Viewport GPU Acceleration & 60+ FPS Surface Caching**, **Three-Way Color Theme Architecture** (`Light`, `Dark`, `Use System Default`), and configurable **Action History Limit**.

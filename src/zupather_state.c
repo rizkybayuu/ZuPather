@@ -3190,7 +3190,7 @@ static FILE* open_session_error_log(void) {
         fprintf(f, " ZuPather Error & Crash Diagnostic Log\n");
         fprintf(f, " Session Started : %04d-%02d-%02d %02d:%02d:%02d\n",
                 st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
-        fprintf(f, " Version         : v0.1.5\n");
+        fprintf(f, " Version         : v0.1.6\n");
 #if defined(_WIN64)
         fprintf(f, " Architecture    : 64-bit (x64)\n");
 #else
