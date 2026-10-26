@@ -345,7 +345,8 @@ HFONT CreateFontA(int cHeight, int cWidth, int cEscapement, int cOrientation, in
     CFRelease(faceNameCF);
 
     if (!baseFont) {
-        baseFont = CTFontCreateUIFontForType(kCTFontUIFontSystem, pointSize, NULL);
+        NSFont *sysFont = [NSFont systemFontOfSize:pointSize];
+        baseFont = sysFont ? (CTFontRef)CFRetain((__bridge CTFontRef)sysFont) : NULL;
     }
 
     CTFontSymbolicTraits traits = 0;
@@ -866,7 +867,8 @@ int DrawTextA(HDC hdc, LPCSTR lpchText, int cchText, LPRECT lprc, UINT format) {
 
     CTFontRef font = dc->selectedFont ? dc->selectedFont->ctFont : NULL;
     if (!font) {
-        font = CTFontCreateUIFontForType(kCTFontUIFontSystem, 12.0f, NULL);
+        NSFont *sysFont = [NSFont systemFontOfSize:12.0f];
+        font = sysFont ? (CTFontRef)CFRetain((__bridge CTFontRef)sysFont) : NULL;
     } else {
         CFRetain(font);
     }
@@ -956,7 +958,10 @@ BOOL GetTextExtentPoint32A(HDC hdc, LPCSTR lpString, int c, LPSIZE lpsz) {
     if (!str) return FALSE;
 
     CTFontRef font = (dc && dc->selectedFont) ? dc->selectedFont->ctFont : NULL;
-    if (!font) font = CTFontCreateUIFontForType(kCTFontUIFontSystem, 12.0f, NULL);
+    if (!font) {
+        NSFont *sysFont = [NSFont systemFontOfSize:12.0f];
+        font = sysFont ? (CTFontRef)CFRetain((__bridge CTFontRef)sysFont) : NULL;
+    }
     else CFRetain(font);
 
     CFStringRef keys[] = { kCTFontAttributeName };

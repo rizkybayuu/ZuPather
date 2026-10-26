@@ -33,7 +33,9 @@ extern "C" {
 #define PASCAL
 #endif
 
+#if !defined(__OBJC__)
 typedef int            BOOL;
+#endif
 #ifndef TRUE
 #define TRUE  1
 #define FALSE 0
@@ -113,6 +115,10 @@ typedef void*          HDWP;
 #ifndef _strdup
 #define _strdup strdup
 #endif
+
+/* Avoid symbol collision with Carbon Quickdraw headers */
+#define Polygon      ZP_WinPolygon
+#define LoadResource ZP_WinLoadResource
 
 /* Generic Opaque Handles */
 typedef void*          HANDLE;
