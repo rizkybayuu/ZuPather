@@ -4,8 +4,10 @@
 #include "level_io.h"
 #include "dialog_modals.h"
 #include "undo_redo.h"
+#if defined(_WIN32) && !defined(__APPLE__)
 #include <mmsystem.h>
 #include <timeapi.h>
+#endif
 
 static WNDPROC g_orig_edit_proc = NULL;
 static WNDPROC g_orig_status_proc = NULL;

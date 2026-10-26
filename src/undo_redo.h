@@ -1,7 +1,11 @@
 #ifndef UNDO_REDO_H
 #define UNDO_REDO_H
 
+#if defined(_WIN32) && !defined(__APPLE__)
 #include <windows.h>
+#elif defined(__APPLE__)
+#include "compat/win32_macos_shim.h"
+#endif
 #include <stdbool.h>
 
 #ifdef __cplusplus

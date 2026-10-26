@@ -5,6 +5,52 @@ All notable changes to the **ZuPather** level design suite will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-10-27
+
+Major milestone architecture release establishing native **macOS compatibility** (Apple Silicon M1/M2/M3/M4 & Intel x86_64) alongside Windows, introducing a dedicated zero-dependency **Win32-to-Cocoa/CoreGraphics/CoreText shim layer**, a decoupled **dual-OS build pipeline** (`build_windows.bat`, `build_macos.sh`, `build_macos.command`), **pixel-identical rendering**, and **persistence of canvas progression difficulty** across project Save and Open sessions.
+
+### Added
+- **Native macOS Port & Cocoa Compatibility Layer (`src/compat/`)**:
+  - Engineered an in-house translation subsystem translating Win32 User32/GDI API calls into Apple Native Cocoa, CoreGraphics, and CoreText primitives with zero external GUI framework bloat.
+  - **Windowing & Message Loop (`src/compat/win32_macos_user.m`)**:
+    - Translates `NSWindow`, `NSView` (`ZPContentView`), and Cocoa run-loop events into Win32 messages (`WM_PAINT`, `WM_COMMAND`, `WM_LBUTTONDOWN`, `WM_MOUSEMOVE`, `WM_TIMER`, `WM_KEYDOWN`, etc.).
+    - Implemented virtual child window management, owner-drawn controls (`BS_OWNERDRAW`, `WM_DRAWITEM`), status bar (`STATUSCLASSNAME`), and property system (`SetPropA`, `GetPropA`, `RemovePropA`).
+    - Added native Cocoa ListBox and ComboBox subsystems with complete `LB_*` and `CB_*` message dispatch, themed rendering, and native macOS `NSMenu` popups for dropdown selection.
+    - Implemented multi-monitor geometry query shims (`MonitorFromWindow`, `GetMonitorInfoA`) mapped to `NSScreen`.
+  - **CoreGraphics & CoreText 2D Vector Rendering Subsystem (`src/compat/win32_macos_gdi.m`)**:
+    - Provides high-performance 32-bit BGRA DIB memory device contexts (`CreateCompatibleDC`, `CreateDIBSection`, `BitBlt`, `AlphaBlend`).
+    - Fully typed GDI object management (`ZP_GDIOBJ__`) supporting pens, solid brushes, CoreText fonts (`CTFontRef`), and clipping regions (`CombineRgn`, `SelectClipRgn`, `ExcludeClipRect`).
+    - Fixed GDI object type dispatch in `GetCurrentObject` to return exact selected pen, brush, font, or bitmap handles.
+    - Implemented encapsulated off-screen framebuffer blitting via `zp_macos_create_hdc_image(HDC hdc)`.
+  - **ImageIO Image Loading, Saving & Resource Management (`src/compat/win32_macos_io.m`)**:
+    - Decodes and encodes PNG, JPEG, BMP, and GIF via native Apple ImageIO frameworks using modern non-deprecated UTI literals (`CFSTR("public.png")`, etc.).
+    - Robust embedded resource lookup engine (`FindResourceA`) supporting both flattened and nested bundle layout schemes (`Resources/`, `Resources/assets/media/`, `Resources/assets/fonts/`).
+    - Path normalization helper automatically resolving Windows backslashes (`\`) to POSIX forward slashes (`/`).
+- **Decoupled Dual-OS Build Pipeline**:
+  - `build_windows.bat`: Standalone, auto-adaptive Windows builder supporting MSVC and MinGW-w64 with icon resource compilation.
+  - `build.bat`: Clean forwarder invoking `build_windows.bat %*` to ensure legacy scripts and continuous integration workflows remain backward-compatible.
+  - `build_macos.sh`: Self-contained shell script building native `ZuPather.app` bundles with Apple Silicon/Intel detection, Homebrew flag resolution, `Info.plist` generation, and ad-hoc code signing.
+  - `build_macos.command`: Double-clickable terminal runner enabling one-click builds directly from macOS Finder.
+- **Cross-Platform CMake Architecture (`CMakeLists.txt`)**:
+  - Added native conditional platform branches (`if(WIN32)` vs `elseif(APPLE)`) compiling Objective-C (`.m`) sources and linking Cocoa, Carbon, QuartzCore, CoreGraphics, CoreText, ImageIO, and UniformTypeIdentifiers frameworks on macOS.
+
+### Fixed
+- **Canvas Progression Difficulty Reset on Project Open (`src/level_io.c`, `src/zupather_state.c`, `src/dialog_modals.c`)**:
+  - Fixed a critical bug where opening any existing canvas reset the level progression difficulty back to `Medium` (`zupather-medium`).
+  - Removed the hardcoded difficulty reset from `reset_map_and_dev_attributes()`.
+  - Ensured `load_canvas_settings_xml` accurately preserves saved difficulties (`extreme`, `hard`, `easy`, `dev-test`, or `medium`) when loading into the active editor.
+  - Guaranteed that newly created canvases from `New Canvas Setup` default to `Medium`, while reopened canvases faithfully restore and display their saved difficulty in the `Save Canvas` dialog.
+- **Header Boundary Isolations (`src/image_loader.c`, `src/level_io.c`, `src/zupather_state.c`)**:
+  - Enclosed platform-specific Win32 Windows Imaging Component (WIC) and Windows Media Foundation (MF) code inside `#if defined(_WIN32) && !defined(__APPLE__)` boundary guards.
+
+### Changed
+- **Version & Metadata Alignment**:
+  - Updated application version string `ZUPATHER_VERSION_STR` to `v0.2.0`.
+  - Updated Windows PE resource metadata (`res/zupather.rc`) to File Version `0.2.0.0` and Product Version `0.2.0`.
+  - Updated CMake project configuration to `0.2.0`.
+  - Updated macOS bundle short version string and bundle version to `0.2.0`.
+  - Updated `README.md` documentation to `v0.2.0`.
+
 ## [0.1.6] - 2026-10-26
 
 Major vector interoperability, stability, and diagnostic logging release introducing native **Serif Affinity compound document parsing** (`.af`, `.afdesign`, `.afphoto`, `.afpub`), **Adobe Illustrator PostScript parsing** (`.ai`, `.eps` / Photoshop "Paths to Illustrator..."), **Adobe Photoshop Document WorkPath knot extraction** (`.psd`), direct **Adobe Illustrator curve export** (`.ai`), **Animated WebP canvas resize crash elimination**, and **per-session diagnostic error logging** (`error.txt`).

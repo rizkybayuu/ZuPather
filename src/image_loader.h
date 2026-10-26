@@ -1,8 +1,12 @@
 #ifndef IMAGE_LOADER_H
 #define IMAGE_LOADER_H
 
+#if defined(_WIN32) && !defined(__APPLE__)
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#elif defined(__APPLE__)
+#include "compat/win32_macos_shim.h"
+#endif
 #include <stdbool.h>
 #include <stdint.h>
 

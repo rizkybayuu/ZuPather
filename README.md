@@ -1,6 +1,6 @@
-# ZuPather (v0.1.6)
+# ZuPather (v0.2.0)
 
-> **Version:** 0.1.6 (Unified Vector Import/Export, Affinity & Adobe Suite Engine & Resampling Stability Release)  
+> **Version:** 0.2.0 (Cross-Platform Windows & macOS Native Release, Cocoa/CoreGraphics Subsystem)  
 > **Target Game:** *Zuma Deluxe* v1.0.0.1 & *ZuCompleluxe* Multi-Curve Framework  
 > **Project Scope:** High-Precision Vector Path Editor, Asset Composer & Direct-to-Engine Exporter  
 > **Core Language:** Pure C (C99 / Win32 API)  

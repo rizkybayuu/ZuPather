@@ -1,3 +1,4 @@
+#if defined(_WIN32) && !defined(__APPLE__)
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <wincodec.h>
@@ -5,6 +6,9 @@
 #include <mfidl.h>
 #include <mfreadwrite.h>
 #include <propvarutil.h>
+#elif defined(__APPLE__)
+#include "compat/win32_macos_shim.h"
+#endif
 #include <webp/decode.h>
 #include <webp/encode.h>
 #include <webp/demux.h>
@@ -20,7 +24,11 @@
 extern void log_app_error(const char *category, const char *fmt, ...);
 
 struct VideoPlaybackCtx {
+#if defined(_WIN32) && !defined(__APPLE__)
     IMFSourceReader *reader;
+#else
+    void            *reader;
+#endif
     int              disp_width;
     int              disp_height;
     int              surface_width;
@@ -50,13 +58,17 @@ static void scale_bgra_buffer(const uint8_t *src, int src_w, int src_h, uint8_t 
 static const GUID k_GUID_NULL = { 0, 0, 0, { 0, 0, 0, 0, 0, 0, 0, 0 } };
 
 void image_subsystem_init(void) {
+#if defined(_WIN32) && !defined(__APPLE__)
     CoInitialize(NULL);
     MFStartup(MF_VERSION, MFSTARTUP_NOSOCKET);
+#endif
 }
 
 void image_subsystem_shutdown(void) {
+#if defined(_WIN32) && !defined(__APPLE__)
     MFShutdown();
     CoUninitialize();
+#endif
 }
 
 void image_get_basename_no_ext(const char *filepath, char *out_basename, size_t max_len) {
@@ -348,6 +360,7 @@ static bool load_webp_internal(const char *filepath, CanvasImage *out_img) {
 }
 
 static bool load_wic_internal(const char *filepath, CanvasImage *out_img) {
+#if defined(_WIN32) && !defined(__APPLE__)
     IWICImagingFactory *factory = NULL;
     HRESULT hr = CoCreateInstance(&CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER,
                                   &IID_IWICImagingFactory, (void**)&factory);
@@ -525,8 +538,39 @@ static bool load_wic_internal(const char *filepath, CanvasImage *out_img) {
     image_get_basename_no_ext(filepath, out_img->display_name, sizeof(out_img->display_name));
 
     return true;
+#elif defined(__APPLE__)
+    int w = 0, h = 0;
+    uint32_t *raw_bgra = NULL;
+    if (!zp_macos_decode_image_file(filepath, &w, &h, &raw_bgra) || !raw_bgra) return false;
+    void *bits = NULL;
+    HDC mem_dc = NULL;
+    HBITMAP hbm = create_premultiplied_dib(w, h, (const uint8_t*)raw_bgra, &bits, &mem_dc);
+    free(raw_bgra);
+    if (!hbm || !bits) return false;
+    out_img->hbm = hbm;
+    out_img->hdc_mem = mem_dc;
+    out_img->bits = bits;
+    out_img->width = w;
+    out_img->height = h;
+    out_img->media_type = MEDIA_TYPE_STATIC;
+    out_img->is_animated = false;
+    out_img->is_video = false;
+    out_img->frame_count = 1;
+    strncpy(out_img->filepath, filepath, sizeof(out_img->filepath) - 1);
+    const char *last_slash = strrchr(filepath, '\\');
+    const char *slash2 = strrchr(filepath, '/');
+    if (slash2 && (!last_slash || slash2 > last_slash)) last_slash = slash2;
+    const char *name_start = last_slash ? (last_slash + 1) : filepath;
+    strncpy(out_img->filename, name_start, sizeof(out_img->filename) - 1);
+    image_get_basename_no_ext(filepath, out_img->display_name, sizeof(out_img->display_name));
+    return true;
+#else
+    (void)filepath; (void)out_img;
+    return false;
+#endif
 }
 
+#if defined(_WIN32) && !defined(__APPLE__)
 static void copy_rows_to_dib(const BYTE *row0, LONG pitch, uint32_t *dst, int w, int h) {
     if (!row0 || !dst || w <= 0 || h <= 0) return;
     for (int y = 0; y < h; ++y) {
@@ -586,8 +630,10 @@ static void extract_sample_to_dib(IMFSample *sample, void *dst_bits, int w, int 
     }
     buf->lpVtbl->Release(buf);
 }
+#endif
 
 static bool load_video_internal(const char *filepath, CanvasImage *out_img) {
+#if defined(_WIN32) && !defined(__APPLE__)
     WCHAR wpath[MAX_PATH] = {0};
     MultiByteToWideChar(CP_ACP, 0, filepath, -1, wpath, MAX_PATH);
 
@@ -775,6 +821,10 @@ static bool load_video_internal(const char *filepath, CanvasImage *out_img) {
     image_get_basename_no_ext(filepath, out_img->display_name, sizeof(out_img->display_name));
 
     return true;
+#else
+    (void)filepath; (void)out_img;
+    return false;
+#endif
 }
 
 bool image_load_from_file(const char *filepath, CanvasImage *out_img) {
@@ -845,7 +895,7 @@ bool image_load_from_file(const char *filepath, CanvasImage *out_img) {
 bool image_load_from_memory(const void *data, size_t size, CanvasImage *out_img) {
     if (!data || size == 0 || !out_img) return false;
     memset(out_img, 0, sizeof(CanvasImage));
-
+#if defined(_WIN32) && !defined(__APPLE__)
     IWICImagingFactory *factory = NULL;
     HRESULT hr = CoCreateInstance(&CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER,
                                   &IID_IWICImagingFactory, (void**)&factory);
@@ -950,6 +1000,39 @@ bool image_load_from_memory(const void *data, size_t size, CanvasImage *out_img)
     }
 
     return true;
+#elif defined(__APPLE__)
+    int w = 0, h = 0;
+    uint32_t *raw_bgra = NULL;
+    if (!zp_macos_decode_image_memory(data, size, &w, &h, &raw_bgra) || !raw_bgra) return false;
+
+    void *bits = NULL;
+    HDC hdc_mem = NULL;
+    HBITMAP hbm = create_premultiplied_dib(w, h, (const uint8_t*)raw_bgra, &bits, &hdc_mem);
+    free(raw_bgra);
+    if (!hbm || !bits) return false;
+
+    out_img->width = w;
+    out_img->height = h;
+    out_img->hbm = hbm;
+    out_img->hdc_mem = hdc_mem;
+    out_img->bits = bits;
+    out_img->media_type = MEDIA_TYPE_STATIC;
+    out_img->is_animated = false;
+    out_img->is_video = false;
+    out_img->frame_count = 1;
+    strncpy(out_img->filename, "embedded_resource", sizeof(out_img->filename) - 1);
+    strncpy(out_img->display_name, "embedded_resource", sizeof(out_img->display_name) - 1);
+
+    if (bits && w > 0 && h > 0 && !out_img->orig_bits) {
+        out_img->orig_bits = malloc((size_t)w * h * 4);
+        if (out_img->orig_bits) {
+            memcpy(out_img->orig_bits, bits, (size_t)w * h * 4);
+            out_img->orig_width = w;
+            out_img->orig_height = h;
+        }
+    }
+    return true;
+#endif
 }
 
 bool image_load_from_resource(int res_id, CanvasImage *out_img) {
@@ -1050,6 +1133,7 @@ bool image_advance_animation(CanvasImage *img) {
     }
 
     /* 3. Video stream via IMFSourceReader */
+#if defined(_WIN32) && !defined(__APPLE__)
     if (img->is_video && img->video_ctx && img->video_ctx->reader) {
         VideoPlaybackCtx *vc = img->video_ctx;
         int interval = vc->frame_interval_ms > 0 ? vc->frame_interval_ms : 16;
@@ -1111,6 +1195,7 @@ bool image_advance_animation(CanvasImage *img) {
         }
         return false;
     }
+#endif
 
     return false;
 }
@@ -1119,10 +1204,12 @@ void image_free(CanvasImage *img) {
     if (!img) return;
 
     if (img->video_ctx) {
+#if defined(_WIN32) && !defined(__APPLE__)
         if (img->video_ctx->reader) {
             img->video_ctx->reader->lpVtbl->Release(img->video_ctx->reader);
             img->video_ctx->reader = NULL;
         }
+#endif
         if (img->video_ctx->frame_buf) {
             free(img->video_ctx->frame_buf);
             img->video_ctx->frame_buf = NULL;
@@ -1197,6 +1284,7 @@ void image_free(CanvasImage *img) {
 
 bool get_video_stream_info(const char *filepath, double *out_duration_sec, int *out_fps, int *out_total_frames) {
     if (!filepath || filepath[0] == '\0') return false;
+#if defined(_WIN32) && !defined(__APPLE__)
     WCHAR wpath[MAX_PATH] = {0};
     MultiByteToWideChar(CP_ACP, 0, filepath, -1, wpath, MAX_PATH);
 
@@ -1237,12 +1325,16 @@ bool get_video_stream_info(const char *filepath, double *out_duration_sec, int *
     if (out_fps) *out_fps = fps;
     if (out_total_frames) *out_total_frames = total_frames;
     return true;
+#else
+    (void)out_duration_sec; (void)out_fps; (void)out_total_frames;
+    return false;
+#endif
 }
 
 /* High-quality 32-bit BGRA image scaling using Windows Imaging Component (WIC) */
 static bool scale_bgra_wic(const uint8_t *src_bgra, int src_w, int src_h, uint8_t *dst_bgra, int dst_w, int dst_h, bool is_premultiplied) {
     if (!src_bgra || !dst_bgra || src_w <= 0 || src_h <= 0 || dst_w <= 0 || dst_h <= 0) return false;
-
+#if defined(_WIN32) && !defined(__APPLE__)
     IWICImagingFactory *factory = NULL;
     HRESULT hr = CoCreateInstance(&CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER,
                                   &IID_IWICImagingFactory, (void**)&factory);
@@ -1287,6 +1379,10 @@ static bool scale_bgra_wic(const uint8_t *src_bgra, int src_w, int src_h, uint8_
     factory->lpVtbl->Release(factory);
 
     return SUCCEEDED(hr);
+#else
+    (void)is_premultiplied;
+    return false;
+#endif
 }
 
 /* Fast pure C bilinear interpolation rescaler for 32-bit BGRA with precalculated X table */
@@ -1607,6 +1703,7 @@ static bool export_webp_file(
     if (out_h <= 0) out_h = 480;
 
     /* 1. If video: encode video frames into animated WebP */
+#if defined(_WIN32) && !defined(__APPLE__)
     if (img->is_video && img->filepath[0] != '\0') {
         WCHAR wpath[MAX_PATH] = {0};
         MultiByteToWideChar(CP_ACP, 0, img->filepath, -1, wpath, MAX_PATH);
@@ -1755,6 +1852,7 @@ static bool export_webp_file(
             }
         }
     }
+#endif
 
     /* 2. If animated WebP: decode all frames and re-encode */
     if (img->is_animated && (img->media_type == MEDIA_TYPE_ANIMATED_WEBP || img->webp_ctx != NULL || (!img->frames && img->frame_count > 1))) {
@@ -2061,7 +2159,7 @@ static bool export_gif_file(
     int max_frames_limit
 ) {
     if (!img || !dest_filepath || dest_filepath[0] == '\0' || img->width <= 0 || img->height <= 0) return false;
-
+#if defined(_WIN32) && !defined(__APPLE__)
     IWICImagingFactory *factory = NULL;
     HRESULT hr = CoCreateInstance(&CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER,
                                   &IID_IWICImagingFactory, (void**)&factory);
@@ -2251,6 +2349,30 @@ static bool export_gif_file(
     factory->lpVtbl->Release(factory);
 
     return SUCCEEDED(hr);
+#elif defined(__APPLE__)
+    (void)max_frames_limit;
+    const uint8_t *src_bits = (img->first_frame_bits) ? (const uint8_t*)img->first_frame_bits : (const uint8_t*)img->bits;
+    if (!src_bits) return false;
+    int out_w = (resize && target_w > 0) ? target_w : img->width;
+    int out_h = (resize && target_h > 0) ? target_h : img->height;
+    if (out_w <= 0) out_w = 640;
+    if (out_h <= 0) out_h = 480;
+    int place_x = 0, place_y = 0, place_w = out_w, place_h = out_h;
+    if (resize) {
+        get_canvas_image_dest_rect(out_w, out_h, img->width, img->height, g_canvas_fit_mode, g_canvas_alignment, &place_x, &place_y, &place_w, &place_h);
+    }
+    uint8_t *scaled_bits = (uint8_t*)malloc((size_t)place_w * place_h * 4);
+    if (!scaled_bits) return false;
+    scale_bgra_software_bilinear(src_bits, img->width, img->height, scaled_bits, place_w, place_h);
+    uint8_t *canvas_bits = (uint8_t*)calloc((size_t)out_w * out_h * 4, 1);
+    if (canvas_bits) {
+        blit_bgra_to_canvas(scaled_bits, place_w, place_h, canvas_bits, out_w, out_h, place_x, place_y);
+    }
+    bool ok = zp_macos_encode_image_file(dest_filepath, out_w, out_h, canvas_bits ? (const uint32_t*)canvas_bits : (const uint32_t*)scaled_bits, 3);
+    free(scaled_bits);
+    if (canvas_bits) free(canvas_bits);
+    return ok;
+#endif
 }
 
 bool image_export_to_file_ex(
@@ -2302,9 +2424,9 @@ bool image_export_to_file_ex(
     if (out_w <= 0) out_w = 640;
     if (out_h <= 0) out_h = 480;
 
-    CLSID encoder_clsid = CLSID_WICPngEncoder;
     bool is_jpeg = false;
-
+#if defined(_WIN32) && !defined(__APPLE__)
+    CLSID encoder_clsid = CLSID_WICPngEncoder;
     if (format == IMG_EXPORT_JPG || _stricmp(ext, "jpg") == 0 || _stricmp(ext, "jpeg") == 0) {
         encoder_clsid = CLSID_WICJpegEncoder;
         is_jpeg = true;
@@ -2313,6 +2435,11 @@ bool image_export_to_file_ex(
     } else {
         encoder_clsid = CLSID_WICPngEncoder;
     }
+#else
+    if (format == IMG_EXPORT_JPG || _stricmp(ext, "jpg") == 0 || _stricmp(ext, "jpeg") == 0) {
+        is_jpeg = true;
+    }
+#endif
 
     /* 5. Scale to buffer and unpremultiply alpha for WIC encoder */
     int place_x = 0, place_y = 0, place_w = out_w, place_h = out_h;
@@ -2350,7 +2477,8 @@ bool image_export_to_file_ex(
     blit_bgra_to_canvas(scaled_bits, place_w, place_h, px, out_w, out_h, place_x, place_y);
     free(scaled_bits);
 
-    /* 6. Encode via WIC */
+    /* 6. Encode via WIC on Windows, or ImageIO on macOS */
+#if defined(_WIN32) && !defined(__APPLE__)
     IWICImagingFactory *factory = NULL;
     HRESULT hr = CoCreateInstance(&CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER,
                                   &IID_IWICImagingFactory, (void**)&factory);
@@ -2448,6 +2576,17 @@ bool image_export_to_file_ex(
     free(px);
 
     return true;
+#elif defined(__APPLE__)
+    int fmt_type = 0; /* PNG */
+    if (is_jpeg) {
+        fmt_type = 1;
+    } else if (format == IMG_EXPORT_BMP || _stricmp(ext, "bmp") == 0) {
+        fmt_type = 2;
+    }
+    bool ok = zp_macos_encode_image_file(dest_filepath, out_w, out_h, (const uint32_t*)px, fmt_type);
+    free(px);
+    return ok;
+#endif
 }
 
 bool image_export_to_file(

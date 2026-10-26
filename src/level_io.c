@@ -3,7 +3,9 @@
 #include "dialog_modals.h"
 #include "undo_redo.h"
 #include "ai_psd_path.h"
+#if defined(_WIN32) && !defined(__APPLE__)
 #include <shobjidl.h>
+#endif
 
 /* Handle Universal Path Import (.dat, .svg, .ai, .eps, .psd, .af) */
 void handle_import_path(HWND hwnd) {
@@ -1244,6 +1246,10 @@ bool load_canvas_settings_xml(
     if (out_sprite_count) *out_sprite_count = 0;
     if (out_bgalpha_count) *out_bgalpha_count = 0;
 
+    bool is_active_editor = (out_coins != NULL || out_cutouts != NULL || out_sprites != NULL || out_bgalphas != NULL);
+    LevelDifficulty loaded_diff = LEVEL_DIFF_MEDIUM;
+    bool has_loaded_diff = false;
+
     char line[512];
     while (fgets(line, sizeof(line), f)) {
         char *p = line;
@@ -1300,13 +1306,17 @@ bool load_canvas_settings_xml(
         } else if (strncmp(p, "Difficulty:", 11) == 0) {
             char *val = p + 11;
             while (*val == ' ' || *val == '\t') val++;
-            g_level_difficulty = level_difficulty_from_string(val);
+            if (is_active_editor) {
+                loaded_diff = level_difficulty_from_string(val);
+                has_loaded_diff = true;
+            }
         } else if (strncmp(p, "Progression:", 12) == 0) {
             char *val = p + 12;
             while (*val == ' ' || *val == '\t') val++;
             char *dash = strchr(val, '-');
-            if (dash) {
-                g_level_difficulty = level_difficulty_from_string(dash + 1);
+            if (dash && is_active_editor) {
+                loaded_diff = level_difficulty_from_string(dash + 1);
+                has_loaded_diff = true;
             }
         }
 
@@ -1595,8 +1605,9 @@ bool load_canvas_settings_xml(
                     strncpy(prog_val, prog_attr + 13, l);
                     prog_val[l] = '\0';
                     char *dash = strchr(prog_val, '-');
-                    if (dash) {
-                        g_level_difficulty = level_difficulty_from_string(dash + 1);
+                    if (dash && is_active_editor) {
+                        loaded_diff = level_difficulty_from_string(dash + 1);
+                        has_loaded_diff = true;
                     }
                 }
             }
@@ -1605,6 +1616,9 @@ bool load_canvas_settings_xml(
     if (out_title && out_title[0] == '\0' && out_name && out_name[0] != '\0') {
         strncpy(out_title, out_name, max_title - 1);
         out_title[max_title - 1] = '\0';
+    }
+    if (is_active_editor && has_loaded_diff) {
+        g_level_difficulty = loaded_diff;
     }
     fclose(f);
     return true;
@@ -2624,6 +2638,9 @@ bool execute_save_canvas_with_plan(
 bool browse_for_folder(HWND hwnd_owner, char *out_folder, size_t max_len) {
     if (!out_folder || max_len == 0) return false;
     out_folder[0] = '\0';
+#if defined(__APPLE__)
+    return zp_macos_pick_folder(hwnd_owner, out_folder, max_len);
+#else
     BROWSEINFOA bi;
     memset(&bi, 0, sizeof(bi));
     bi.hwndOwner = hwnd_owner;
@@ -2639,6 +2656,7 @@ bool browse_for_folder(HWND hwnd_owner, char *out_folder, size_t max_len) {
         CoTaskMemFree(pidl);
     }
     return false;
+#endif
 }
 
 /* Validate Zuma Deluxe levels.xml */
@@ -2794,6 +2812,7 @@ bool validate_zuma_levels_xml(const char *file_path, char *out_error, size_t max
     return true;
 }
 
+#if defined(_WIN32) && !defined(__APPLE__)
 /* Thread hook to ensure IFileOpenDialog window and explorer controls match current dark/light theme */
 static HHOOK s_hCbtDialogHook = NULL;
 static LRESULT CALLBACK CbtDialogHookProc(int nCode, WPARAM wParam, LPARAM lParam) {
@@ -2879,6 +2898,11 @@ bool browse_for_zuma_folder(HWND hwnd_owner, char *out_folder, size_t max_len) {
     }
     return picked;
 }
+#elif defined(__APPLE__)
+bool browse_for_zuma_folder(HWND hwnd_owner, char *out_folder, size_t max_len) {
+    return zp_macos_pick_folder(hwnd_owner, out_folder, max_len);
+}
+#endif
 
 /* Handle Set Zuma Folder Action with smart resolution and adaptive validation dialogs */
 void handle_set_zuma_folder(HWND hwnd) {

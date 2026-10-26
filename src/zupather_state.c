@@ -424,7 +424,6 @@ void reset_map_and_dev_attributes(void) {
     g_dev_treasurefreq = 1000;
     g_dev_has_partime = false;
     g_dev_partime = 300;
-    g_level_difficulty = LEVEL_DIFF_MEDIUM;
 }
 
 CanvasHandleType g_hovered_canvas_handle = CANVAS_HANDLE_NONE;
@@ -825,6 +824,7 @@ void snapshot_object_selection(void) {
 }
 
 bool is_system_dark_mode(void) {
+#if defined(_WIN32) && !defined(__APPLE__)
     HKEY hKey;
     DWORD value = 1;
     DWORD size = sizeof(value);
@@ -833,6 +833,9 @@ bool is_system_dark_mode(void) {
         RegCloseKey(hKey);
     }
     return (value == 0);
+#else
+    return false;
+#endif
 }
 
 const ThemeColors *get_theme(void) {
@@ -867,6 +870,7 @@ void draw_menu_nc_bottom_line(HWND hWnd, COLORREF bg_color) {
     }
 }
 
+#if defined(_WIN32) && !defined(__APPLE__)
 void update_window_theme_attributes(HWND hwnd, bool is_dark) {
     BOOL dwm_dark = is_dark ? TRUE : FALSE;
     DwmSetWindowAttribute(hwnd, 20, &dwm_dark, sizeof(dwm_dark));
@@ -3190,7 +3194,7 @@ static FILE* open_session_error_log(void) {
         fprintf(f, " ZuPather Error & Crash Diagnostic Log\n");
         fprintf(f, " Session Started : %04d-%02d-%02d %02d:%02d:%02d\n",
                 st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
-        fprintf(f, " Version         : v0.1.6\n");
+        fprintf(f, " Version         : %s\n", ZUPATHER_VERSION_STR);
 #if defined(_WIN64)
         fprintf(f, " Architecture    : 64-bit (x64)\n");
 #else
@@ -3221,6 +3225,17 @@ void log_app_error(const char *category, const char *fmt, ...) {
     fclose(f);
 }
 
+#else
+void update_window_theme_attributes(HWND hwnd, bool is_dark) {
+    (void)hwnd; (void)is_dark;
+    DrawMenuBar(hwnd);
+}
+void apply_control_dark_mode(HWND hwnd_ctrl, bool is_dark) {
+    (void)hwnd_ctrl; (void)is_dark;
+}
+#endif
+
+#if defined(_WIN32) && !defined(__APPLE__)
 static LONG WINAPI crash_exception_filter(EXCEPTION_POINTERS *ep) {
     FILE *f = open_session_error_log();
     if (f) {
@@ -3336,3 +3351,8 @@ static LONG WINAPI crash_exception_filter(EXCEPTION_POINTERS *ep) {
 void init_error_handler(void) {
     SetUnhandledExceptionFilter(crash_exception_filter);
 }
+#elif defined(__APPLE__)
+void init_error_handler(void) {
+    zp_macos_install_crash_handler();
+}
+#endif

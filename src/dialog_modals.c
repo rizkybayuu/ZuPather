@@ -2,7 +2,9 @@
 #include "level_io.h"
 #include "hud_overlay.h"
 #include "undo_redo.h"
+#if defined(_WIN32) && !defined(__APPLE__)
 #include <shellapi.h>
+#endif
 #include "canvas_render.h"
 
 /* ========================================================================= */
@@ -1263,6 +1265,8 @@ static LRESULT CALLBACK NewCanvasModalProc(HWND hwnd, UINT msg, WPARAM wParam, L
 
                 /* Apply new canvas */
                 g_has_canvas = true;
+                g_level_difficulty = LEVEL_DIFF_MEDIUM;
+                reset_map_and_dev_attributes();
                 strncpy(g_canvas_name, name_buf, sizeof(g_canvas_name) - 1);
                 sync_canvas_title_everywhere(title_buf, NULL);
                 sync_all_map_attr_edits_from_state();

@@ -1,6 +1,7 @@
 #ifndef ZUPATHER_STATE_H
 #define ZUPATHER_STATE_H
 
+#if defined(_WIN32) && !defined(__APPLE__)
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <windowsx.h>
@@ -10,6 +11,9 @@
 #include <shellapi.h>
 #include <dwmapi.h>
 #include <uxtheme.h>
+#elif defined(__APPLE__)
+#include "compat/win32_macos_shim.h"
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -280,7 +284,7 @@ typedef void(WINAPI *pfnFlushMenuThemes)(void);
 
 #define RIGHT_PANEL_WIDTH         254
 #define TOOLBAR_NEEDED_WIDTH      620
-#define ZUPATHER_VERSION_STR      "v0.1.6"
+#define ZUPATHER_VERSION_STR      "v0.2.0"
 
 /* Embedded Resource IDs */
 #define IDR_SPLASH_JPG              101
