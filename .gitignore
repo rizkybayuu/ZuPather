@@ -61,3 +61,6 @@ ehthumbs.db
 *.swp
 *.swo
 *~
+
+# Release Notes Working Files (Kept local only)
+RELEASE_NOTES*.md
