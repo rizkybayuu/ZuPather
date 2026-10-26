@@ -120,7 +120,9 @@ ZuPather/
 │   ├── zupather_state.c / .h     # Global application state management & configuration
 │   └── zupather_ui.c             # Win32 window procedure, message dispatcher & CLI entry point
 ├── .gitignore                    # Comprehensive Git exclusion rules
-├── build.bat                     # Unified 1-click build script
+├── build_windows.bat             # Dedicated Windows 1-click build script
+├── build_macos.sh                # Dedicated macOS terminal build script
+├── build_macos.command           # Double-clickable macOS Finder runner
 ├── CHANGELOG.md                  # Detailed version release notes
 ├── LICENSE.md                    # Legal notices, disclaimers & MIT license
 └── README.md                     # Project documentation
@@ -134,13 +136,13 @@ ZuPather/
 - **Operating System**: Windows 7 / 8 / 10 / 11 (32-bit or 64-bit).
 - **C Compiler**: MinGW-w64 (`gcc.exe`), Clang, or MSVC (`cl.exe`).
 
-### 1-Click Master Build (`build.bat`)
+### 1-Click Windows Build (`build_windows.bat`)
 Open a command prompt in the repository root and execute:
 
 ```cmd
 build.bat
 ```
-*(To build non-interactively in automated pipelines, use `build.bat --no-pause`)*.
+*(To build non-interactively in automated pipelines, use `build_windows.bat --no-pause`)*.
 
 The build script will:
 1. Detect installed compilers adaptively (MinGW-w64, Clang, or MSVC).
@@ -179,7 +181,7 @@ $$x_i = x_{i-1} + \frac{\Delta x_i}{100.0}, \quad y_i = y_{i-1} + \frac{\Delta y
 
 ZuPather can be built on Windows using either the native automated batch script or cross-toolchain CMake.
 
-### 1. Automated Script (`build.bat`)
+### 1. Automated Windows Script (`build_windows.bat`)
 Run the self-contained build script which automatically scans for available GCC, Clang, or MSVC toolchains and embeds resources:
 ```cmd
 build.bat
