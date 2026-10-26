@@ -2324,7 +2324,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                             g_path_count = 1;
                             g_active_path_idx = 0;
                             char name[64];
-                            snprintf(name, sizeof(name), "%s", g_canvas_name[0] ? g_canvas_name : "curve");
+                            snprintf(name, sizeof(name), "%.60s", g_canvas_name[0] ? g_canvas_name : "curve");
                             bezier_path_init(&g_paths[0], name);
                         } else if (g_active_path_idx < 0) {
                             g_active_path_idx = 0;
@@ -6300,7 +6300,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                             const char *base = g_canvas_name[0] ? g_canvas_name : "curve";
                             char name[64];
                             if (g_path_count == 1) {
-                                snprintf(name, sizeof(name), "%s", base);
+                                snprintf(name, sizeof(name), "%.60s", base);
                             } else {
                                 if (g_path_count == 2) {
                                     snprintf(g_paths[0].name, sizeof(g_paths[0].name), "%s-1", base);
@@ -7461,7 +7461,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                             BezierPath *new_path = &g_paths[g_path_count];
                             const char *base = g_canvas_name[0] ? g_canvas_name : "curve";
                             char new_name[64];
-                            snprintf(new_name, sizeof(new_name), "%s-%d", base, g_path_count + 1);
+                            snprintf(new_name, sizeof(new_name), "%.50s-%d", base, g_path_count + 1);
                             bezier_path_init(new_path, new_name);
                             if (bezier_path_split_at_node(bp, split_idx, new_path)) {
                                 g_path_count++;

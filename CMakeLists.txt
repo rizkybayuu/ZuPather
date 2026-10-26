@@ -75,6 +75,39 @@ else()
     endif()
 endif()
 
+# Zstandard (zstd) Library Resolution
+find_package(zstd CONFIG QUIET)
+if(zstd_FOUND)
+    if(TARGET zstd::libzstd_static)
+        target_link_libraries(ZuPather PRIVATE zstd::libzstd_static)
+    elseif(TARGET zstd::libzstd_shared)
+        target_link_libraries(ZuPather PRIVATE zstd::libzstd_shared)
+    endif()
+else()
+    find_package(PkgConfig QUIET)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(ZSTD QUIET libzstd)
+        if(ZSTD_FOUND)
+            target_include_directories(ZuPather PRIVATE ${ZSTD_INCLUDE_DIRS})
+            target_link_libraries(ZuPather PRIVATE ${ZSTD_LIBRARIES})
+        endif()
+    endif()
+    if(NOT ZSTD_FOUND)
+        if(MINGW)
+            target_link_libraries(ZuPather PRIVATE
+                -Wl,-Bstatic
+                -lzstd
+                -Wl,-Bdynamic
+            )
+        else()
+            find_library(ZSTD_LIB NAMES zstd zstd_static)
+            if(ZSTD_LIB)
+                target_link_libraries(ZuPather PRIVATE ${ZSTD_LIB})
+            endif()
+        endif()
+    endif()
+endif()
+
 # Compiler & Linker Flag Optimizations
 if(MSVC)
     target_compile_definitions(ZuPather PRIVATE

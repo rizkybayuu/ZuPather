@@ -36,12 +36,13 @@ jobs:
             mingw-w64-x86_64-cmake
             mingw-w64-x86_64-make
             mingw-w64-x86_64-libwebp
+            mingw-w64-x86_64-zstd
             mingw-w64-x86_64-binutils
 
       - name: Install vcpkg dependencies (MSVC)
         if: matrix.toolchain == 'msvc'
         run: |
-          vcpkg install libwebp:x64-windows
+          vcpkg install libwebp:x64-windows zstd:x64-windows
 
       - name: Configure CMake (MSVC)
         if: matrix.toolchain == 'msvc'
