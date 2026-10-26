@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.2.0] - 2026-10-27
 
-Major milestone architecture release establishing native **macOS compatibility** (Apple Silicon M1/M2/M3/M4 & Intel x86_64) alongside Windows, introducing a dedicated zero-dependency **Win32-to-Cocoa/CoreGraphics/CoreText shim layer**, a decoupled **dual-OS build pipeline** (`build_windows.bat`, `build_macos.sh`, `build_macos.command`), **pixel-identical rendering**, and **persistence of canvas progression difficulty** across project Save and Open sessions.
+Major milestone architecture release establishing native **macOS compatibility** (Apple Silicon M1/M2/M3/M4 & Intel x86_64) alongside Windows, introducing a dedicated zero-dependency **Win32-to-Cocoa/CoreGraphics/CoreText shim layer**, a decoupled **dual-OS build pipeline** (`build_windows.bat` and `build_macos.command`), **pixel-identical rendering**, and **persistence of canvas progression difficulty** across project Save and Open sessions.
 
 ### Added
 - **Native macOS Port & Cocoa Compatibility Layer (`src/compat/`)**:
@@ -28,7 +28,6 @@ Major milestone architecture release establishing native **macOS compatibility**
     - Path normalization helper automatically resolving Windows backslashes (`\`) to POSIX forward slashes (`/`).
 - **Decoupled Dual-OS Build Pipeline**:
   - `build_windows.bat`: Standalone, auto-adaptive Windows builder supporting MSVC and MinGW-w64 with icon resource compilation.
-  - `build_macos.sh`: Self-contained shell script building native `ZuPather.app` bundles with Apple Silicon/Intel detection, Homebrew flag resolution, `Info.plist` generation, and ad-hoc code signing.
   - `build_macos.command`: Double-clickable terminal runner enabling one-click builds directly from macOS Finder.
 - **Cross-Platform CMake Architecture (`CMakeLists.txt`)**:
   - Added native conditional platform branches (`if(WIN32)` vs `elseif(APPLE)`) compiling Objective-C (`.m`) sources and linking Cocoa, Carbon, QuartzCore, CoreGraphics, CoreText, ImageIO, and UniformTypeIdentifiers frameworks on macOS.
