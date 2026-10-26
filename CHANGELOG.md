@@ -13,14 +13,14 @@ Major vector interoperability, stability, and diagnostic logging release introdu
 - **Native Serif Affinity Compound Document Parser (`src/ai_psd_path.c`, `src/ai_psd_path.h`)**:
   - Implemented a native parser for Serif Affinity binary compound archives (`.af`, `.afdesign`, `.afphoto`, `.afpub`) with signature `\0\xFFKA`.
   - Decompresses internal document object model (DOM) streams using statically linked Zstandard (`libzstd`) with zero external runtime DLL dependencies.
-  - Automatically detects and parses Artboard bounds and canvas dimensions (e.g. $1200 \times 675$ in `spiralof8.af`).
+  - Automatically detects and parses Artboard bounds and canvas dimensions (e.g. 1200 × 675 in `spiralof8.af`).
   - Extracts PolyCurve geometry blocks (`svrC\x01DvCP` / `PCrv`), reading 18-byte knot triplets (incoming control handle `0x0200`, anchor point `0x0002`/`0x0001`, outgoing control handle `0x0100`).
   - Decodes row-major 2D affine transformation matrices `(mrfX` (`Xfrm(` `[a, c, tx, b, d, ty]`), applying scaling, rotation, and translation directly to anchors and Bézier tangent handles without distortion.
 - **Adobe Illustrator (.ai, .eps) & Photoshop "Paths to Illustrator" Parser (`src/ai_psd_path.c`, `src/ai_psd_path.h`)**:
   - Added support for Adobe Illustrator PostScript formats and Photoshop's *Export > Paths to Illustrator...*.
   - Parses header bounding boxes (`%%BoundingBox`, `%%HiResBoundingBox`, `%AI3_Cropmarks`) for canvas dimension initialization.
   - Supports PostScript path operators: `m` (moveto), `l` (lineto), `c` (curveto), `v` (smooth curveto with start coinciding), `y` (curveto with end coinciding), `h` (closepath), `cm` (concatmatrix 2D affine transform), and path strokers/terminators `S`, `s`, `F`, `f`, `B`, `b`, `N`, `n`.
-  - Accurately converts bottom-up PostScript coordinate space to top-down canvas coordinate space: $y_{\text{canvas}} = y_{\text{bbox\_top}} - y_{\text{ps}}$.
+  - Accurately converts bottom-up PostScript coordinate space to top-down canvas coordinate space: `y_canvas = y_bbox_top - y_ps`.
 - **Adobe Photoshop Document (.psd) WorkPath Knot Extraction (`src/ai_psd_path.c`, `src/ai_psd_path.h`)**:
   - Added native reading of Adobe Photoshop `.psd` documents with magic `8BPS`.
   - Scans Image Resource Blocks for IDs 2000 through 2998 (*WorkPath* and *Vector Masks*).
@@ -121,7 +121,7 @@ Targeted engine release introducing the adaptive Zuma engine `.dat` curve import
 - **Adaptive Zuma Engine `.dat` Curve Importer (`src/bezier_path.c`)**:
   - Re-engineered `bezier_path_import_dat_ex` based on decompiled `Zuma.exe` engine runtime logic (`CurveMgr::LoadCurve`), decoupling discrete waypoint ingestion from rigid PopCap editor control-point structures.
   - Added support for `.dat` files authored with non-standard, modified, or custom tool headers (such as "DeathKnight Zuma Bessel Generator", "GScienceStudio", or custom mod signatures found in *Zuma Glitched Remake*), eliminating erroneous `DAT_ERR_INVALID_CP_COUNT` rejections.
-  - Implemented analytical least-squares cubic Bézier curve fitting (`fit_bezier_segment_points`, `extract_adaptive_control_points`) with recursive subdivision when standard PopCap control points are absent or custom, guaranteeing sub-pixel curve deviation ($< 1.0\text{ px}$) while yielding clean, intuitive, and fully editable Bézier anchors.
+  - Implemented analytical least-squares cubic Bézier curve fitting (`fit_bezier_segment_points`, `extract_adaptive_control_points`) with recursive subdivision when standard PopCap control points are absent or custom, guaranteeing sub-pixel curve deviation (< 1.0 px) while yielding clean, intuitive, and fully editable Bézier anchors.
   - Maintained 100% bitwise parity and control point integrity for official vanilla PopCap `.dat` curve files.
 - **Multi-Track Zuma Level Importer Robustness (`src/dialog_modals.c`)**:
   - Enhanced Zuma level XML parser in `import_zuma_level_to_canvas` and `show_zuma_level_attributes_dialog` to support both `curve` and `curve1` attribute keys in `<Graphics>` tags.
@@ -148,8 +148,8 @@ Major feature release introducing Canvas Affect Transform, enabling proportional
   - Added new dedicated controls section directly below **Image Alignment** in the Top-Right Canvas Tools HUD.
   - Provided three toggleable boolean options:
     1. `[x] Include Element (Frog & Coin)`: Proportionally scales Frog shooter anchor and Treasure Point coin waypoints with the canvas.
-    2. `[x] Include Curve (Paths & Attrs)`: Proportionally scales all path anchor coordinates $(x, y)$, tangent handles $(h_{\text{in}}, h_{\text{out}})$, and curve attribute spans (`CurveSpan` tunnel and priority offsets $off_c, off_d$) according to exact arc-length stretch ratios.
-    3. `[x] Include Overlay (Cutout/Sprite)`: Proportionally transforms both placement coordinates $(x, y)$ and image dimensions $(w, h)$ of Cutouts, Sprites, and Background Alpha masks.
+    2. `[x] Include Curve (Paths & Attrs)`: Proportionally scales all path anchor coordinates (x, y), tangent handles (h_in, h_out), and curve attribute spans (`CurveSpan` tunnel and priority offsets off_c, off_d) according to exact arc-length stretch ratios.
+    3. `[x] Include Overlay (Cutout/Sprite)`: Proportionally transforms both placement coordinates (x, y) and image dimensions (w, h) of Cutouts, Sprites, and Background Alpha masks.
   - Integrated with all canvas resize pathways: 8 interactive drag handles, Center Move handle, HUD Apply button, HUD/Menu preset buttons (640x480, 800x600, 1024x768, 1280x720), and keyboard arrow key handle nudging.
   - Documented Affect Transform shortcuts and behavior in the in-app Canvas Guide HUD (<kbd>F1</kbd>).
 - **Non-Destructive Image Resampling (`orig_bits`)**:
@@ -185,7 +185,7 @@ Major feature and stability release introducing cross-toolchain CMake and GitHub
   - Embedded Windows PE resource script (`res/zupather.rc`) automatically across both MSVC (`rc.exe`) and MinGW (`windres.exe`).
   - Added comprehensive build instructions in `README.md` covering automated `build.bat` and CMake commands.
 - **Draw Mode Bézier Segment Subdivision & Insertion**:
-  - Added segment insertion: split any curve segment at arbitrary parameter $t$ using De Casteljau subdivision while mathematically preserving 100% of the curve's curvature geometry.
+  - Added segment insertion: split any curve segment at arbitrary parameter `t` using De Casteljau subdivision while mathematically preserving 100% of the curve's curvature geometry.
   - Enforced strict modifier condition: holding <kbd>Alt</kbd> (or <kbd>Ctrl</kbd>+<kbd>Alt</kbd>) over a curve segment displays an interactive cyan target reticle and floating badge `+Insert Node (Alt+LMB) [X, Y]`.
   - Pure Left Click (LMB) remains strictly reserved for drawing curves and adding new anchor nodes without any interruption or hijacking.
   - Enforced strict <kbd>Ctrl</kbd> requirement for selecting anchor nodes (`Ctrl + Click` / `Ctrl + Drag Marquee`).
@@ -274,7 +274,7 @@ Initial milestone release establishing the complete, standalone vector path edit
 
 - **Vector Bézier Core & Arc-Length Parameterization**:
   - High-precision cubic Bézier curve calculation with analytical tangent and curvature derivatives.
-  - Numerical arc-length integration with uniform equidistant resampling ($\Delta s = 1.0\text{ pixel}$) guaranteeing uniform ball rolling speed in-game.
+  - Numerical arc-length integration with uniform equidistant resampling ($Δs = 1.0 px$) guaranteeing uniform ball rolling speed in-game.
   - Drift-free delta quantization tracking cumulative fractional sub-pixel errors to eliminate positional drift across thousands of path waypoints.
   - Multi-track curve architecture supporting from 1 path up to 10 independent active curves per level (`curve` through `curve10`), fully compatible with the *ZuCompleluxe* multi-curve engine.
 
