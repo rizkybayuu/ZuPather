@@ -213,6 +213,7 @@ typedef void*          HMONITOR;
 #define MONITOR_DEFAULTTONULL    0
 #define MONITOR_DEFAULTTOPRIMARY  1
 #define MONITOR_DEFAULTTONEAREST  2
+#define MONITORINFOF_PRIMARY      0x00000001
 
 typedef struct tagMONITORINFO {
     DWORD cbSize;
@@ -871,6 +872,9 @@ typedef struct _SYSTEMTIME {
 #define CB_SETCURSEL             0x014E
 #define CB_GETCURSEL             0x0147
 #define CB_GETLBTEXT             0x0148
+#define CB_GETLBTEXTLEN          0x0149
+#define CB_SETITEMDATA           0x0151
+#define CB_GETITEMDATA           0x0150
 #define CB_GETCOUNT              0x0146
 #define CB_RESETCONTENT          0x014B
 #define CB_SETDROPPEDWIDTH       0x0160

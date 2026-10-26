@@ -96,6 +96,12 @@ static POINT g_cursor_pos = { 0, 0 };
 
 @implementation ZPContentView
 
+static int s_active_cb_selected_index = -1;
+
+- (void)onComboBoxMenuItemSelected:(NSMenuItem *)sender {
+    s_active_cb_selected_index = (int)[sender tag];
+}
+
 - (BOOL)isFlipped {
     return YES; /* Top-down coordinates */
 }
@@ -316,17 +322,19 @@ static POINT g_cursor_pos = { 0, 0 };
                     NSMenu *cbMenu = [[NSMenu alloc] initWithTitle:@"ComboBoxMenu"];
                     for (int itemIdx = 0; itemIdx < child->listCount; ++itemIdx) {
                         NSString *titleStr = [NSString stringWithUTF8String:child->listItems[itemIdx] ? child->listItems[itemIdx] : ""];
-                        NSMenuItem *mi = [[NSMenuItem alloc] initWithTitle:titleStr action:nil keyEquivalent:@""];
+                        NSMenuItem *mi = [[NSMenuItem alloc] initWithTitle:titleStr action:@selector(onComboBoxMenuItemSelected:) keyEquivalent:@""];
+                        [mi setTarget:self];
                         mi.tag = itemIdx;
                         if (itemIdx == child->selIndex) [mi setState:NSControlStateValueOn];
                         [cbMenu addItem:mi];
                     }
                     NSPoint menuPoint = NSMakePoint(child->x, child->y + child->h);
-                    NSMenuItem *selectedItem = [cbMenu popUpMenuPositioningItem:(child->selIndex >= 0 && child->selIndex < child->listCount) ? [cbMenu itemAtIndex:child->selIndex] : nil
+                    s_active_cb_selected_index = -1;
+                    [cbMenu popUpMenuPositioningItem:(child->selIndex >= 0 && child->selIndex < child->listCount) ? [cbMenu itemAtIndex:child->selIndex] : nil
                                                                      atLocation:menuPoint
                                                                          inView:self];
-                    if (selectedItem) {
-                        child->selIndex = (int)selectedItem.tag;
+                    if (s_active_cb_selected_index >= 0) {
+                        child->selIndex = s_active_cb_selected_index;
                         if (child->selIndex >= 0 && child->selIndex < child->listCount && child->listItems[child->selIndex]) {
                             strncpy(child->windowText, child->listItems[child->selIndex], sizeof(child->windowText) - 1);
                             child->windowText[sizeof(child->windowText) - 1] = '\0';
