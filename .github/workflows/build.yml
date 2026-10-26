@@ -135,13 +135,18 @@ jobs:
           mkdir -p dist
           # Package Windows zip
           cp artifact-windows/ZuPather.exe dist/
-          cp README.md CHANGELOG.md dist/
+          cp README.md CHANGELOG.md LICENSE.md dist/
           cd dist
-          zip -r "ZuPather-${{ github.ref_name }}-windows.zip" ZuPather.exe README.md CHANGELOG.md
-          rm ZuPather.exe README.md CHANGELOG.md
+          zip -r "ZuPather-${{ github.ref_name }}-windows.zip" ZuPather.exe README.md CHANGELOG.md LICENSE.md
+          rm ZuPather.exe README.md CHANGELOG.md LICENSE.md
           cd ..
           # Package macOS zip
-          cp artifact-macos/ZuPather-macOS.zip "dist/ZuPather-${{ github.ref_name }}-macos.zip"
+          unzip artifact-macos/ZuPather-macOS.zip -d macos-tmp
+          cp README.md CHANGELOG.md LICENSE.md macos-tmp/
+          cd macos-tmp
+          zip -r "../dist/ZuPather-${{ github.ref_name }}-macos.zip" ZuPather.app README.md CHANGELOG.md LICENSE.md
+          cd ..
+          rm -rf macos-tmp
 
       - name: Upload Assets to GitHub Release
         uses: softprops/action-gh-release@v2
