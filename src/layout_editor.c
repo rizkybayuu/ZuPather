@@ -915,7 +915,7 @@ static const char* get_element_sprite_name(const LayoutElement *el, int *out_col
         if (_stricmp(el->tag, "QuitBtn") == 0)      { if (out_cols) *out_cols = 3; return "mmquitbutton"; }
         if (_stricmp(el->tag, "EyeIdle1") == 0)     return "mmeyeleft";
         if (_stricmp(el->tag, "EyeIdle2") == 0)     return "mmeyeright";
-        if (_stricmp(el->tag, "Sun1") == 0 || _stricmp(el->tag, "Sun2") == 0) return "mmsun";
+        if (_stricmp(el->tag, "Sun") == 0 || _stricmp(el->tag, "Sun1") == 0 || _stricmp(el->tag, "Sun2") == 0) return "mmsun";
         if (_stricmp(el->tag, "Hat") == 0)          return "mmhat";
     }
 
@@ -1240,10 +1240,10 @@ static void assign_element_default_bounds(LayoutElement *el) {
             el->def_w = 108; el->def_h = 45;
             if (!(el->flags & ATTR_HAS_X)) { el->x = 191; el->flags |= ATTR_HAS_X; }
             if (!(el->flags & ATTR_HAS_Y)) { el->y = 331; el->flags |= ATTR_HAS_Y; }
-        } else if (_stricmp(el->tag, "Sun1") == 0 || _stricmp(el->tag, "Sun2") == 0) {
+        } else if (_stricmp(el->tag, "Sun") == 0 || _stricmp(el->tag, "Sun1") == 0 || _stricmp(el->tag, "Sun2") == 0) {
             el->def_w = 120; el->def_h = 120;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = -63; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = -69; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = -69; el->flags |= ATTR_HAS_X; }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = -63; el->flags |= ATTR_HAS_Y; }
         } else if (_stricmp(el->tag, "Hat") == 0) {
             el->def_w = 101; el->def_h = 107;
             el->is_conditional = true;
@@ -1902,6 +1902,24 @@ static bool extract_xml_attr_str(const char *tag_str, const char *attr_name, cha
 }
 
 /* Parse layout.xml into structured elements array */
+/* Canonical section list */
+static const char *g_canonical_sections[] = {
+    "AdventureTemples", "AdventureDoors", "AdventureButtons", "AdventureLabels",
+    "GauntletDoors", "GauntletButtons", "GauntletLabels",
+    "MainMenu", "MoreGames", "LoadingScreen", "InGameHUD",
+    "StageComplete", "TempleCleared", "CreditsScreen", "HelpScreen",
+    "Dialogs", "DevHelpScreen"
+};
+static const int g_num_canonical_sections = (int)(sizeof(g_canonical_sections) / sizeof(g_canonical_sections[0]));
+
+static bool is_known_section_name(const char *name) {
+    if (!name || !*name) return false;
+    for (int s = 0; s < g_num_canonical_sections; ++s) {
+        if (_stricmp(name, g_canonical_sections[s]) == 0) return true;
+    }
+    return false;
+}
+
 static bool layout_xml_load(LayoutEditorState *st, const char *filepath) {
     FILE *fp = fopen(filepath, "r");
     if (!fp) return false;
@@ -1950,7 +1968,8 @@ static bool layout_xml_load(LayoutEditorState *st, const char *filepath) {
             /* If line ends with '>' and has no attributes (or is InGameHUD section header), it's a section header */
             char *slash = strchr(p, '/');
             char *quote = strchr(p, '\"');
-            if ((!slash && !quote) || is_hud_open) {
+            bool is_known_sec = is_known_section_name(tag_name);
+            if ((!slash && !quote) || is_hud_open || (is_known_sec && !strstr(p, "/>"))) {
                 strncpy(cur_section, tag_name, sizeof(cur_section) - 1);
                 cur_section[sizeof(cur_section) - 1] = '\0';
                 continue;
@@ -2523,7 +2542,7 @@ static int get_element_z_order(const LayoutElement *el, int screen_idx) {
 
     /* Main Menu */
     if (_stricmp(sec, "MainMenu") == 0) {
-        if (_stricmp(tag, "Sun1") == 0 || _stricmp(tag, "Sun2") == 0) return 5;
+    if (_stricmp(tag, "Sun") == 0 || _stricmp(tag, "Sun1") == 0 || _stricmp(tag, "Sun2") == 0) return 5;
         if (_stricmp(tag, "EyeRay1") == 0 || _stricmp(tag, "EyeRay2") == 0) return 6;
         if (_stricmp(tag, "FrogEyes") == 0) return 10;
         if (_stricmp(tag, "EyeIdle1") == 0 || _stricmp(tag, "EyeIdle2") == 0) return 15;
