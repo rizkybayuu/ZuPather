@@ -1,4 +1,5 @@
 #include "hud_overlay.h"
+#include "undo_redo.h"
 
 /* High-Performance HUD Rendering Helpers */
 static void blit_hud_surface(HDC dst_dc, int x, int y, int w, int h, HDC src_dc, BYTE alpha) {
@@ -318,8 +319,267 @@ void get_top_left_overlay_guide_hud_rect(int work_h, RECT *rc) {
     rc->bottom = rc->top + tl_h;
 }
 
+/* Zuma Deluxe / ZuCompleluxe 33 Affinity Blending Modes Specifications */
+typedef struct {
+    int id;
+    const char *name;
+    const char *xml_key;
+    const char *category;
+} ZumaBlendModeInfo;
+
+static const ZumaBlendModeInfo g_zuma_blend_modes[BLEND_MODE_COUNT] = {
+    { BLEND_MODE_NORMAL,          "Normal",              "normal",          "Normal" },
+    { BLEND_MODE_PIGMENT,         "Pigment",             "pigment",         "Normal" },
+    { BLEND_MODE_DARKEN,          "Darken",              "darken",          "Darken" },
+    { BLEND_MODE_MULTIPLY,        "Multiply",            "multiply",        "Darken" },
+    { BLEND_MODE_COLOR_BURN,      "Color Burn",          "color_burn",      "Darken" },
+    { BLEND_MODE_LINEAR_BURN,     "Linear Burn",         "linear_burn",     "Darken" },
+    { BLEND_MODE_DARKER_COLOR,    "Darker Color",        "darker_color",    "Darken" },
+    { BLEND_MODE_LIGHTEN,         "Lighten",             "lighten",         "Lighten" },
+    { BLEND_MODE_SCREEN,          "Screen",              "screen",          "Lighten" },
+    { BLEND_MODE_COLOR_DODGE,     "Color Dodge",         "color_dodge",     "Lighten" },
+    { BLEND_MODE_ADD,             "Add (Linear Dodge)",  "add",             "Lighten" },
+    { BLEND_MODE_LIGHTER_COLOR,   "Lighter Color",       "lighter_color",   "Lighten" },
+    { BLEND_MODE_OVERLAY,         "Overlay",             "overlay",         "Contrast" },
+    { BLEND_MODE_SOFT_LIGHT,      "Soft Light",          "soft_light",      "Contrast" },
+    { BLEND_MODE_HARD_LIGHT,      "Hard Light",          "hard_light",      "Contrast" },
+    { BLEND_MODE_VIVID_LIGHT,     "Vivid Light",         "vivid_light",     "Contrast" },
+    { BLEND_MODE_LINEAR_LIGHT,    "Linear Light",        "linear_light",    "Contrast" },
+    { BLEND_MODE_PIN_LIGHT,       "Pin Light",           "pin_light",       "Contrast" },
+    { BLEND_MODE_HARD_MIX,        "Hard Mix",            "hard_mix",        "Contrast" },
+    { BLEND_MODE_DIFFERENCE,      "Difference",          "difference",      "Comparative" },
+    { BLEND_MODE_EXCLUSION,       "Exclusion",           "exclusion",       "Comparative" },
+    { BLEND_MODE_SUBTRACT,        "Subtract",            "subtract",        "Comparative" },
+    { BLEND_MODE_DIVIDE,          "Divide",              "divide",          "Comparative" },
+    { BLEND_MODE_HUE,             "Hue",                 "hue",             "Component (HSL)" },
+    { BLEND_MODE_SATURATION,      "Saturation",          "saturation",      "Component (HSL)" },
+    { BLEND_MODE_COLOR,           "Color",               "color",           "Component (HSL)" },
+    { BLEND_MODE_LUMINOSITY,      "Luminosity",          "luminosity",      "Component (HSL)" },
+    { BLEND_MODE_AVERAGE,         "Average",             "average",         "Affinity Specialized" },
+    { BLEND_MODE_NEGATION,        "Negation",            "negation",        "Affinity Specialized" },
+    { BLEND_MODE_REFLECT,         "Reflect",             "reflect",         "Affinity Specialized" },
+    { BLEND_MODE_GLOW,            "Glow",                "glow",            "Affinity Specialized" },
+    { BLEND_MODE_CONTRAST_NEGATE, "Contrast Negate",     "contrast_negate", "Affinity Specialized" },
+    { BLEND_MODE_ERASE,           "Erase",               "erase",           "Utility & Masking" }
+};
+
+const char *get_zuma_blend_mode_name(int mode) {
+    if (mode >= 0 && mode < BLEND_MODE_COUNT) {
+        return g_zuma_blend_modes[mode].name;
+    }
+    return "Normal";
+}
+
+const char *get_zuma_blend_mode_xml_key(int mode) {
+    if (mode >= 0 && mode < BLEND_MODE_COUNT) {
+        return g_zuma_blend_modes[mode].xml_key;
+    }
+    return "normal";
+}
+
+const char *get_zuma_blend_mode_category(int mode) {
+    if (mode >= 0 && mode < BLEND_MODE_COUNT) {
+        return g_zuma_blend_modes[mode].category;
+    }
+    return "Normal";
+}
+
+int parse_zuma_blend_mode(const char *str) {
+    if (!str || !str[0]) return 0;
+    while (*str == ' ' || *str == '\t') str++;
+    if (*str >= '0' && *str <= '9') {
+        int v = atoi(str);
+        if (v >= 0 && v < BLEND_MODE_COUNT) return v;
+        return 0;
+    }
+    char norm[64] = {0};
+    size_t o = 0;
+    for (size_t i = 0; str[i] && o + 1 < sizeof(norm); ++i) {
+        char c = str[i];
+        if (c == '-' || c == '_' || c == ' ' || c == '\t') continue;
+        if (c >= 'A' && c <= 'Z') c = (char)(c + 32);
+        norm[o++] = c;
+    }
+    norm[o] = '\0';
+
+    if (strcmp(norm, "normal") == 0 || strcmp(norm, "none") == 0 ||
+        strcmp(norm, "default") == 0 || strcmp(norm, "standard") == 0) return 0;
+    if (strcmp(norm, "pigment") == 0) return 1;
+    if (strcmp(norm, "darken") == 0 || strcmp(norm, "dark") == 0) return 2;
+    if (strcmp(norm, "multiply") == 0 || strcmp(norm, "mult") == 0) return 3;
+    if (strcmp(norm, "colorburn") == 0 || strcmp(norm, "burn") == 0) return 4;
+    if (strcmp(norm, "linearburn") == 0) return 5;
+    if (strcmp(norm, "darkercolor") == 0 || strcmp(norm, "darker") == 0) return 6;
+    if (strcmp(norm, "lighten") == 0 || strcmp(norm, "light") == 0) return 7;
+    if (strcmp(norm, "screen") == 0 || strcmp(norm, "scr") == 0) return 8;
+    if (strcmp(norm, "colordodge") == 0 || strcmp(norm, "dodge") == 0) return 9;
+    if (strcmp(norm, "add") == 0 || strcmp(norm, "additive") == 0 ||
+        strcmp(norm, "lineardodge") == 0 || strcmp(norm, "plus") == 0) return 10;
+    if (strcmp(norm, "lightercolor") == 0 || strcmp(norm, "lighter") == 0) return 11;
+    if (strcmp(norm, "overlay") == 0) return 12;
+    if (strcmp(norm, "softlight") == 0) return 13;
+    if (strcmp(norm, "hardlight") == 0) return 14;
+    if (strcmp(norm, "vividlight") == 0) return 15;
+    if (strcmp(norm, "linearlight") == 0) return 16;
+    if (strcmp(norm, "pinlight") == 0) return 17;
+    if (strcmp(norm, "hardmix") == 0) return 18;
+    if (strcmp(norm, "difference") == 0 || strcmp(norm, "diff") == 0 ||
+        strcmp(norm, "invert") == 0 || strcmp(norm, "inversion") == 0) return 19;
+    if (strcmp(norm, "exclusion") == 0 || strcmp(norm, "excl") == 0) return 20;
+    if (strcmp(norm, "subtract") == 0 || strcmp(norm, "sub") == 0 ||
+        strcmp(norm, "minus") == 0) return 21;
+    if (strcmp(norm, "divide") == 0 || strcmp(norm, "div") == 0) return 22;
+    if (strcmp(norm, "hue") == 0) return 23;
+    if (strcmp(norm, "saturation") == 0 || strcmp(norm, "sat") == 0) return 24;
+    if (strcmp(norm, "color") == 0 || strcmp(norm, "colour") == 0) return 25;
+    if (strcmp(norm, "luminosity") == 0 || strcmp(norm, "lum") == 0 ||
+        strcmp(norm, "luminance") == 0) return 26;
+    if (strcmp(norm, "average") == 0 || strcmp(norm, "avg") == 0 ||
+        strcmp(norm, "mean") == 0) return 27;
+    if (strcmp(norm, "negation") == 0 || strcmp(norm, "negate") == 0) return 28;
+    if (strcmp(norm, "reflect") == 0) return 29;
+    if (strcmp(norm, "glow") == 0) return 30;
+    if (strcmp(norm, "contrastnegate") == 0 || strcmp(norm, "contrastneg") == 0) return 31;
+    if (strcmp(norm, "erase") == 0 || strcmp(norm, "eraser") == 0 ||
+        strcmp(norm, "clear") == 0) return 32;
+
+    return 0;
+}
+
+/* Blend Mode Owner-Drawn Menu Visuals Pool (Atkinson Hyperlegible & Dark Theme) */
+static int s_blend_visual_count = 0;
+static MenuItemVisual s_blend_menu_visuals[64];
+
+static MenuItemVisual* alloc_blend_menu_visual(const char *name, UINT id, HMENU hsub, bool is_sep, bool is_bold) {
+    if (s_blend_visual_count >= 64) return NULL;
+    MenuItemVisual *v = &s_blend_menu_visuals[s_blend_visual_count++];
+    memset(v, 0, sizeof(*v));
+    v->id = id;
+    v->hsubmenu = hsub;
+    v->is_separator = is_sep;
+    v->is_bold = is_bold;
+    if (name) {
+        strncpy(v->name, name, sizeof(v->name) - 1);
+    }
+    return v;
+}
+
+static void add_blend_custom_menu_item(HMENU hmenu, UINT flags, UINT_PTR id_or_sub, const char *text, bool is_bold) {
+    bool is_sep = (flags & MF_SEPARATOR) != 0;
+    bool is_sub = (flags & MF_POPUP) != 0;
+    MenuItemVisual *v = alloc_blend_menu_visual(text, is_sub ? 0 : (UINT)id_or_sub, is_sub ? (HMENU)id_or_sub : NULL, is_sep, is_bold);
+    UINT final_flags = (flags & ~(MF_STRING)) | MF_OWNERDRAW;
+    AppendMenuA(hmenu, final_flags, id_or_sub, (LPCSTR)v);
+}
+
+void show_blend_mode_popup_menu(HWND hwnd, int screen_x, int screen_y, bool is_cutout) {
+    int sel_sp = get_active_selected_sprite_idx();
+    int sel_co = get_active_selected_cutout_idx();
+    bool has_sp = (g_mode_overlay && ((sel_sp >= 0 && sel_sp < g_sprite_count) || g_placing_sprite));
+    bool has_co = (g_mode_overlay && ((sel_co >= 0 && sel_co < g_cutout_count) || g_placing_cutout));
+    if (!has_sp && !has_co) return;
+
+    int cur_blend = 0;
+    if (g_placing_sprite) {
+        cur_blend = g_pending_sprite_blend_mode;
+    } else if (g_placing_cutout) {
+        cur_blend = g_pending_cutout_blend_mode;
+    } else if (has_sp) {
+        cur_blend = g_sprites[sel_sp].blend_mode;
+    } else if (has_co) {
+        cur_blend = g_cutouts[sel_co].blend_mode;
+    }
+    if (cur_blend < 0 || cur_blend >= BLEND_MODE_COUNT) cur_blend = 0;
+
+    HMENU hMenu = CreatePopupMenu();
+    if (!hMenu) return;
+
+    s_blend_visual_count = 0;
+
+    if (is_cutout) {
+        add_blend_custom_menu_item(hMenu, MF_DISABLED | MF_GRAYED, 0, "[!] Kurang cocok (disarankan Sprite)", false);
+        add_blend_custom_menu_item(hMenu, MF_SEPARATOR, 0, NULL, false);
+    }
+
+    HMENU hSubNormal   = CreatePopupMenu();
+    HMENU hSubDarken   = CreatePopupMenu();
+    HMENU hSubLighten  = CreatePopupMenu();
+    HMENU hSubContrast = CreatePopupMenu();
+    HMENU hSubComp     = CreatePopupMenu();
+    HMENU hSubHSL      = CreatePopupMenu();
+    HMENU hSubSpec     = CreatePopupMenu();
+    HMENU hSubUtil     = CreatePopupMenu();
+
+    for (int i = 0; i < BLEND_MODE_COUNT; ++i) {
+        char item_str[64];
+        snprintf(item_str, sizeof(item_str), "[%02d] %s", i, get_zuma_blend_mode_name(i));
+        UINT flags = 0;
+        if (i == cur_blend) flags |= MF_CHECKED;
+
+        HMENU target_sub = NULL;
+        if (i <= 1) target_sub = hSubNormal;
+        else if (i <= 6) target_sub = hSubDarken;
+        else if (i <= 11) target_sub = hSubLighten;
+        else if (i <= 18) target_sub = hSubContrast;
+        else if (i <= 22) target_sub = hSubComp;
+        else if (i <= 26) target_sub = hSubHSL;
+        else if (i <= 31) target_sub = hSubSpec;
+        else target_sub = hSubUtil;
+
+        add_blend_custom_menu_item(target_sub, flags, ID_BLEND_MODE_BASE + i, item_str, i == cur_blend);
+        if (i == cur_blend) {
+            CheckMenuItem(target_sub, ID_BLEND_MODE_BASE + i, MF_BYCOMMAND | MF_CHECKED);
+        }
+    }
+
+    add_blend_custom_menu_item(hMenu, MF_POPUP, (UINT_PTR)hSubNormal,   "1. Normal Group", false);
+    add_blend_custom_menu_item(hMenu, MF_POPUP, (UINT_PTR)hSubDarken,   "2. Darken Group", false);
+    add_blend_custom_menu_item(hMenu, MF_POPUP, (UINT_PTR)hSubLighten,  "3. Lighten Group", false);
+    add_blend_custom_menu_item(hMenu, MF_POPUP, (UINT_PTR)hSubContrast, "4. Contrast Group", false);
+    add_blend_custom_menu_item(hMenu, MF_POPUP, (UINT_PTR)hSubComp,     "5. Comparative Group", false);
+    add_blend_custom_menu_item(hMenu, MF_POPUP, (UINT_PTR)hSubHSL,      "6. Component (HSL) Group", false);
+    add_blend_custom_menu_item(hMenu, MF_POPUP, (UINT_PTR)hSubSpec,     "7. Affinity Specialized Group", false);
+    add_blend_custom_menu_item(hMenu, MF_POPUP, (UINT_PTR)hSubUtil,     "8. Utility && Masking Group", false);
+
+    add_blend_custom_menu_item(hMenu, MF_SEPARATOR, 0, NULL, false);
+    UINT rst_flags = (cur_blend == 0) ? MF_CHECKED : 0;
+    add_blend_custom_menu_item(hMenu, rst_flags, ID_BLEND_MODE_BASE + 0, "Reset to Normal [00]", cur_blend == 0);
+    if (cur_blend == 0) {
+        CheckMenuItem(hMenu, ID_BLEND_MODE_BASE + 0, MF_BYCOMMAND | MF_CHECKED);
+    }
+
+    SetForegroundWindow(hwnd);
+    int cmd = TrackPopupMenu(hMenu, TPM_RETURNCMD | TPM_LEFTBUTTON | TPM_RIGHTBUTTON,
+                            screen_x, screen_y, 0, hwnd, NULL);
+    DestroyMenu(hMenu);
+
+    if (cmd >= ID_BLEND_MODE_BASE && cmd < ID_BLEND_MODE_BASE + BLEND_MODE_COUNT) {
+        int new_mode = cmd - ID_BLEND_MODE_BASE;
+        undo_ensure_baseline();
+        if (g_placing_sprite) {
+            g_pending_sprite_blend_mode = new_mode;
+        } else if (g_placing_cutout) {
+            g_pending_cutout_blend_mode = new_mode;
+        } else if (has_sp) {
+            g_sprites[sel_sp].blend_mode = new_mode;
+            undo_snapshot_capture("Change Sprite Blend Mode");
+        } else if (has_co) {
+            g_cutouts[sel_co].blend_mode = new_mode;
+            undo_snapshot_capture("Change Cutout Blend Mode");
+        }
+        InvalidateRect(hwnd, NULL, FALSE);
+        update_status_bar();
+    }
+}
+
 int get_overlay_tools_content_height(void) {
     if (g_hud_overlay_collapsed) return 26;
+    int sel_co = get_active_selected_cutout_idx();
+    int sel_sp = get_active_selected_sprite_idx();
+    bool has_co = (g_mode_overlay && ((sel_co >= 0 && sel_co < g_cutout_count) || g_placing_cutout));
+    bool has_sp = (g_mode_overlay && ((sel_sp >= 0 && sel_sp < g_sprite_count) || g_placing_sprite));
+    if (has_co) return 152;
+    if (has_sp) return 132;
     return 104;
 }
 
@@ -1064,8 +1324,8 @@ void render_overlay_hud(HDC mem_dc, int client_w, int work_h, const ThemeColors 
         int sel_co_idx = get_active_selected_cutout_idx();
         int sel_sp_idx = get_active_selected_sprite_idx();
         bool has_sel_ba = (g_mode_overlay && sel_ba_idx >= 0 && sel_ba_idx < g_bg_alpha_count);
-        bool has_sel_co = (g_mode_overlay && sel_co_idx >= 0 && sel_co_idx < g_cutout_count);
-        bool has_sel_sp = (g_mode_overlay && sel_sp_idx >= 0 && sel_sp_idx < g_sprite_count);
+        bool has_sel_co = (g_mode_overlay && ((sel_co_idx >= 0 && sel_co_idx < g_cutout_count) || g_placing_cutout));
+        bool has_sel_sp = (g_mode_overlay && ((sel_sp_idx >= 0 && sel_sp_idx < g_sprite_count) || g_placing_sprite));
         bool has_target = has_sel_ba || has_sel_co || has_sel_sp;
 
         bool is_active_mode = (has_sel_ba && g_placing_bgalpha_vector) ||
@@ -1104,36 +1364,136 @@ void render_overlay_hud(HDC mem_dc, int client_w, int work_h, const ThemeColors 
         SetTextColor(dc_tr, text_col_motion);
         DrawTextA(dc_tr, btn_text, -1, &rc_btn_motion, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
 
-        RECT rc_prio_lbl = { 108, 76 + sy, 168, 98 + sy };
-        SelectObject(dc_tr, g_font_primary_regular);
-        SetTextColor(dc_tr, th->text_secondary);
-        DrawTextA(dc_tr, "Priority:", -1, &rc_prio_lbl, DT_SINGLELINE | DT_VCENTER | DT_RIGHT);
+        if (has_sel_co || has_sel_sp) {
+            RECT rc_prio_lbl = { 108, 76 + sy, 168, 98 + sy };
+            SelectObject(dc_tr, g_font_primary_regular);
+            SetTextColor(dc_tr, th->text_secondary);
+            DrawTextA(dc_tr, "Priority:", -1, &rc_prio_lbl, DT_SINGLELINE | DT_VCENTER | DT_RIGHT);
 
-        RECT rc_prio_frame = { 172, 76 + sy, 228, 98 + sy };
-        HBRUSH br_prio_bg = CreateSolidBrush(is_dark ? RGB(36, 40, 48) : RGB(255, 255, 255));
-        FillRect(dc_tr, &rc_prio_frame, br_prio_bg);
-        DeleteObject(br_prio_bg);
-        FrameRect(dc_tr, &rc_prio_frame, (HBRUSH)GetStockObject(BLACK_BRUSH));
+            RECT rc_prio_frame = { 172, 76 + sy, 228, 98 + sy };
+            HBRUSH br_prio_bg = CreateSolidBrush(is_dark ? RGB(36, 40, 48) : RGB(255, 255, 255));
+            FillRect(dc_tr, &rc_prio_frame, br_prio_bg);
+            DeleteObject(br_prio_bg);
+            FrameRect(dc_tr, &rc_prio_frame, (HBRUSH)GetStockObject(BLACK_BRUSH));
 
-        if (g_edit_prio) {
-            int prio_x = rc_tr.left + 172;
-            int prio_y = rc_tr.top + 76 + sy;
-            int prio_w = 56;
-            int prio_h = 22;
-            if (prio_y >= rc_tr.top + 23 && prio_y + prio_h <= rc_tr.bottom) {
-                SetWindowPos(g_edit_prio, HWND_TOP, prio_x, prio_y, prio_w, prio_h, SWP_SHOWWINDOW | SWP_NOACTIVATE);
-                if (!g_in_prio_update && GetFocus() != g_edit_prio) {
-                    char buf[16];
-                    snprintf(buf, sizeof(buf), "%d", g_overlay_current_prio);
-                    char cur_txt[16] = {0};
-                    GetWindowTextA(g_edit_prio, cur_txt, sizeof(cur_txt));
-                    if (strcmp(cur_txt, buf) != 0) {
-                        g_in_prio_update = true;
-                        SetWindowTextA(g_edit_prio, buf);
-                        g_in_prio_update = false;
+            if (g_edit_prio) {
+                int prio_x = rc_tr.left + 172;
+                int prio_y = rc_tr.top + 76 + sy;
+                int prio_w = 56;
+                int prio_h = 22;
+                if (prio_y >= rc_tr.top + 23 && prio_y + prio_h <= rc_tr.bottom) {
+                    SetWindowPos(g_edit_prio, HWND_TOP, prio_x, prio_y, prio_w, prio_h, SWP_SHOWWINDOW | SWP_NOACTIVATE);
+                    if (!g_in_prio_update && GetFocus() != g_edit_prio) {
+                        char buf[16];
+                        snprintf(buf, sizeof(buf), "%d", g_overlay_current_prio);
+                        char cur_txt[16] = {0};
+                        GetWindowTextA(g_edit_prio, cur_txt, sizeof(cur_txt));
+                        if (strcmp(cur_txt, buf) != 0) {
+                            g_in_prio_update = true;
+                            SetWindowTextA(g_edit_prio, buf);
+                            g_in_prio_update = false;
+                        }
                     }
+                } else {
+                    ShowWindow(g_edit_prio, SW_HIDE);
                 }
-            } else {
+            }
+
+            /* Row 4: Blend Mode Label & Dropdown Button (Appears below Set Variable when Cutout/Sprite is selected) */
+            int cur_blend = 0;
+            if (g_placing_sprite) {
+                cur_blend = g_pending_sprite_blend_mode;
+            } else if (g_placing_cutout) {
+                cur_blend = g_pending_cutout_blend_mode;
+            } else if (has_sel_sp) {
+                cur_blend = g_sprites[sel_sp_idx].blend_mode;
+            } else if (has_sel_co) {
+                cur_blend = g_cutouts[sel_co_idx].blend_mode;
+            }
+            if (cur_blend < 0 || cur_blend >= BLEND_MODE_COUNT) cur_blend = 0;
+            const char *b_name = get_zuma_blend_mode_name(cur_blend);
+
+            RECT rc_blend_lbl = { 8, 102 + sy, 54, 124 + sy };
+            SelectObject(dc_tr, g_font_primary_regular);
+            SetTextColor(dc_tr, th->text_secondary);
+            DrawTextA(dc_tr, "Blend:", -1, &rc_blend_lbl, DT_SINGLELINE | DT_VCENTER | DT_LEFT);
+
+            RECT rc_blend_btn = { 58, 102 + sy, 228, 124 + sy };
+            COLORREF bg_btn_blend = is_dark ? RGB(36, 42, 56) : RGB(220, 226, 236);
+            HBRUSH br_btn_blend = CreateSolidBrush(bg_btn_blend);
+            FillRect(dc_tr, &rc_blend_btn, br_btn_blend);
+            DeleteObject(br_btn_blend);
+
+            COLORREF border_btn_blend = is_dark ? RGB(60, 70, 90) : RGB(170, 180, 200);
+            HBRUSH br_bdr_blend = CreateSolidBrush(border_btn_blend);
+            FrameRect(dc_tr, &rc_blend_btn, br_bdr_blend);
+            DeleteObject(br_bdr_blend);
+
+            RECT rc_b_txt = { rc_blend_btn.left + 6, rc_blend_btn.top, rc_blend_btn.right - 18, rc_blend_btn.bottom };
+            SelectObject(dc_tr, g_font_primary_bold);
+            SetTextColor(dc_tr, th->text_accent_blue);
+            char b_txt[64];
+            snprintf(b_txt, sizeof(b_txt), "%02d: %s", cur_blend, b_name);
+            DrawTextA(dc_tr, b_txt, -1, &rc_b_txt, DT_SINGLELINE | DT_VCENTER | DT_LEFT | DT_END_ELLIPSIS);
+
+            RECT rc_b_arr = { rc_blend_btn.right - 18, rc_blend_btn.top, rc_blend_btn.right - 4, rc_blend_btn.bottom };
+            SelectObject(dc_tr, g_font_primary_regular);
+            SetTextColor(dc_tr, th->text_secondary);
+            DrawTextA(dc_tr, "v", -1, &rc_b_arr, DT_SINGLELINE | DT_VCENTER | DT_CENTER);
+
+            if (has_sel_co) {
+                /* Row 5: Warning badge for Cutout (Blend mode is not recommended for Cutout, Sprite is advised) */
+                RECT rc_warn = { 8, 128 + sy, 228, 146 + sy };
+                SelectObject(dc_tr, g_font_primary_regular);
+                SetTextColor(dc_tr, is_dark ? RGB(255, 175, 50) : RGB(210, 110, 0));
+                DrawTextA(dc_tr, "[!] Kurang cocok (disarankan Sprite)", -1, &rc_warn, DT_SINGLELINE | DT_VCENTER | DT_LEFT);
+            }
+        } else if (has_sel_ba) {
+            if (g_edit_prio && IsWindowVisible(g_edit_prio)) {
+                ShowWindow(g_edit_prio, SW_HIDE);
+            }
+            LevelBackgroundAlpha *ba = &g_bg_alphas[sel_ba_idx];
+            int cur_vx = g_placing_bgalpha_vector ? g_bgalpha_pending_vx : ba->vx;
+            int cur_vy = g_placing_bgalpha_vector ? g_bgalpha_pending_vy : ba->vy;
+
+            /* Vx: Label & Value Box */
+            RECT rc_vx_lbl = { 108, 76 + sy, 124, 98 + sy };
+            SelectObject(dc_tr, g_font_primary_regular);
+            SetTextColor(dc_tr, th->text_secondary);
+            DrawTextA(dc_tr, "Vx:", -1, &rc_vx_lbl, DT_SINGLELINE | DT_VCENTER | DT_RIGHT);
+
+            RECT rc_vx_box = { 126, 76 + sy, 162, 98 + sy };
+            HBRUSH br_vx = CreateSolidBrush(is_dark ? RGB(36, 40, 48) : RGB(255, 255, 255));
+            FillRect(dc_tr, &rc_vx_box, br_vx);
+            DeleteObject(br_vx);
+            FrameRect(dc_tr, &rc_vx_box, (HBRUSH)GetStockObject(BLACK_BRUSH));
+
+            char str_vx[16];
+            snprintf(str_vx, sizeof(str_vx), "%d", cur_vx);
+            SelectObject(dc_tr, g_font_mono_bold);
+            SetTextColor(dc_tr, th->text_accent_blue);
+            DrawTextA(dc_tr, str_vx, -1, &rc_vx_box, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
+
+            /* Vy: Label & Value Box */
+            RECT rc_vy_lbl = { 168, 76 + sy, 184, 98 + sy };
+            SelectObject(dc_tr, g_font_primary_regular);
+            SetTextColor(dc_tr, th->text_secondary);
+            DrawTextA(dc_tr, "Vy:", -1, &rc_vy_lbl, DT_SINGLELINE | DT_VCENTER | DT_RIGHT);
+
+            RECT rc_vy_box = { 186, 76 + sy, 222, 98 + sy };
+            HBRUSH br_vy = CreateSolidBrush(is_dark ? RGB(36, 40, 48) : RGB(255, 255, 255));
+            FillRect(dc_tr, &rc_vy_box, br_vy);
+            DeleteObject(br_vy);
+            FrameRect(dc_tr, &rc_vy_box, (HBRUSH)GetStockObject(BLACK_BRUSH));
+
+            char str_vy[16];
+            snprintf(str_vy, sizeof(str_vy), "%d", cur_vy);
+            SelectObject(dc_tr, g_font_mono_bold);
+            SetTextColor(dc_tr, th->text_accent_blue);
+            DrawTextA(dc_tr, str_vy, -1, &rc_vy_box, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
+        } else {
+            /* No object selected: completely hide priority edit and leave right side blank */
+            if (g_edit_prio && IsWindowVisible(g_edit_prio)) {
                 ShowWindow(g_edit_prio, SW_HIDE);
             }
         }

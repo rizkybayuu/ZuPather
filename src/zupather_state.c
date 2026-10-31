@@ -133,6 +133,7 @@ HDC           g_default_cutout_hdc_dark   = NULL;
 CanvasImage   g_pending_cutout_img;
 bool          g_has_pending_cutout_img    = false;
 char          g_pending_cutout_filepath[MAX_PATH] = "";
+int           g_pending_cutout_blend_mode = 0;
 HBITMAP       g_pending_cutout_mask_light = NULL;
 HDC           g_pending_cutout_hdc_light  = NULL;
 HBITMAP       g_pending_cutout_mask_dark  = NULL;
@@ -146,6 +147,7 @@ bool          g_picked_up_sprite        = false;
 int           g_hovered_sprite_idx      = -1;
 int           g_selected_sprite_idx     = 0;
 int           g_pending_sprite_pri      = 1;
+int           g_pending_sprite_blend_mode = 0;
 CanvasImage   g_default_sprite_img;
 bool          g_has_default_sprite_img  = false;
 
@@ -264,6 +266,7 @@ HWND g_btn_frog           = NULL;
 HWND g_btn_coin           = NULL;
 HWND g_btn_canvas         = NULL;
 HWND g_btn_manage_maps    = NULL;
+HWND g_btn_manage_layout  = NULL;
 HWND g_btn_element        = NULL;
 HWND g_btn_curve          = NULL;
 HWND g_edit_w             = NULL;
@@ -370,6 +373,7 @@ int  g_drag_prev_info_bg_scroll_start      = 0;
 /* Level Preview Assets (11 Balls & Skull) */
 CanvasImage g_ball_imgs[LEVEL_PREVIEW_BALL_COLORS];
 bool        g_has_ball_imgs[LEVEL_PREVIEW_BALL_COLORS] = { false };
+int         g_ball_rows[LEVEL_PREVIEW_BALL_COLORS]     = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
 CanvasImage g_skull_img;
 bool        g_has_skull_img                        = false;
 HWND        g_edit_preview_title                   = NULL;
@@ -921,10 +925,286 @@ void apply_control_dark_mode(HWND hwnd_ctrl, bool is_dark) {
 }
 #endif
 
+bool get_zuma_images_dir(char *out_dir, size_t max_len) {
+    if (!out_dir || max_len == 0) return false;
+    char candidate[MAX_PATH];
+
+    /* 1. Try g_zuma_root_dir\images */
+    if (g_zuma_root_dir[0] != '\0') {
+        snprintf(candidate, sizeof(candidate), "%s\\images", g_zuma_root_dir);
+        if (GetFileAttributesA(candidate) != INVALID_FILE_ATTRIBUTES) {
+            strncpy(out_dir, candidate, max_len - 1);
+            out_dir[max_len - 1] = '\0';
+            return true;
+        }
+    }
+
+    /* 2. Try g_zuma_levels_dir\..\images */
+    if (g_zuma_levels_dir[0] != '\0') {
+        snprintf(candidate, sizeof(candidate), "%s\\..\\images", g_zuma_levels_dir);
+        if (GetFileAttributesA(candidate) != INVALID_FILE_ATTRIBUTES) {
+            strncpy(out_dir, candidate, max_len - 1);
+            out_dir[max_len - 1] = '\0';
+            return true;
+        }
+
+        /* 3. Try g_zuma_levels_dir\images */
+        snprintf(candidate, sizeof(candidate), "%s\\images", g_zuma_levels_dir);
+        if (GetFileAttributesA(candidate) != INVALID_FILE_ATTRIBUTES) {
+            strncpy(out_dir, candidate, max_len - 1);
+            out_dir[max_len - 1] = '\0';
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool get_zuma_properties_dir(char *out_dir, size_t max_len) {
+    if (!out_dir || max_len == 0) return false;
+    char candidate[MAX_PATH];
+
+    if (g_zuma_root_dir[0] != '\0') {
+        snprintf(candidate, sizeof(candidate), "%s\\properties", g_zuma_root_dir);
+        if (GetFileAttributesA(candidate) != INVALID_FILE_ATTRIBUTES) {
+            strncpy(out_dir, candidate, max_len - 1);
+            out_dir[max_len - 1] = '\0';
+            return true;
+        }
+    }
+
+    if (g_zuma_levels_dir[0] != '\0') {
+        snprintf(candidate, sizeof(candidate), "%s\\..\\properties", g_zuma_levels_dir);
+        if (GetFileAttributesA(candidate) != INVALID_FILE_ATTRIBUTES) {
+            strncpy(out_dir, candidate, max_len - 1);
+            out_dir[max_len - 1] = '\0';
+            return true;
+        }
+
+        snprintf(candidate, sizeof(candidate), "%s\\properties", g_zuma_levels_dir);
+        if (GetFileAttributesA(candidate) != INVALID_FILE_ATTRIBUTES) {
+            strncpy(out_dir, candidate, max_len - 1);
+            out_dir[max_len - 1] = '\0';
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool load_zuma_game_image_with_alpha(const char *images_dir, const char *base_name, const char *alpha_name, CanvasImage *out_img) {
+    if (!images_dir || !base_name || !out_img) return false;
+
+    static const char *exts[] = { "gif", "png", "jpg", "jpeg", "bmp" };
+    char base_path[MAX_PATH] = {0};
+    bool base_found = false;
+
+    for (int e = 0; e < 5; ++e) {
+        snprintf(base_path, sizeof(base_path), "%s\\%s.%s", images_dir, base_name, exts[e]);
+        if (GetFileAttributesA(base_path) != INVALID_FILE_ATTRIBUTES) {
+            base_found = true;
+            break;
+        }
+    }
+
+    if (!base_found) {
+        char lower_name[64];
+        strncpy(lower_name, base_name, sizeof(lower_name) - 1);
+        lower_name[sizeof(lower_name) - 1] = '\0';
+        for (char *c = lower_name; *c; ++c) *c = (char)tolower((unsigned char)*c);
+        for (int e = 0; e < 5; ++e) {
+            snprintf(base_path, sizeof(base_path), "%s\\%s.%s", images_dir, lower_name, exts[e]);
+            if (GetFileAttributesA(base_path) != INVALID_FILE_ATTRIBUTES) {
+                base_found = true;
+                break;
+            }
+        }
+    }
+
+    if (!base_found) return false;
+
+    if (!image_load_from_file(base_path, out_img)) {
+        return false;
+    }
+
+    char alpha_path[MAX_PATH] = {0};
+    bool alpha_found = false;
+
+    if (alpha_name && alpha_name[0]) {
+        for (int e = 0; e < 5; ++e) {
+            snprintf(alpha_path, sizeof(alpha_path), "%s\\%s.%s", images_dir, alpha_name, exts[e]);
+            if (GetFileAttributesA(alpha_path) != INVALID_FILE_ATTRIBUTES) {
+                alpha_found = true;
+                break;
+            }
+        }
+        if (!alpha_found) {
+            char lower_alpha[64];
+            strncpy(lower_alpha, alpha_name, sizeof(lower_alpha) - 1);
+            lower_alpha[sizeof(lower_alpha) - 1] = '\0';
+            for (char *c = lower_alpha; *c; ++c) *c = (char)tolower((unsigned char)*c);
+            for (int e = 0; e < 5; ++e) {
+                snprintf(alpha_path, sizeof(alpha_path), "%s\\%s.%s", images_dir, lower_alpha, exts[e]);
+                if (GetFileAttributesA(alpha_path) != INVALID_FILE_ATTRIBUTES) {
+                    alpha_found = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (!alpha_found) {
+        for (int e = 0; e < 5; ++e) {
+            snprintf(alpha_path, sizeof(alpha_path), "%s\\_%s.%s", images_dir, base_name, exts[e]);
+            if (GetFileAttributesA(alpha_path) != INVALID_FILE_ATTRIBUTES) {
+                alpha_found = true;
+                break;
+            }
+        }
+    }
+
+    if (alpha_found) {
+        CanvasImage mask_img;
+        memset(&mask_img, 0, sizeof(CanvasImage));
+        if (image_load_from_file(alpha_path, &mask_img)) {
+            int bw = out_img->width;
+            int bh = out_img->height;
+            int mw = mask_img.width;
+            int mh = mask_img.height;
+            if (bw > 0 && bh > 0 && mw > 0 && mh > 0 && out_img->bits && mask_img.bits) {
+                uint32_t *dst_bits = (uint32_t*)out_img->bits;
+                const uint32_t *src_mask = (const uint32_t*)mask_img.bits;
+
+                for (int y = 0; y < bh; ++y) {
+                    int my = y % mh;
+                    for (int x = 0; x < bw; ++x) {
+                        int mx = x % mw;
+                        uint32_t m_px = src_mask[my * mw + mx];
+                        uint8_t mb = (uint8_t)(m_px & 0xFF);
+                        uint8_t mg = (uint8_t)((m_px >> 8) & 0xFF);
+                        uint8_t mr = (uint8_t)((m_px >> 16) & 0xFF);
+                        uint8_t ma = (uint8_t)((m_px >> 24) & 0xFF);
+
+                        uint32_t lum = (uint32_t)((mr * 299 + mg * 587 + mb * 114 + 500) / 1000);
+                        if (lum > 255) lum = 255;
+                        if (ma < 255) lum = (lum * ma) / 255;
+
+                        uint32_t d_px = dst_bits[y * bw + x];
+                        uint8_t db = (uint8_t)(d_px & 0xFF);
+                        uint8_t dg = (uint8_t)((d_px >> 8) & 0xFF);
+                        uint8_t dr = (uint8_t)((d_px >> 16) & 0xFF);
+                        uint8_t da = (uint8_t)((d_px >> 24) & 0xFF);
+
+                        uint32_t final_a = (da < 255) ? ((lum * da + 127) / 255) : lum;
+                        if (final_a > 255) final_a = 255;
+
+                        uint8_t out_b = (uint8_t)(((uint32_t)db * final_a + 127) / 255);
+                        uint8_t out_g = (uint8_t)(((uint32_t)dg * final_a + 127) / 255);
+                        uint8_t out_r = (uint8_t)(((uint32_t)dr * final_a + 127) / 255);
+
+                        dst_bits[y * bw + x] = ((uint32_t)final_a << 24) | ((uint32_t)out_r << 16) | ((uint32_t)out_g << 8) | out_b;
+                    }
+                }
+
+                if (out_img->orig_bits) {
+                    memcpy(out_img->orig_bits, out_img->bits, (size_t)bw * bh * 4);
+                }
+                if (out_img->first_frame_bits) {
+                    memcpy(out_img->first_frame_bits, out_img->bits, (size_t)bw * bh * 4);
+                }
+            }
+            image_free(&mask_img);
+        }
+    }
+
+    return true;
+}
+
+static void parse_ball_rows_from_xml(const char *xml_path, const char **ball_names, int count, int *out_rows) {
+    FILE *f = fopen(xml_path, "rb");
+    if (!f) return;
+    fseek(f, 0, SEEK_END);
+    long sz = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (sz <= 0 || sz > 10 * 1024 * 1024) { fclose(f); return; }
+
+    char *buf = (char*)malloc(sz + 1);
+    if (!buf) { fclose(f); return; }
+    fread(buf, 1, sz, f);
+    buf[sz] = '\0';
+    fclose(f);
+
+    for (int i = 0; i < count; ++i) {
+        char pattern[128];
+        snprintf(pattern, sizeof(pattern), "path=\"%s\"", ball_names[i]);
+        char *pos = strstr(buf, pattern);
+        if (!pos) {
+            char lower_p[128];
+            snprintf(lower_p, sizeof(lower_p), "path=\"%s\"", ball_names[i]);
+            for (char *c = lower_p + 6; *c && *c != '\"'; ++c) *c = (char)tolower((unsigned char)*c);
+            pos = strstr(buf, lower_p);
+        }
+
+        if (pos) {
+            char *tag_end = strchr(pos, '>');
+            if (tag_end) {
+                char *r_pos = strstr(pos, "rows=");
+                if (r_pos && r_pos < tag_end) {
+                    r_pos += 5;
+                    while (*r_pos == '\"' || *r_pos == ' ' || *r_pos == '\'') r_pos++;
+                    int rows = atoi(r_pos);
+                    if (rows > 0) {
+                        out_rows[i] = rows;
+                    }
+                }
+            }
+        }
+    }
+    free(buf);
+}
+
+void reload_all_game_assets(void) {
+    if (g_has_frog_img) {
+        image_free(&g_frog_img);
+        g_has_frog_img = false;
+    }
+    if (g_has_coin_img) {
+        image_free(&g_coin_img);
+        g_has_coin_img = false;
+    }
+    if (g_has_skull_img) {
+        image_free(&g_skull_img);
+        g_has_skull_img = false;
+    }
+    for (int i = 0; i < LEVEL_PREVIEW_BALL_COLORS; ++i) {
+        if (g_has_ball_imgs[i]) {
+            image_free(&g_ball_imgs[i]);
+            g_has_ball_imgs[i] = false;
+        }
+        g_ball_rows[i] = 1;
+    }
+
+    load_frog_sprite();
+    load_coin_sprite();
+    load_level_preview_assets();
+}
+
 void load_frog_sprite(void) {
     if (g_has_frog_img) return;
 
-    /* 1. Try embedded resource (IDR_SPRITE_FROG) */
+    /* 1. If enabled, attempt loading from linked Zuma folder's images/ */
+    if (g_use_zuma_assets) {
+        char images_dir[MAX_PATH];
+        if (get_zuma_images_dir(images_dir, sizeof(images_dir))) {
+            if (load_zuma_game_image_with_alpha(images_dir, "SMALLFROGonPAD", "_SMALLFROGonPAD", &g_frog_img) ||
+                load_zuma_game_image_with_alpha(images_dir, "smallfrogonpad", "_smallfrogonpad", &g_frog_img)) {
+                g_has_frog_img = true;
+                return;
+            }
+        }
+    }
+
+    /* 2. Try embedded resource (IDR_SPRITE_FROG) */
     if (image_load_from_resource(IDR_SPRITE_FROG, &g_frog_img)) {
         g_has_frog_img = true;
         return;
@@ -959,7 +1239,19 @@ void load_frog_sprite(void) {
 void load_coin_sprite(void) {
     if (g_has_coin_img) return;
 
-    /* 1. Try embedded resource (IDR_SPRITE_COIN) */
+    /* 1. If enabled, attempt loading from linked Zuma folder's images/ */
+    if (g_use_zuma_assets) {
+        char images_dir[MAX_PATH];
+        if (get_zuma_images_dir(images_dir, sizeof(images_dir))) {
+            if (load_zuma_game_image_with_alpha(images_dir, "COIN", "_COIN", &g_coin_img) ||
+                load_zuma_game_image_with_alpha(images_dir, "coin", "_coin", &g_coin_img)) {
+                g_has_coin_img = true;
+                return;
+            }
+        }
+    }
+
+    /* 2. Try embedded resource (IDR_SPRITE_COIN) */
     if (image_load_from_resource(IDR_SPRITE_COIN, &g_coin_img)) {
         g_has_coin_img = true;
         return;
@@ -1034,11 +1326,32 @@ void sync_cutout_image_names(void) {
 }
 
 void sync_sprite_image_names(void) {
+    int sprite_count = 0;
+    int overlay_count = 0;
     for (int i = 0; i < g_sprite_count; ++i) {
-        if (g_sprite_count == 1) {
-            snprintf(g_sprites[i].image_name, sizeof(g_sprites[i].image_name), "sprite");
+        int pri = (g_sprites[i].pri > 0) ? g_sprites[i].pri : 1;
+        if (pri >= 10) overlay_count++;
+        else sprite_count++;
+    }
+
+    int cur_s = 0;
+    int cur_o = 0;
+    for (int i = 0; i < g_sprite_count; ++i) {
+        int pri = (g_sprites[i].pri > 0) ? g_sprites[i].pri : 1;
+        if (pri >= 10) {
+            cur_o++;
+            if (overlay_count == 1) {
+                snprintf(g_sprites[i].image_name, sizeof(g_sprites[i].image_name), "overlay");
+            } else {
+                snprintf(g_sprites[i].image_name, sizeof(g_sprites[i].image_name), "overlay%d", cur_o);
+            }
         } else {
-            snprintf(g_sprites[i].image_name, sizeof(g_sprites[i].image_name), "sprite%d", i + 1);
+            cur_s++;
+            if (sprite_count == 1) {
+                snprintf(g_sprites[i].image_name, sizeof(g_sprites[i].image_name), "sprite");
+            } else {
+                snprintf(g_sprites[i].image_name, sizeof(g_sprites[i].image_name), "sprite%d", cur_s);
+            }
         }
     }
 }
@@ -1063,6 +1376,7 @@ void free_pending_cutout(void) {
     if (g_pending_cutout_hdc_dark)   { DeleteDC(g_pending_cutout_hdc_dark); g_pending_cutout_hdc_dark = NULL; }
     if (g_pending_cutout_mask_dark)  { DeleteObject(g_pending_cutout_mask_dark); g_pending_cutout_mask_dark = NULL; }
     g_pending_cutout_filepath[0] = '\0';
+    g_pending_cutout_blend_mode = 0;
 }
 
 void free_pending_sprite(void) {
@@ -1071,6 +1385,7 @@ void free_pending_sprite(void) {
         g_has_pending_sprite_img = false;
     }
     g_pending_sprite_filepath[0] = '\0';
+    g_pending_sprite_blend_mode = 0;
 }
 
 void free_pending_bgalpha(void) {
@@ -1387,47 +1702,177 @@ void load_level_preview_assets(void) {
     if (last_slash) *(last_slash + 1) = '\0';
 
     static const char *s_ball_files[LEVEL_PREVIEW_BALL_COLORS] = {
-        "baBallBlue.png",
-        "baBallYellow.png",
-        "baBallRed.png",
-        "baBallGreen.png",
-        "baBallPurple.png",
-        "baBallWhite.png",
-        "baBallOrange.png",
-        "baBallNavy.png",
-        "baBallCyan.png",
-        "baBallBlack.png",
-        "baBallCream.png"
+        "baBallBlue",
+        "baBallYellow",
+        "baBallRed",
+        "baBallGreen",
+        "baBallPurple",
+        "baBallWhite",
+        "baBallOrange",
+        "baBallNavy",
+        "baBallCyan",
+        "baBallBlack",
+        "baBallCream"
     };
 
-    for (int i = 0; i < LEVEL_PREVIEW_BALL_COLORS; ++i) {
-        if (!g_has_ball_imgs[i]) {
-            /* 1. Try embedded resource (IDR_SPRITE_BALL_BASE + i) */
-            if (image_load_from_resource(IDR_SPRITE_BALL_BASE + i, &g_ball_imgs[i])) {
-                g_has_ball_imgs[i] = true;
-                continue;
+    /* 1. If enabled, attempt loading from linked Zuma folder's images/ and properties/ */
+    if (g_use_zuma_assets) {
+        char prop_dir[MAX_PATH];
+        if (get_zuma_properties_dir(prop_dir, sizeof(prop_dir))) {
+            char res_xml[MAX_PATH];
+            snprintf(res_xml, sizeof(res_xml), "%s\\resources.xml", prop_dir);
+            parse_ball_rows_from_xml(res_xml, s_ball_files, LEVEL_PREVIEW_BALL_COLORS, g_ball_rows);
+            snprintf(res_xml, sizeof(res_xml), "%s\\resources_extra.xml", prop_dir);
+            parse_ball_rows_from_xml(res_xml, s_ball_files, LEVEL_PREVIEW_BALL_COLORS, g_ball_rows);
+        }
+
+        char images_dir[MAX_PATH];
+        if (get_zuma_images_dir(images_dir, sizeof(images_dir))) {
+            for (int i = 0; i < LEVEL_PREVIEW_BALL_COLORS; ++i) {
+                if (!g_has_ball_imgs[i]) {
+                    if (load_zuma_game_image_with_alpha(images_dir, s_ball_files[i], "_ballalpha", &g_ball_imgs[i])) {
+                        g_has_ball_imgs[i] = true;
+                        if (g_ball_rows[i] <= 1 && g_ball_imgs[i].height > g_ball_imgs[i].width && g_ball_imgs[i].width > 0) {
+                            g_ball_rows[i] = g_ball_imgs[i].height / g_ball_imgs[i].width;
+                        }
+                    }
+                }
             }
 
-            char path_buf[MAX_PATH];
-            snprintf(path_buf, sizeof(path_buf), "%sassets\\media\\%s", exe_dir, s_ball_files[i]);
-            if (image_load_from_file(path_buf, &g_ball_imgs[i])) {
-                g_has_ball_imgs[i] = true;
-            } else {
-                snprintf(path_buf, sizeof(path_buf), "assets\\media\\%s", s_ball_files[i]);
-                if (image_load_from_file(path_buf, &g_ball_imgs[i])) {
-                    g_has_ball_imgs[i] = true;
+            if (!g_has_skull_img) {
+                if (load_zuma_game_image_with_alpha(images_dir, "SKULL", "_SKULL", &g_skull_img) ||
+                    load_zuma_game_image_with_alpha(images_dir, "skull", "_skull", &g_skull_img)) {
+                    g_has_skull_img = true;
                 } else {
-                    snprintf(path_buf, sizeof(path_buf), "D:\\Files\\Project\\Reverse Engineer\\ZuPather - Zuma Deluxe Path Maker\\assets\\media\\%s", s_ball_files[i]);
-                    if (image_load_from_file(path_buf, &g_ball_imgs[i])) {
-                        g_has_ball_imgs[i] = true;
+                    bool has_hole = load_zuma_game_image_with_alpha(images_dir, "Hole", "_Hole", &g_skull_img) ||
+                                    load_zuma_game_image_with_alpha(images_dir, "hole", "_hole", &g_skull_img);
+                    CanvasImage pitcover_img;
+                    memset(&pitcover_img, 0, sizeof(CanvasImage));
+                    bool has_cover = load_zuma_game_image_with_alpha(images_dir, "pitcover", "_pitcover", &pitcover_img) ||
+                                     load_zuma_game_image_with_alpha(images_dir, "PitCover", "_PitCover", &pitcover_img);
+
+                    if (has_hole && has_cover) {
+                        int w = g_skull_img.width;
+                        int h = g_skull_img.height;
+                        int pw = pitcover_img.width;
+                        int ph = (pitcover_img.height > pitcover_img.width && pitcover_img.width > 0) ? pitcover_img.width : pitcover_img.height;
+                        if (w > 0 && h > 0 && pw > 0 && ph > 0 && g_skull_img.bits && pitcover_img.bits) {
+                            uint32_t *hole_bits = (uint32_t*)g_skull_img.bits;
+                            const uint32_t *pit_bits = (const uint32_t*)pitcover_img.bits;
+                            int min_w = (w < pw) ? w : pw;
+                            int min_h = (h < ph) ? h : ph;
+                            for (int y = 0; y < min_h; ++y) {
+                                for (int x = 0; x < min_w; ++x) {
+                                    uint32_t p_px = pit_bits[y * pw + x];
+                                    uint8_t pa = (uint8_t)(p_px >> 24);
+                                    if (pa == 0) continue;
+                                    uint32_t h_px = hole_bits[y * w + x];
+                                    if (pa == 255) {
+                                        hole_bits[y * w + x] = p_px;
+                                    } else {
+                                        uint8_t inv_a = 255 - pa;
+                                        uint8_t pb = (uint8_t)(p_px & 0xFF);
+                                        uint8_t pg = (uint8_t)((p_px >> 8) & 0xFF);
+                                        uint8_t pr = (uint8_t)((p_px >> 16) & 0xFF);
+                                        uint8_t hb = (uint8_t)(h_px & 0xFF);
+                                        uint8_t hg = (uint8_t)((h_px >> 8) & 0xFF);
+                                        uint8_t hr = (uint8_t)((h_px >> 16) & 0xFF);
+                                        uint8_t ha = (uint8_t)(h_px >> 24);
+                                        uint8_t out_b = (uint8_t)(pb + ((hb * inv_a + 127) / 255));
+                                        uint8_t out_g = (uint8_t)(pg + ((hg * inv_a + 127) / 255));
+                                        uint8_t out_r = (uint8_t)(pr + ((hr * inv_a + 127) / 255));
+                                        uint8_t out_a = (uint8_t)(pa + ((ha * inv_a + 127) / 255));
+                                        hole_bits[y * w + x] = ((uint32_t)out_a << 24) | ((uint32_t)out_r << 16) | ((uint32_t)out_g << 8) | out_b;
+                                    }
+                                }
+                            }
+                            if (g_skull_img.orig_bits) memcpy(g_skull_img.orig_bits, g_skull_img.bits, (size_t)w * h * 4);
+                            if (g_skull_img.first_frame_bits) memcpy(g_skull_img.first_frame_bits, g_skull_img.bits, (size_t)w * h * 4);
+                        }
+                        image_free(&pitcover_img);
+                        g_has_skull_img = true;
+                    } else if (has_cover) {
+                        int pw = pitcover_img.width;
+                        int ph = (pitcover_img.height > pitcover_img.width && pitcover_img.width > 0) ? pitcover_img.width : pitcover_img.height;
+                        BITMAPINFO bmi;
+                        memset(&bmi, 0, sizeof(bmi));
+                        bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+                        bmi.bmiHeader.biWidth = pw;
+                        bmi.bmiHeader.biHeight = -ph;
+                        bmi.bmiHeader.biPlanes = 1;
+                        bmi.bmiHeader.biBitCount = 32;
+                        bmi.bmiHeader.biCompression = BI_RGB;
+                        void *nbits = NULL;
+                        HDC sdc = GetDC(NULL);
+                        HDC mdc = CreateCompatibleDC(sdc);
+                        HBITMAP nhbm = CreateDIBSection(mdc, &bmi, DIB_RGB_COLORS, &nbits, NULL, 0);
+                        SelectObject(mdc, nhbm);
+                        ReleaseDC(NULL, sdc);
+                        if (nhbm && nbits) {
+                            memcpy(nbits, pitcover_img.bits, (size_t)pw * ph * 4);
+                            g_skull_img = pitcover_img;
+                            g_skull_img.hbm = nhbm;
+                            g_skull_img.hdc_mem = mdc;
+                            g_skull_img.bits = nbits;
+                            g_skull_img.width = pw;
+                            g_skull_img.height = ph;
+                            g_skull_img.orig_width = pw;
+                            g_skull_img.orig_height = ph;
+                            g_skull_img.orig_bits = malloc((size_t)pw * ph * 4);
+                            if (g_skull_img.orig_bits) memcpy(g_skull_img.orig_bits, nbits, (size_t)pw * ph * 4);
+                            g_skull_img.first_frame_bits = malloc((size_t)pw * ph * 4);
+                            if (g_skull_img.first_frame_bits) memcpy(g_skull_img.first_frame_bits, nbits, (size_t)pw * ph * 4);
+                            if (pitcover_img.hbm) DeleteObject(pitcover_img.hbm);
+                            if (pitcover_img.hdc_mem) DeleteDC(pitcover_img.hdc_mem);
+                            if (pitcover_img.orig_bits) free(pitcover_img.orig_bits);
+                            if (pitcover_img.first_frame_bits) free(pitcover_img.first_frame_bits);
+                            g_has_skull_img = true;
+                        } else {
+                            if (mdc) DeleteDC(mdc);
+                            if (nhbm) DeleteObject(nhbm);
+                            g_skull_img = pitcover_img;
+                            g_has_skull_img = true;
+                        }
+                    } else if (has_hole) {
+                        g_has_skull_img = true;
                     }
                 }
             }
         }
     }
 
+    /* 2. Fallbacks for any remaining unloaded balls */
+    for (int i = 0; i < LEVEL_PREVIEW_BALL_COLORS; ++i) {
+        if (!g_has_ball_imgs[i]) {
+            if (image_load_from_resource(IDR_SPRITE_BALL_BASE + i, &g_ball_imgs[i])) {
+                g_has_ball_imgs[i] = true;
+                g_ball_rows[i] = (g_ball_imgs[i].height > g_ball_imgs[i].width && g_ball_imgs[i].width > 0) ? (g_ball_imgs[i].height / g_ball_imgs[i].width) : 1;
+                continue;
+            }
+
+            char path_buf[MAX_PATH];
+            snprintf(path_buf, sizeof(path_buf), "%sassets\\media\\%s.png", exe_dir, s_ball_files[i]);
+            if (image_load_from_file(path_buf, &g_ball_imgs[i])) {
+                g_has_ball_imgs[i] = true;
+            } else {
+                snprintf(path_buf, sizeof(path_buf), "assets\\media\\%s.png", s_ball_files[i]);
+                if (image_load_from_file(path_buf, &g_ball_imgs[i])) {
+                    g_has_ball_imgs[i] = true;
+                } else {
+                    snprintf(path_buf, sizeof(path_buf), "D:\\Files\\Project\\Reverse Engineer\\ZuPather - Zuma Deluxe Path Maker\\assets\\media\\%s.png", s_ball_files[i]);
+                    if (image_load_from_file(path_buf, &g_ball_imgs[i])) {
+                        g_has_ball_imgs[i] = true;
+                    }
+                }
+            }
+            if (g_has_ball_imgs[i]) {
+                g_ball_rows[i] = (g_ball_imgs[i].height > g_ball_imgs[i].width && g_ball_imgs[i].width > 0) ? (g_ball_imgs[i].height / g_ball_imgs[i].width) : 1;
+            }
+        }
+    }
+
+    /* 3. Fallback for skull */
     if (!g_has_skull_img) {
-        /* 1. Try embedded resource (IDR_SPRITE_SKULL) */
         if (image_load_from_resource(IDR_SPRITE_SKULL, &g_skull_img)) {
             g_has_skull_img = true;
         } else {
@@ -2964,6 +3409,7 @@ void update_open_progress(const char *status_msg, int pct) {
 char g_zuma_levels_dir[MAX_PATH] = {0};
 char g_zuma_root_dir[MAX_PATH] = {0};
 bool g_has_zuma_dir = false;
+bool g_use_zuma_assets = true;
 
 static void get_zupather_config_path(char *out_path, size_t max_len) {
     if (!out_path || max_len == 0) return;
@@ -3000,14 +3446,19 @@ void load_zuma_config(void) {
         }
     }
 
-    /* Load Theme (Dark or Light Mode) */
+    /* Load Theme Preference (Dark, Light, or Use System Default) */
     char theme_buf[32] = {0};
     GetPrivateProfileStringA("Preferences", "Theme", "", theme_buf, sizeof(theme_buf), ini_path);
     if (theme_buf[0] != '\0') {
-        if (_stricmp(theme_buf, "dark") == 0 || strcmp(theme_buf, "1") == 0) {
-            g_current_theme = THEME_DARK;
+        if (_stricmp(theme_buf, "system") == 0 || strcmp(theme_buf, "2") == 0) {
+            g_theme_preference = THEME_PREF_SYSTEM;
+            g_current_theme = is_system_dark_mode() ? THEME_DARK : THEME_LIGHT;
         } else if (_stricmp(theme_buf, "light") == 0 || strcmp(theme_buf, "0") == 0) {
+            g_theme_preference = THEME_PREF_LIGHT;
             g_current_theme = THEME_LIGHT;
+        } else if (_stricmp(theme_buf, "dark") == 0 || strcmp(theme_buf, "1") == 0) {
+            g_theme_preference = THEME_PREF_DARK;
+            g_current_theme = THEME_DARK;
         }
     }
 
@@ -3032,6 +3483,10 @@ void load_zuma_config(void) {
     } else if (grid_val == 1) {
         g_show_grid = true;
     }
+
+    /* Load Use Zuma Assets preference (default 1 / checked) */
+    int assets_val = GetPrivateProfileIntA("Preferences", "UseZumaAssets", 1, ini_path);
+    g_use_zuma_assets = (assets_val != 0);
 }
 
 void save_zuma_config(void) {
@@ -3045,6 +3500,7 @@ void save_zuma_config(void) {
     else if (g_theme_preference == THEME_PREF_LIGHT) pref_str = "light";
     WritePrivateProfileStringA("Preferences", "Theme", pref_str, ini_path);
     WritePrivateProfileStringA("Preferences", "Grid", g_show_grid ? "1" : "0", ini_path);
+    WritePrivateProfileStringA("Preferences", "UseZumaAssets", g_use_zuma_assets ? "1" : "0", ini_path);
     char num_buf[32];
     WritePrivateProfileStringA("Preferences", "PerformanceDirectBlit", g_perf_direct_blit ? "1" : "0", ini_path);
     WritePrivateProfileStringA("Preferences", "PerformanceHudCache", g_perf_hud_cache ? "1" : "0", ini_path);

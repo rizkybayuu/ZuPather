@@ -11321,6 +11321,7 @@ typedef struct {
     HWND hwnd_edit_undo_limit;
     HWND hwnd_combo_theme;
     HWND hwnd_chk_show_grid;
+    HWND hwnd_chk_use_zuma_assets;
     HWND hwnd_btn_change_zuma;
     HWND hwnd_btn_save;
     HWND hwnd_btn_cancel;
@@ -11332,6 +11333,7 @@ typedef struct {
     int  undo_limit_val;
     AppThemePreference theme_pref_val;
     bool show_grid;
+    bool use_zuma_assets;
     bool is_done;
 } SettingsModalData;
 
@@ -11594,26 +11596,29 @@ static LRESULT CALLBACK SettingsModalWndProc(HWND hwnd, UINT msg, WPARAM wParam,
             SendMessage(data->hwnd_combo_theme, CB_SETCURSEL, sel_th, 0);
 
             MAKE_CHK(ID_SETTINGS_CHK_SHOW_GRID, "Show Canvas Coordinate Grid by Default",
-                     34, 338, 472, 17, &data->show_grid);
+                     34, 336, 472, 17, &data->show_grid);
+
+            MAKE_CHK(ID_SETTINGS_CHK_USE_ZUMA_ASSETS, "Use Assets from Linked Zuma Folder",
+                     34, 356, 472, 17, &data->use_zuma_assets);
 
             /* Control Box: 80x24 px */
             data->hwnd_btn_change_zuma = CreateWindowA(
                 "BUTTON", "Change...", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW | WS_TABSTOP,
-                424, 362, 80, 24, hwnd, (HMENU)ID_SETTINGS_BTN_CHANGE_ZUMA, hinst, NULL
+                424, 377, 80, 24, hwnd, (HMENU)ID_SETTINGS_BTN_CHANGE_ZUMA, hinst, NULL
             );
 
             /* Bottom Action Buttons: perfectly equal margins (20px top, 20px bottom, 20px left, 20px right) */
             data->hwnd_btn_reset = CreateWindowA(
                 "BUTTON", "Reset Defaults", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW | WS_TABSTOP,
-                20, 418, 105, 28, hwnd, (HMENU)ID_SETTINGS_BTN_RESET, hinst, NULL
+                20, 431, 105, 28, hwnd, (HMENU)ID_SETTINGS_BTN_RESET, hinst, NULL
             );
             data->hwnd_btn_cancel = CreateWindowA(
                 "BUTTON", "Cancel", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW | WS_TABSTOP,
-                320, 418, 80, 28, hwnd, (HMENU)ID_SETTINGS_BTN_CANCEL, hinst, NULL
+                320, 431, 80, 28, hwnd, (HMENU)ID_SETTINGS_BTN_CANCEL, hinst, NULL
             );
             data->hwnd_btn_save = CreateWindowA(
                 "BUTTON", "Save & Apply", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW | WS_TABSTOP,
-                410, 418, 110, 28, hwnd, (HMENU)ID_SETTINGS_BTN_SAVE, hinst, NULL
+                410, 431, 110, 28, hwnd, (HMENU)ID_SETTINGS_BTN_SAVE, hinst, NULL
             );
 
             #undef MAKE_CHK
@@ -11701,14 +11706,14 @@ static LRESULT CALLBACK SettingsModalWndProc(HWND hwnd, UINT msg, WPARAM wParam,
             SetTextColor(hdc, th->text_dim);
             DrawTextA(hdc, "Maximum undo/redo states retained in memory (zero disk cache).", -1, &rc_sub_hist, DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_NOPREFIX);
 
-            /* 5. Card 3: WORKSPACE & ENVIRONMENT (y: 284 to 398 -> h = 114) */
-            draw_settings_card(hdc, 20, 284, rc.right - 40, 114, "WORKSPACE & ENVIRONMENT", th, is_dark);
+            /* 5. Card 3: WORKSPACE & ENVIRONMENT (y: 284 to 411 -> h = 127) */
+            draw_settings_card(hdc, 20, 284, rc.right - 40, 127, "WORKSPACE & ENVIRONMENT", th, is_dark);
             RECT rc_lbl_theme = { 34, 308, 118, 332 };
             SetTextColor(hdc, th->text_primary);
             SelectObject(hdc, g_font_primary_regular);
             DrawTextA(hdc, "Color Theme:", -1, &rc_lbl_theme, DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_NOPREFIX);
 
-            RECT rc_lbl_zuma = { 34, 362, 118, 386 };
+            RECT rc_lbl_zuma = { 34, 377, 118, 401 };
             DrawTextA(hdc, "Zuma Folder:", -1, &rc_lbl_zuma, DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_NOPREFIX);
 
             char zuma_disp[MAX_PATH];
@@ -11719,7 +11724,7 @@ static LRESULT CALLBACK SettingsModalWndProc(HWND hwnd, UINT msg, WPARAM wParam,
             }
             SetTextColor(hdc, (g_has_zuma_dir && g_zuma_levels_dir[0]) ? th->text_accent_green : th->text_secondary);
             SelectObject(hdc, g_font_mono_regular);
-            RECT rc_txt_zuma = { 122, 362, 416, 386 };
+            RECT rc_txt_zuma = { 122, 377, 416, 401 };
             DrawTextA(hdc, zuma_disp, -1, &rc_txt_zuma, DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_PATH_ELLIPSIS);
 
             /* Notice: NO horizontal line above the bottom buttons! */
@@ -11811,6 +11816,9 @@ static LRESULT CALLBACK SettingsModalWndProc(HWND hwnd, UINT msg, WPARAM wParam,
             int cmd = LOWORD(wParam);
             if (cmd == ID_SETTINGS_BTN_CHANGE_ZUMA) {
                 handle_set_zuma_folder(hwnd);
+                if (data && data->use_zuma_assets) {
+                    reload_all_game_assets();
+                }
                 InvalidateRect(hwnd, NULL, TRUE);
             } else if (cmd == ID_SETTINGS_BTN_RESET) {
                 if (data) {
@@ -11818,6 +11826,7 @@ static LRESULT CALLBACK SettingsModalWndProc(HWND hwnd, UINT msg, WPARAM wParam,
                     data->chk_hud_cache = true;
                     data->chk_smooth_scroll = true;
                     data->show_grid = true;
+                    data->use_zuma_assets = true;
                     data->theme_pref_val = THEME_PREF_SYSTEM;
                     if (data->hwnd_combo_theme) {
                         SendMessage(data->hwnd_combo_theme, CB_SETCURSEL, (WPARAM)THEME_PREF_SYSTEM, 0);
@@ -11843,6 +11852,12 @@ static LRESULT CALLBACK SettingsModalWndProc(HWND hwnd, UINT msg, WPARAM wParam,
                     g_perf_hud_cache = data->chk_hud_cache;
                     g_perf_smooth_scroll = data->chk_smooth_scroll;
                     g_show_grid = data->show_grid;
+
+                    bool old_use_assets = g_use_zuma_assets;
+                    g_use_zuma_assets = data->use_zuma_assets;
+                    if (old_use_assets != g_use_zuma_assets || g_use_zuma_assets) {
+                        reload_all_game_assets();
+                    }
 
                     int sel_th = (int)SendMessage(data->hwnd_combo_theme, CB_GETCURSEL, 0, 0);
                     if (sel_th < 0 || sel_th > 2) sel_th = (int)THEME_PREF_DARK;
@@ -11899,7 +11914,7 @@ void show_settings_dialog(HWND parent_hwnd) {
         s_settings_class_registered = true;
     }
 
-    RECT rc_dlg = { 0, 0, 540, 466 };
+    RECT rc_dlg = { 0, 0, 540, 479 };
     AdjustWindowRectEx(&rc_dlg, WS_POPUP | WS_CAPTION | WS_SYSMENU, FALSE, WS_EX_DLGMODALFRAME);
     int dlg_w = rc_dlg.right - rc_dlg.left;
     int dlg_h = rc_dlg.bottom - rc_dlg.top;
@@ -11922,6 +11937,7 @@ void show_settings_dialog(HWND parent_hwnd) {
     data.undo_limit_val = g_undo_limit;
     data.theme_pref_val = g_theme_preference;
     data.show_grid = g_show_grid;
+    data.use_zuma_assets = g_use_zuma_assets;
     data.is_done = false;
 
     HWND prev_modal = g_active_modal_dlg;

@@ -44,6 +44,7 @@ typedef struct {
     int  w;
     int  h;
     int  pri;
+    int  blend_mode;
     char image_name[64];
     char source_filepath[MAX_PATH];
     bool selected;
@@ -55,6 +56,7 @@ typedef struct {
     int  w;
     int  h;
     int  pri;
+    int  blend_mode;
     char image_name[64];
     char source_filepath[MAX_PATH];
     bool selected;
@@ -192,6 +194,7 @@ static void capture_current_state(UndoMemorySnapshot *snap, const char *action_n
         snap->cutouts[i].w = g_cutouts[i].has_img ? g_cutouts[i].img.width : 0;
         snap->cutouts[i].h = g_cutouts[i].has_img ? g_cutouts[i].img.height : 0;
         snap->cutouts[i].pri = g_cutouts[i].pri;
+        snap->cutouts[i].blend_mode = g_cutouts[i].blend_mode;
         snap->cutouts[i].selected = g_cutouts[i].selected;
         strncpy(snap->cutouts[i].image_name, g_cutouts[i].image_name, sizeof(snap->cutouts[i].image_name) - 1);
         strncpy(snap->cutouts[i].source_filepath, g_cutouts[i].source_filepath, sizeof(snap->cutouts[i].source_filepath) - 1);
@@ -205,6 +208,7 @@ static void capture_current_state(UndoMemorySnapshot *snap, const char *action_n
         snap->sprites[i].w = g_sprites[i].has_img ? g_sprites[i].img.width : 0;
         snap->sprites[i].h = g_sprites[i].has_img ? g_sprites[i].img.height : 0;
         snap->sprites[i].pri = g_sprites[i].pri;
+        snap->sprites[i].blend_mode = g_sprites[i].blend_mode;
         snap->sprites[i].selected = g_sprites[i].selected;
         strncpy(snap->sprites[i].image_name, g_sprites[i].image_name, sizeof(snap->sprites[i].image_name) - 1);
         strncpy(snap->sprites[i].source_filepath, g_sprites[i].source_filepath, sizeof(snap->sprites[i].source_filepath) - 1);
@@ -372,6 +376,7 @@ static void restore_state(const UndoMemorySnapshot *snap, HWND hwnd_main) {
         co->x = snap->cutouts[i].x;
         co->y = snap->cutouts[i].y;
         co->pri = snap->cutouts[i].pri;
+        co->blend_mode = snap->cutouts[i].blend_mode;
         co->selected = snap->cutouts[i].selected;
         strncpy(co->image_name, snap->cutouts[i].image_name, sizeof(co->image_name) - 1);
         strncpy(co->source_filepath, snap->cutouts[i].source_filepath, sizeof(co->source_filepath) - 1);
@@ -397,6 +402,7 @@ static void restore_state(const UndoMemorySnapshot *snap, HWND hwnd_main) {
         sp->x = snap->sprites[i].x;
         sp->y = snap->sprites[i].y;
         sp->pri = snap->sprites[i].pri;
+        sp->blend_mode = snap->sprites[i].blend_mode;
         sp->selected = snap->sprites[i].selected;
         strncpy(sp->image_name, snap->sprites[i].image_name, sizeof(sp->image_name) - 1);
         strncpy(sp->source_filepath, snap->sprites[i].source_filepath, sizeof(sp->source_filepath) - 1);

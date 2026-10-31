@@ -1,6 +1,6 @@
 # Zuma Deluxe - `levels.xml` Specification & Reverse Engineering Catalog
 
-This comprehensive document specifies the schema, elements, attributes, and data types of the Zuma Deluxe level configuration file (`levels/levels.xml`).
+This comprehensive document specifies the schema, elements, attributes, and data types of the Zuma Deluxe level configuration file (`levels/levels.xml`), synchronized with the **ZuCompleluxe v0.6** engine architecture and **ZuPather** editor specifications.
 
 ---
 
@@ -27,9 +27,9 @@ The `<Graphics>` tag defines visual parameters, curve references, background ima
 | `image` | String | Background asset filename without extension (e.g., `image="coaster"`). |
 | `dir` | String | *(Optional)* Subfolder path containing level assets (defaults to `levels/`). |
 | `curve` | String | Primary binary curve trajectory file basename (e.g., `curve="coaster"` maps to `levels/coaster/coaster.dat`). |
-| `curve1` .. `curve9` | String | Secondary through 10th curves for multi-track levels (e.g., `curve1="track2"`, `curve2="track3"`). ZuPather and Zuma engine support up to 10 tracks per level. |
-| **`gx`** | Integer | **Gun X** - Horizontal coordinate of the frog shooter in screen pixels (defaults to `320`). |
-| **`gy`** | Integer | **Gun Y** - Vertical coordinate of the frog shooter in screen pixels (defaults to `240`). |
+| `curve2` .. `curve10`<br>*(or `curve1`..`curve9`)* | String | Secondary through 10th curves for multi-track levels (e.g., `curve="blackswirley-2" curve2="blackswirley-1"`). ZuPather and Zuma engine support up to 10 tracks per level. |
+| **`gx`** | Integer | **Gun X** - Horizontal coordinate of the frog shooter in virtual 640x480 screen pixels (defaults to `320`). |
+| **`gy`** | Integer | **Gun Y** - Vertical coordinate of the frog shooter in virtual 640x480 screen pixels (defaults to `240`). |
 | `skullrot` | Float / Int | *(Optional)* Explicit rotation angle of the skull pit in degrees (e.g., `skullrot="0"` in Mirror Serpent). When specified, it overrides and resets the curve endpoint tangent. |
 | `space` | Boolean | *(Optional)* Flag activating procedural cosmic space arena mode (`space="true"`). |
 | `drawcurve` | Boolean | *(Optional)* Controls whether the curve track rail line is drawn (`"true"` or `"false"`, default `"true"`). |
@@ -44,21 +44,29 @@ The `<Graphics>` tag defines visual parameters, curve references, background ima
 > [!NOTE]
 > In `Zuma.exe`, `<Graphics>` also directly supports embedding gameplay difficulty parameters that normally appear in `<Settings>` (e.g., `speed`, `maxspeed`, `start`, `colors`, `balls`, `score`, `firespeed`, `reloaddelay`, `difficulty`, `powerfreq`, `accrate`, `bombfreq`, `slowfreq`, `accfreq`, `backfreq`, `repeat`, `single`, `mergespeed`, `danger`, `slowdistance`, `slowfactor`, `slowspeed`, `zumaslow`, `zumaback`). When present on `<Graphics>`, these override the progression settings.
 
+> [!TIP]
+> **Decoupled UI Presentation**: In ZuCompleluxe v0.6, user interface layouts, navigation buttons, and temple doorways are decoupled from `levels.xml` and managed via `properties/layout.xml`. See `ZUMA_LAYOUT_XML_SPECIFICATION.md` for full details.
+
+---
+
 ### Child Elements inside `<Graphics>`:
 
 #### A. `<TreasurePoint>` (Bonus Coin Spawns)
 Defines spawn coordinates and trigger distance thresholds for golden coins.
-- `x` (Integer): Horizontal screen position of the coin.
-- `y` (Integer): Vertical screen position of the coin.
+- `x` (Integer): Horizontal screen position of the coin (640x480 canvas).
+- `y` (Integer): Vertical screen position of the coin (640x480 canvas).
 - `dist1` (Float / Int): Ball train distance progress threshold along curve 1 required for the coin to spawn (e.g., `dist1="35"`).
 - `dist2` (Float / Int): *(Optional)* Progress threshold along curve 2 for multi-track levels (e.g., `dist2="40"`).
 
-#### B. `<Cutout>` (Tunnel & Bridge Visual Overlays)
-Defines overlay cutout sprites rendered **above** rolling balls to create bridges and tunnels.
+#### B. `<Cutout>` (Tunnel & Bridge Static Visual Overlays)
+Defines overlay cutout sprites rendered above rolling balls to create bridges and tunnels.
 - `image` (String): Cutout sprite asset name (e.g., `image="tunnel01"`, `image="serpentsM"`).
 - `pri` (Integer): Rendering layer priority (`0` to `4`, `pri="1"` = rendered above rolling balls).
 - `x` (Integer): X coordinate of cutout placement.
 - `y` (Integer): Y coordinate of cutout placement.
+
+> [!WARNING]
+> **Strict Separation Rule**: `<Cutout>` elements are permanently drawn in the lower background render passes (priorities `0` through `4`) below the player frog, coins, and fired bullets. **DO NOT USE `<Cutout>` for blend modes!** All blend modes and high-priority overlay layers require `<Sprite>`.
 
 #### C. `<BackgroundAlpha>` (Dynamic Ambient Animation Layers)
 Defines looping ambient motion layers (water streams, earthquakes, volcanic smoke).
@@ -67,12 +75,20 @@ Defines looping ambient motion layers (water streams, earthquakes, volcanic smok
 - `vx` (Float / Int): Horizontal scrolling velocity (e.g., `vx="-1"` or `vx="1"`).
 - `vy` (Float / Int): Vertical scrolling velocity (e.g., `vy="1"` or `vy="2"`).
 
-#### D. `<Sprite>` (Static / Decorative Level Overlays)
-Defines decorative sprite overlays placed at specific coordinates.
-- `image` (String): Sprite image asset name.
-- `pri` (Integer): Priority / layer index.
-- `x` (Integer): Horizontal placement coordinate.
-- `y` (Integer): Vertical placement coordinate.
+#### D. `<Sprite>` (Dynamic / High-Priority Level Overlays & Blend Modes)
+Defines decorative sprite overlays placed at specific coordinates. In ZuCompleluxe v0.6 (`zumapriolayer.dll`), `<Sprite>` elements support high-priority rendering and the full suite of 33 Affinity Photo blend modes.
+- `image` (String) or `id` (String): Sprite image asset name (e.g., `image="fog_overlay"`, `id="vignette"`).
+- `pri` (Integer): Layer priority index:
+  - `0` to `4`: Low-priority background overlays (drawn beneath frog and rolling marbles).
+  - `10` to `19`: **High-Priority Overlays** (drawn dynamically **above** the frog shooter, moving balls, fired bullets, and bonus coins). Elevated sprites participate in stage earthquake crumbling (State 5).
+- `x` (Integer): Horizontal placement coordinate in virtual 640x480 space.
+- `y` (Integer): Vertical placement coordinate in virtual 640x480 space.
+- `blend` (String / Integer): *(Optional)* Blending mode name (e.g., `blend="multiply"`, `blend="overlay"`, `blend="glow"`, `blend="pigment"`) or direct numeric ID (`0` to `32`). See `ZUMA_OVERLAY_BLEND_MODES_SPECIFICATION.md` for the complete 33-mode specification.
+
+> [!IMPORTANT]
+> **Cardinal Rule for Level Designers**:
+> * To create a track tunnel/bridge: Use `<Cutout pri="1..4" />`.
+> * To create atmospheric fog, lighting flares, vignette shadows, or elements above the frog: Always use `<Sprite pri="10..19" blend="..." />`.
 
 ---
 
@@ -108,7 +124,7 @@ The `<Settings>` tag defines ball train movement physics, difficulty scaling, an
 | `start` | Integer | Initial number of balls spawned when train enters. | `20` to `80` |
 | `score` | Integer | Score threshold required to trigger "ZUMA" state and stop ball feeding. | `1000` to `10000` |
 | `repeat` | Integer | Probability weight for consecutive identical ball colors. | `40` to `50` |
-| `colors` | Integer | Number of active distinct ball colors. | `4`, `5`, or `6` |
+| `colors` | Integer | Number of active distinct ball colors. In ZuCompleluxe, up to 11 colors are supported (`4` to `11`). | `4` to `11` |
 | `reloaddelay`| Integer | Delay in ticks before frog reloads next ball. | `0` |
 | `mergespeed` | Float | Magnetic attraction acceleration when two matching gaps close. | `0.05` |
 | `firespeed` | Float | Velocity of projectiles launched by frog. | `6` |

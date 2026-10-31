@@ -116,6 +116,7 @@ clang -O2 \
     "$SCRIPT_DIR/src/undo_redo.c" \
     "$SCRIPT_DIR/src/level_io.c" \
     "$SCRIPT_DIR/src/dialog_modals.c" \
+    "$SCRIPT_DIR/src/layout_editor.c" \
     "$SCRIPT_DIR/src/hud_overlay.c" \
     "$SCRIPT_DIR/src/canvas_render.c" \
     "$SCRIPT_DIR/src/image_loader.c" \
