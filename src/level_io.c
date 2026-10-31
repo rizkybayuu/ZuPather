@@ -979,14 +979,10 @@ bool save_canvas_settings_xml(
                 snprintf(co_name, sizeof(co_name), "tunnel%d", i + 1);
             }
             int pri = (g_cutouts[i].pri >= 0 && g_cutouts[i].pri <= 99) ? g_cutouts[i].pri : 1;
-            if (g_cutouts[i].blend_mode > 0 && g_cutouts[i].blend_mode < BLEND_MODE_COUNT) {
-                const char *bkey = get_zuma_blend_mode_xml_key(g_cutouts[i].blend_mode);
-                fprintf(f, "        <Cutout pri=\"%d\" image=\"%s\" x=\"%d\" y=\"%d\" blend=\"%s\" />\n",
-                        pri, co_name, g_cutouts[i].x, g_cutouts[i].y, bkey);
-            } else {
-                fprintf(f, "        <Cutout pri=\"%d\" image=\"%s\" x=\"%d\" y=\"%d\" />\n",
-                        pri, co_name, g_cutouts[i].x, g_cutouts[i].y);
-            }
+            /* In ZuCompleluxe / zumapriolayer.dll, Cutout does NOT support blend modes.
+             * Blend modes are only valid on <Sprite>. Write standard Cutout tag without blend attribute. */
+            fprintf(f, "        <Cutout pri=\"%d\" image=\"%s\" x=\"%d\" y=\"%d\" />\n",
+                    pri, co_name, g_cutouts[i].x, g_cutouts[i].y);
         }
     } else {
         fprintf(f, "        <!-- <Cutout pri=\"1\" image=\"tunnel\" x=\"0\" y=\"0\" /> -->\n");
@@ -1518,19 +1514,8 @@ bool load_canvas_settings_xml(
                         cimg[l] = '\0';
                     }
                 }
-                char *blend_attr = strstr(co_tag, "blend=\"");
+                /* Cutouts do not support blend mode in engine - ignore blend attribute on Cutout */
                 int c_blend = 0;
-                if (blend_attr) {
-                    char *q = strchr(blend_attr + 7, '"');
-                    if (q) {
-                        char bbuf[64] = {0};
-                        size_t l = q - (blend_attr + 7);
-                        if (l >= sizeof(bbuf)) l = sizeof(bbuf) - 1;
-                        strncpy(bbuf, blend_attr + 7, l);
-                        bbuf[l] = '\0';
-                        c_blend = parse_zuma_blend_mode(bbuf);
-                    }
-                }
                 if (out_cutouts && out_cutout_count && *out_cutout_count < max_cutouts) {
                     LevelCutout *co = &out_cutouts[*out_cutout_count];
                     memset(co, 0, sizeof(LevelCutout));

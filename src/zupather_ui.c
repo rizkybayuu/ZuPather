@@ -5040,17 +5040,15 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                                         }
                                     }
                                 } else if (content_y >= 102 && content_y <= 126) {
-                                    /* Row 4: Blend Mode Button (Cutout and Sprite) */
-                                    int sel_co = get_active_selected_cutout_idx();
+                                    /* Row 4: Blend Mode Button (Exclusive to <Sprite>) */
                                     int sel_sp = get_active_selected_sprite_idx();
-                                    bool has_co = (g_mode_overlay && ((sel_co >= 0 && sel_co < g_cutout_count) || g_placing_cutout));
                                     bool has_sp = (g_mode_overlay && ((sel_sp >= 0 && sel_sp < g_sprite_count) || g_placing_sprite));
-                                    if (has_co || has_sp) {
+                                    if (has_sp) {
                                         if (rel_x >= 8 && rel_x <= 228) {
                                             hit_btn = true;
                                             POINT pt = { rc_ov.left + 58, rc_ov.top + (124 - g_hud_overlay_tools_scroll_y) };
                                             ClientToScreen(hwnd, &pt);
-                                            show_blend_mode_popup_menu(hwnd, pt.x, pt.y, has_co && !has_sp);
+                                            show_blend_mode_popup_menu(hwnd, pt.x, pt.y, false);
                                             return 0;
                                         }
                                     }

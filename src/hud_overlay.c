@@ -473,33 +473,18 @@ static void add_blend_custom_menu_item(HMENU hmenu, UINT flags, UINT_PTR id_or_s
 }
 
 void show_blend_mode_popup_menu(HWND hwnd, int screen_x, int screen_y, bool is_cutout) {
+    if (is_cutout) return; /* Blend modes are strictly supported on <Sprite>, never on <Cutout> */
     int sel_sp = get_active_selected_sprite_idx();
-    int sel_co = get_active_selected_cutout_idx();
     bool has_sp = (g_mode_overlay && ((sel_sp >= 0 && sel_sp < g_sprite_count) || g_placing_sprite));
-    bool has_co = (g_mode_overlay && ((sel_co >= 0 && sel_co < g_cutout_count) || g_placing_cutout));
-    if (!has_sp && !has_co) return;
+    if (!has_sp) return;
 
-    int cur_blend = 0;
-    if (g_placing_sprite) {
-        cur_blend = g_pending_sprite_blend_mode;
-    } else if (g_placing_cutout) {
-        cur_blend = g_pending_cutout_blend_mode;
-    } else if (has_sp) {
-        cur_blend = g_sprites[sel_sp].blend_mode;
-    } else if (has_co) {
-        cur_blend = g_cutouts[sel_co].blend_mode;
-    }
+    int cur_blend = g_placing_sprite ? g_pending_sprite_blend_mode : g_sprites[sel_sp].blend_mode;
     if (cur_blend < 0 || cur_blend >= BLEND_MODE_COUNT) cur_blend = 0;
 
     HMENU hMenu = CreatePopupMenu();
     if (!hMenu) return;
 
     s_blend_visual_count = 0;
-
-    if (is_cutout) {
-        add_blend_custom_menu_item(hMenu, MF_DISABLED | MF_GRAYED, 0, "[!] Kurang cocok (disarankan Sprite)", false);
-        add_blend_custom_menu_item(hMenu, MF_SEPARATOR, 0, NULL, false);
-    }
 
     HMENU hSubNormal   = CreatePopupMenu();
     HMENU hSubDarken   = CreatePopupMenu();
@@ -558,14 +543,9 @@ void show_blend_mode_popup_menu(HWND hwnd, int screen_x, int screen_y, bool is_c
         undo_ensure_baseline();
         if (g_placing_sprite) {
             g_pending_sprite_blend_mode = new_mode;
-        } else if (g_placing_cutout) {
-            g_pending_cutout_blend_mode = new_mode;
         } else if (has_sp) {
             g_sprites[sel_sp].blend_mode = new_mode;
             undo_snapshot_capture("Change Sprite Blend Mode");
-        } else if (has_co) {
-            g_cutouts[sel_co].blend_mode = new_mode;
-            undo_snapshot_capture("Change Cutout Blend Mode");
         }
         InvalidateRect(hwnd, NULL, FALSE);
         update_status_bar();
@@ -1399,54 +1379,39 @@ void render_overlay_hud(HDC mem_dc, int client_w, int work_h, const ThemeColors 
                 }
             }
 
-            /* Row 4: Blend Mode Label & Dropdown Button (Appears below Set Variable when Cutout/Sprite is selected) */
-            int cur_blend = 0;
-            if (g_placing_sprite) {
-                cur_blend = g_pending_sprite_blend_mode;
-            } else if (g_placing_cutout) {
-                cur_blend = g_pending_cutout_blend_mode;
-            } else if (has_sel_sp) {
-                cur_blend = g_sprites[sel_sp_idx].blend_mode;
-            } else if (has_sel_co) {
-                cur_blend = g_cutouts[sel_co_idx].blend_mode;
-            }
-            if (cur_blend < 0 || cur_blend >= BLEND_MODE_COUNT) cur_blend = 0;
-            const char *b_name = get_zuma_blend_mode_name(cur_blend);
+            /* Row 4: Blend Mode Label & Dropdown Button (Exclusive to <Sprite> in ZuCompleluxe) */
+            if (has_sel_sp || g_placing_sprite) {
+                int cur_blend = g_placing_sprite ? g_pending_sprite_blend_mode : g_sprites[sel_sp_idx].blend_mode;
+                if (cur_blend < 0 || cur_blend >= BLEND_MODE_COUNT) cur_blend = 0;
+                const char *b_name = get_zuma_blend_mode_name(cur_blend);
 
-            RECT rc_blend_lbl = { 8, 102 + sy, 54, 124 + sy };
-            SelectObject(dc_tr, g_font_primary_regular);
-            SetTextColor(dc_tr, th->text_secondary);
-            DrawTextA(dc_tr, "Blend:", -1, &rc_blend_lbl, DT_SINGLELINE | DT_VCENTER | DT_LEFT);
-
-            RECT rc_blend_btn = { 58, 102 + sy, 228, 124 + sy };
-            COLORREF bg_btn_blend = is_dark ? RGB(36, 42, 56) : RGB(220, 226, 236);
-            HBRUSH br_btn_blend = CreateSolidBrush(bg_btn_blend);
-            FillRect(dc_tr, &rc_blend_btn, br_btn_blend);
-            DeleteObject(br_btn_blend);
-
-            COLORREF border_btn_blend = is_dark ? RGB(60, 70, 90) : RGB(170, 180, 200);
-            HBRUSH br_bdr_blend = CreateSolidBrush(border_btn_blend);
-            FrameRect(dc_tr, &rc_blend_btn, br_bdr_blend);
-            DeleteObject(br_bdr_blend);
-
-            RECT rc_b_txt = { rc_blend_btn.left + 6, rc_blend_btn.top, rc_blend_btn.right - 18, rc_blend_btn.bottom };
-            SelectObject(dc_tr, g_font_primary_bold);
-            SetTextColor(dc_tr, th->text_accent_blue);
-            char b_txt[64];
-            snprintf(b_txt, sizeof(b_txt), "%02d: %s", cur_blend, b_name);
-            DrawTextA(dc_tr, b_txt, -1, &rc_b_txt, DT_SINGLELINE | DT_VCENTER | DT_LEFT | DT_END_ELLIPSIS);
-
-            RECT rc_b_arr = { rc_blend_btn.right - 18, rc_blend_btn.top, rc_blend_btn.right - 4, rc_blend_btn.bottom };
-            SelectObject(dc_tr, g_font_primary_regular);
-            SetTextColor(dc_tr, th->text_secondary);
-            DrawTextA(dc_tr, "v", -1, &rc_b_arr, DT_SINGLELINE | DT_VCENTER | DT_CENTER);
-
-            if (has_sel_co) {
-                /* Row 5: Warning badge for Cutout (Blend mode is not recommended for Cutout, Sprite is advised) */
-                RECT rc_warn = { 8, 128 + sy, 228, 146 + sy };
+                RECT rc_blend_lbl = { 8, 102 + sy, 54, 124 + sy };
                 SelectObject(dc_tr, g_font_primary_regular);
-                SetTextColor(dc_tr, is_dark ? RGB(255, 175, 50) : RGB(210, 110, 0));
-                DrawTextA(dc_tr, "[!] Kurang cocok (disarankan Sprite)", -1, &rc_warn, DT_SINGLELINE | DT_VCENTER | DT_LEFT);
+                SetTextColor(dc_tr, th->text_secondary);
+                DrawTextA(dc_tr, "Blend:", -1, &rc_blend_lbl, DT_SINGLELINE | DT_VCENTER | DT_LEFT);
+
+                RECT rc_blend_btn = { 58, 102 + sy, 228, 124 + sy };
+                COLORREF bg_btn_blend = is_dark ? RGB(36, 42, 56) : RGB(220, 226, 236);
+                HBRUSH br_btn_blend = CreateSolidBrush(bg_btn_blend);
+                FillRect(dc_tr, &rc_blend_btn, br_btn_blend);
+                DeleteObject(br_btn_blend);
+
+                COLORREF border_btn_blend = is_dark ? RGB(60, 70, 90) : RGB(170, 180, 200);
+                HBRUSH br_bdr_blend = CreateSolidBrush(border_btn_blend);
+                FrameRect(dc_tr, &rc_blend_btn, br_bdr_blend);
+                DeleteObject(br_bdr_blend);
+
+                RECT rc_b_txt = { rc_blend_btn.left + 6, rc_blend_btn.top, rc_blend_btn.right - 18, rc_blend_btn.bottom };
+                SelectObject(dc_tr, g_font_primary_bold);
+                SetTextColor(dc_tr, th->text_accent_blue);
+                char b_txt[64];
+                snprintf(b_txt, sizeof(b_txt), "%02d: %s", cur_blend, b_name);
+                DrawTextA(dc_tr, b_txt, -1, &rc_b_txt, DT_SINGLELINE | DT_VCENTER | DT_LEFT | DT_END_ELLIPSIS);
+
+                RECT rc_b_arr = { rc_blend_btn.right - 18, rc_blend_btn.top, rc_blend_btn.right - 4, rc_blend_btn.bottom };
+                SelectObject(dc_tr, g_font_primary_regular);
+                SetTextColor(dc_tr, th->text_secondary);
+                DrawTextA(dc_tr, "v", -1, &rc_b_arr, DT_SINGLELINE | DT_VCENTER | DT_CENTER);
             }
         } else if (has_sel_ba) {
             if (g_edit_prio && IsWindowVisible(g_edit_prio)) {
