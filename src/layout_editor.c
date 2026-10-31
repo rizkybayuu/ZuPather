@@ -1,4 +1,5 @@
 #include "layout_editor.h"
+#include "bezier_path.h"
 #include "zupather_state.h"
 #include "dialog_modals.h"
 #include "image_loader.h"
@@ -402,6 +403,7 @@ static const SpriteMetadata g_sprite_metadata_table[] = {
     { "baBallCream", 1, 50, 0 },
     { "pitcover", 1, 12, 0 },
     { "coin", 1, 30, 0 },
+    { "explosion", 1, 17, 0 },
     { "advmainmenubutton", 3, 1, 0 },
     { "advplaybutton", 3, 1, 0 },
     { "gauntbackbutton", 3, 1, 0 },
@@ -1234,8 +1236,8 @@ static void assign_element_default_bounds(LayoutElement *el) {
             if (!(el->flags & ATTR_HAS_Y)) { el->y = 247; el->flags |= ATTR_HAS_Y; }
         } else if (_stricmp(el->tag, "Sun1") == 0 || _stricmp(el->tag, "Sun2") == 0) {
             el->def_w = 120; el->def_h = 120;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 47; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 25; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = -63; el->flags |= ATTR_HAS_X; }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = -69; el->flags |= ATTR_HAS_Y; }
         } else if (_stricmp(el->tag, "Hat") == 0) {
             el->def_w = 112; el->def_h = 50;
             if (!(el->flags & ATTR_HAS_X)) { el->x = 188; el->flags |= ATTR_HAS_X; }
@@ -2609,14 +2611,6 @@ static void update_all_elements_canvas_rects(LayoutEditorState *st, int cv_w, in
                 }
             } else {
                 /* Mode A: Menu 4:3 with outscreen pillars */
-                if (scr == 1 && (_stricmp(el->tag, "Sun1") == 0 || _stricmp(el->tag, "Sun2") == 0)) {
-                    /* Zuma.exe 0x00431e50: Sun is child of Welcome banner widget at (110, 94).
-                       Relative coord (-63, -69) -> local (47, 25) sitting on the warrior's staff */
-                    if (in_x < 0 || in_y < 0) {
-                        in_x = 47;
-                        in_y = 25;
-                    }
-                }
                 if (scr == 8) {
                     /* HelpScreen child widget offsets */
                     if (_stricmp(el->tag, "TopText1") == 0 || _stricmp(el->tag, "BallTarget") == 0) {
@@ -3353,7 +3347,7 @@ static void ensure_popcap_fonts(void) {
     popcap_font_load(&g_popcap_cancun_14, "CancunFloat14", "fonts\\CancunFloat14", "_CancunFloat14", NULL);
     popcap_font_load(&g_popcap_cancun_12, "Cancun12", NULL, "_Cancun12", NULL);
     popcap_font_load(&g_popcap_cancun_13, "Cancun13", NULL, "_Cancun13", NULL);
-    popcap_font_load(&g_popcap_cancun_10, "Cancun10", NULL, "_Cancun10", NULL);
+    popcap_font_load(&g_popcap_cancun_10, "Cancun10", NULL, "_Cancun10", "_CancunOUTLINE10");
     popcap_font_load(&g_popcap_cancun_outline_10, "Cancun10", NULL, "_CancunOUTLINE10", NULL);
     popcap_font_load(&g_popcap_arial_12, "Arial12Bold", NULL, "_Arial12Bold", NULL);
 }
@@ -3424,17 +3418,14 @@ static void popcap_font_draw_line(
             continue;
         }
 
-        /* 1. Soft 1-pixel drop shadow for tinted fonts (PopCap engine standard) */
-        if (tint_dc && color != RGB(0, 0, 0)) {
-            HDC shadow_dc = popcap_font_get_tinted_dc(font, RGB(0, 0, 0));
-            if (shadow_dc && def->src_w > 0 && def->src_h > 0) {
-                int sx = cur_x + (int)roundf((float)def->off_x * vscale) + 1;
-                int sy = pen_y + (int)roundf((float)def->off_y * vscale) + 1;
-                int sw = (int)roundf((float)def->src_w * vscale);
-                int sh = (int)roundf((float)def->src_h * vscale);
-                AlphaBlend(mem_dc, sx, sy, sw, sh,
-                           shadow_dc, def->src_x, def->src_y, def->src_w, def->src_h, bf);
-            }
+        /* 1. Real PopCap Outline rendering via font->outline_dib (_CancunOUTLINE10.gif) */
+        if (font->outline_dib.hdc_mem && def->src_w > 0 && def->src_h > 0) {
+            int ox = cur_x + (int)roundf((float)def->off_x * vscale);
+            int oy = pen_y + (int)roundf((float)def->off_y * vscale);
+            int ow = (int)roundf((float)def->src_w * vscale);
+            int oh = (int)roundf((float)def->src_h * vscale);
+            AlphaBlend(mem_dc, ox, oy, ow, oh,
+                       font->outline_dib.hdc_mem, def->src_x, def->src_y, def->src_w, def->src_h, bf);
         }
 
         /* 2. Draw Glyph */
@@ -4213,7 +4204,7 @@ static void layout_canvas_paint(LayoutEditorState *st, HWND hwnd) {
         /* Twilight sky at top */
         LayoutSprite *sp_sky = layout_get_cached_sprite("mmsky", 1);
         if (sp_sky && sp_sky->loaded && sp_sky->img.hbm) {
-            float sky_s = (sp_sky->from_customres ? 1.0f : zscale) * vscale;
+            float sky_s = vscale;
             int sky_w = rw;
             int sky_h = (int)roundf((float)sp_sky->img.height * sky_s);
             StretchBlt(mem_dc, cx, cy, sky_w, sky_h,
@@ -4259,7 +4250,7 @@ static void layout_canvas_paint(LayoutEditorState *st, HWND hwnd) {
         /* Tiled advsky across top down to top of pyramid (y = 180 * zscale) so ZERO black gap */
         LayoutSprite *sp_sky = layout_get_cached_sprite("advsky", 1);
         if (sp_sky && sp_sky->loaded && sp_sky->img.hbm) {
-            float sky_s = (sp_sky->from_customres ? 1.0f : zscale) * vscale;
+            float sky_s = vscale;
             int sky_w = (int)roundf((float)sp_sky->img.width * sky_s);
             int sky_h = (int)roundf(180.0f * zscale * vscale);
             if (sky_w > 0 && sky_h > 0) {
@@ -4273,7 +4264,7 @@ static void layout_canvas_paint(LayoutEditorState *st, HWND hwnd) {
         /* Waterfall background (advback.jpg) - BEHIND all temples */
         LayoutSprite *sp_back = layout_get_cached_sprite("advback", 1);
         if (sp_back && sp_back->loaded && sp_back->img.hbm) {
-            float ab_s = (sp_back->from_customres ? 1.0f : zscale) * vscale;
+            float ab_s = vscale;
             int ab_h = (int)roundf((float)sp_back->img.height * ab_s);
             int ab_y = cy + rh - ab_h;
             BLENDFUNCTION bf = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
@@ -4283,7 +4274,7 @@ static void layout_canvas_paint(LayoutEditorState *st, HWND hwnd) {
         /* advtitle header at top-left */
         LayoutSprite *sp_title = layout_get_cached_sprite("advtitle", 1);
         if (sp_title && sp_title->loaded && sp_title->img.hbm) {
-            float tw_s = (sp_title->from_customres ? 1.0f : zscale) * vscale;
+            float tw_s = vscale;
             int tw_px = (int)roundf((float)sp_title->img.width * tw_s);
             int th_px = (int)roundf((float)sp_title->img.height * tw_s);
             BLENDFUNCTION bf = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
@@ -4303,7 +4294,7 @@ static void layout_canvas_paint(LayoutEditorState *st, HWND hwnd) {
         /* Top sky band */
         LayoutSprite *sp_gsky = layout_get_cached_sprite("gauntsky", 1);
         if (sp_gsky && sp_gsky->loaded && sp_gsky->img.hbm) {
-            float gsky_s = (sp_gsky->from_customres ? 1.0f : zscale) * vscale;
+            float gsky_s = vscale;
             int gsky_w = (int)roundf((float)sp_gsky->img.width * gsky_s);
             int gsky_h = (int)roundf((float)sp_gsky->img.height * gsky_s);
             if (gsky_w > 0 && gsky_h > 0) {
@@ -4349,7 +4340,7 @@ static void layout_canvas_paint(LayoutEditorState *st, HWND hwnd) {
         /* gaunttitle.gif at top-left */
         LayoutSprite *sp_gt = layout_get_cached_sprite("gaunttitle", 1);
         if (sp_gt && sp_gt->loaded && sp_gt->img.hbm) {
-            float gt_s = (sp_gt->from_customres ? 1.0f : zscale) * vscale;
+            float gt_s = vscale;
             int gtx = cx + (int)roundf(14.0f * zscale * vscale);
             int gty = cy + (int)roundf(14.0f * zscale * vscale);
             int gtw = (int)roundf((float)sp_gt->img.width * gt_s);
@@ -4370,19 +4361,7 @@ static void layout_canvas_paint(LayoutEditorState *st, HWND hwnd) {
             }
         }
 
-        /* Statue holding Gem */
-        LayoutSprite *sp_gem = layout_get_cached_sprite("gauntsungem", 1);
-        if (!sp_gem || !sp_gem->loaded) sp_gem = layout_get_cached_sprite("gaunteaglegem", 1);
-        if (sp_gem && sp_gem->loaded && sp_gem->img.hbm) {
-            float gem_s = (sp_gem->from_customres ? 1.0f : zscale) * vscale;
-            int gw = (int)roundf((float)sp_gem->img.width * gem_s);
-            int gh = (int)roundf((float)sp_gem->img.height * gem_s);
-            int gx = cx + (int)roundf(498.0f * zscale * vscale);
-            int gy = cy + (int)roundf(126.0f * zscale * vscale);
-            BLENDFUNCTION bf = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
-            AlphaBlend(mem_dc, gx, gy, gw, gh,
-                       sp_gem->img.hdc_mem, 0, 0, sp_gem->img.width, sp_gem->img.height, bf);
-        }
+        /* Difficulty Gem is rendered dynamically in Step 3 from st->elements */
 
         /* Dark name bar with "UNLOCKED IN ADVENTURE MODE" */
         int bar_x = cx + (int)roundf(231.0f * zscale * vscale);
@@ -4507,7 +4486,7 @@ static void layout_canvas_paint(LayoutEditorState *st, HWND hwnd) {
         /* Screen 8: HelpScreen / Instructions Authentic Stone Tablet Dialog */
         LayoutSprite *sp_back = layout_get_cached_sprite("helpback", 1);
         if (sp_back && sp_back->loaded && sp_back->img.hbm) {
-            float hb_s = (sp_back->from_customres ? 1.0f : zscale) * vscale;
+            float hb_s = vscale;
             int hb_w = (int)roundf((float)sp_back->img.width * hb_s);
             int hb_h = (int)roundf((float)sp_back->img.height * hb_s);
             int hbx = cx + (rw - hb_w) / 2;
@@ -4681,7 +4660,7 @@ static void layout_canvas_paint(LayoutEditorState *st, HWND hwnd) {
         LayoutSprite *sp_back = layout_get_cached_sprite("helpback_dev", 1);
         if (!sp_back || !sp_back->loaded) sp_back = layout_get_cached_sprite("helpback", 1);
         if (sp_back && sp_back->loaded && sp_back->img.hbm) {
-            float hb_s = (sp_back->from_customres ? 1.0f : zscale) * vscale;
+            float hb_s = vscale;
             int hb_w = (int)roundf((float)sp_back->img.width * hb_s);
             int hb_h = (int)roundf((float)sp_back->img.height * hb_s);
             int hbx = cx + (rw - hb_w) / 2;
@@ -4906,7 +4885,7 @@ static void layout_canvas_paint(LayoutEditorState *st, HWND hwnd) {
             if (rows <= 1 && sp->rows > 1) rows = sp->rows;
         }
 
-        float effective_scale = (st->cur_screen_idx == 4 || st->cur_screen_idx == 5 || st->cur_screen_idx == 6) ? vscale : (zscale * vscale);
+        float effective_scale = vscale;
 
         if (el->flags & ATTR_IS_DOOR_PAIR) {
             render_layout_door_pair(mem_dc, el, sp, cols, rows, cell, is_selected, is_hovered, is_held, st->held_handle, font_bold, font_ui, is_dark);
