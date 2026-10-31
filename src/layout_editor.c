@@ -173,6 +173,8 @@ typedef struct {
     int element_count;
     int cur_screen_idx;
     int cur_sub_filter_idx;
+    int hud_space_w;
+    int hud_space_h;
 
     /* Active Display Resolution (Strictly locked to Zuma.exe) */
     int target_w;
@@ -420,7 +422,9 @@ static const SpriteMetadata g_sprite_metadata_table[] = {
     { "mmoptionsbutton", 3, 1, 0 },
     { "mmmoregamesbutton", 3, 1, 0 },
     { "mmquitbutton", 3, 1, 0 },
-    { "menubutton", 3, 1, 0 }
+    { "menubutton", 3, 1, 0 },
+    { "gauge", 1, 3, 0 },
+    { "toadlives", 1, 1, 0 }
 };
 
 /* Retrieve asset file path prioritizing imagescustomres\ first, then images\ and levels\ */
@@ -935,6 +939,8 @@ static const char* get_element_sprite_name(const LayoutElement *el, int *out_col
     /* 5. In-Game HUD */
     if (_stricmp(el->section, "InGameHUD") == 0) {
         if (_stricmp(el->tag, "Menubar") == 0) return "menubar";
+        if (_stricmp(el->tag, "MenuBtn") == 0) { if (out_cols) *out_cols = 3; return "menubutton"; }
+        if (_stricmp(el->tag, "ProgressBar") == 0) { if (out_rows) *out_rows = 3; return "gauge"; }
     }
 
     /* 6. Stage Complete Cutscene */
@@ -1436,14 +1442,37 @@ static void assign_element_default_bounds(LayoutElement *el) {
         } else if (_stricmp(el->tag, "LivesBanner") == 0) {
             el->hotspot = HOTSPOT_CENTER_BOTH;
             el->def_w = 260; el->def_h = 40;
+            if (!(el->flags & ATTR_HAS_CENTER_X)) { el->centerX = 600; el->flags |= ATTR_HAS_CENTER_X; }
+            if (!(el->flags & ATTR_HAS_CENTER_Y)) { el->centerY = 337; el->flags |= ATTR_HAS_CENTER_Y; }
             if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "center", sizeof(el->align)-1); el->flags |= ATTR_HAS_ALIGN; }
         } else if (_stricmp(el->tag, "Menubar") == 0) {
-            el->def_w = 640; el->def_h = 42;
+            el->def_w = 1200; el->def_h = 42;
             if (!(el->flags & ATTR_HAS_X)) { el->x = 0; el->flags |= ATTR_HAS_X; }
             if (!(el->flags & ATTR_HAS_Y)) { el->y = 0; el->flags |= ATTR_HAS_Y; }
             if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "top-center", sizeof(el->align)-1); el->flags |= ATTR_HAS_ALIGN; }
+        } else if (_stricmp(el->tag, "MenuBtn") == 0) {
+            el->def_w = 67; el->def_h = 27;
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 1100; el->flags |= ATTR_HAS_X; }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 4; el->flags |= ATTR_HAS_Y; }
+        } else if (_stricmp(el->tag, "ProgressBar") == 0) {
+            el->def_w = 178; el->def_h = 24;
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 879; el->flags |= ATTR_HAS_X; }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 2; el->flags |= ATTR_HAS_Y; }
+        } else if (_stricmp(el->tag, "StageName") == 0) {
+            el->hotspot = HOTSPOT_CENTER_X;
+            el->def_w = 110; el->def_h = 28;
+            if (!(el->flags & ATTR_HAS_CENTER_X)) { el->centerX = 290; el->flags |= ATTR_HAS_CENTER_X; }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 8; el->flags |= ATTR_HAS_Y; }
+        } else if (_stricmp(el->tag, "ScoreText") == 0) {
+            el->def_w = 110; el->def_h = 28;
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 640; el->flags |= ATTR_HAS_X; }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 8; el->flags |= ATTR_HAS_Y; }
+        } else if (_stricmp(el->tag, "LivesPos") == 0) {
+            el->def_w = 50; el->def_h = 23;
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 28; el->flags |= ATTR_HAS_X; }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 6; el->flags |= ATTR_HAS_Y; }
         } else if (_stricmp(el->tag, "MenubarMargins") == 0) {
-            el->def_w = 640; el->def_h = 480;
+            el->def_w = 1200; el->def_h = 675;
         } else { el->def_w = 120; el->def_h = 36; }
     }
 
@@ -1743,7 +1772,12 @@ static bool is_element_in_sub_filter(const LayoutElement *el, int screen_idx, in
 
     /* Screen 4: In-Game HUD */
     if (screen_idx == 4) {
-        if (sub_idx == 1) return (_stricmp(el->tag, "Menubar") == 0);
+        if (sub_idx == 1) return (_stricmp(el->tag, "Menubar") == 0 ||
+                                  _stricmp(el->tag, "MenuBtn") == 0 ||
+                                  _stricmp(el->tag, "ProgressBar") == 0 ||
+                                  _stricmp(el->tag, "StageName") == 0 ||
+                                  _stricmp(el->tag, "ScoreText") == 0 ||
+                                  _stricmp(el->tag, "LivesPos") == 0);
         if (sub_idx == 2) return (_stricmp(el->tag, "MenubarMargins") == 0);
         if (sub_idx == 3) return (strstr(el->tag, "Banner") != NULL);
     }
@@ -1871,6 +1905,8 @@ static bool layout_xml_load(LayoutEditorState *st, const char *filepath) {
     if (!fp) return false;
 
     st->element_count = 0;
+    st->hud_space_w = 0;
+    st->hud_space_h = 0;
     char line[1024];
     char cur_section[48] = {0};
 
@@ -1897,10 +1933,22 @@ static bool layout_xml_load(LayoutEditorState *st, const char *filepath) {
 
             if (_stricmp(tag_name, "Layout") == 0) continue;
 
-            /* If line ends with '>' and has no attributes, it's a section header */
+            /* Check if InGameHUD section header has space attribute, e.g. <InGameHUD space="1200x675"> */
+            int is_hud_open = 0;
+            if (_stricmp(tag_name, "InGameHUD") == 0 && !strstr(p, "/>")) {
+                is_hud_open = 1;
+                const char *sp = strstr(p, "space=\"");
+                int sw = 0, sh = 0;
+                if (sp && sscanf(sp + 7, "%dx%d", &sw, &sh) == 2) {
+                    st->hud_space_w = sw;
+                    st->hud_space_h = sh;
+                }
+            }
+
+            /* If line ends with '>' and has no attributes (or is InGameHUD section header), it's a section header */
             char *slash = strchr(p, '/');
             char *quote = strchr(p, '\"');
-            if (!slash && !quote) {
+            if ((!slash && !quote) || is_hud_open) {
                 strncpy(cur_section, tag_name, sizeof(cur_section) - 1);
                 cur_section[sizeof(cur_section) - 1] = '\0';
                 continue;
@@ -1925,6 +1973,7 @@ static bool layout_xml_load(LayoutEditorState *st, const char *filepath) {
 
             /* Extract standard coordinates */
             if (extract_xml_attr_int(p, "x", &el->x)) el->flags |= ATTR_HAS_X;
+            if (extract_xml_attr_int(p, "rightX", &el->x)) { el->flags |= ATTR_HAS_X; el->flags |= ATTR_HAS_SCORE_RX; }
             if (extract_xml_attr_int(p, "y", &el->y)) el->flags |= ATTR_HAS_Y;
             if (extract_xml_attr_int(p, "w", &el->w)) el->flags |= ATTR_HAS_W;
             if (extract_xml_attr_int(p, "h", &el->h)) el->flags |= ATTR_HAS_H;
@@ -2031,7 +2080,35 @@ static bool layout_xml_save(LayoutEditorState *st, const char *filepath) {
         }
         if (!has_sec) continue;
 
-        fprintf(fp, "    <%s>\n", sec_name);
+        if (_stricmp(sec_name, "InGameHUD") == 0) {
+            int sw = st->hud_space_w > 0 ? st->hud_space_w : 1200;
+            int sh = st->hud_space_h > 0 ? st->hud_space_h : 675;
+            fprintf(fp, "    <InGameHUD space=\"%dx%d\">\n", sw, sh);
+        } else {
+            fprintf(fp, "    <%s>\n", sec_name);
+        }
+
+        /* Dual-write sync for InGameHUD: ensure Menubar bundled attributes mirror granular widgets */
+        if (_stricmp(sec_name, "InGameHUD") == 0) {
+            LayoutElement *mb = NULL;
+            LayoutElement *mbtn = NULL, *pbar = NULL, *stg = NULL, *scr = NULL, *lp = NULL;
+            for (int i = 0; i < st->element_count; ++i) {
+                if (_stricmp(st->elements[i].section, "InGameHUD") != 0) continue;
+                if (_stricmp(st->elements[i].tag, "Menubar") == 0) mb = &st->elements[i];
+                else if (_stricmp(st->elements[i].tag, "MenuBtn") == 0) mbtn = &st->elements[i];
+                else if (_stricmp(st->elements[i].tag, "ProgressBar") == 0) pbar = &st->elements[i];
+                else if (_stricmp(st->elements[i].tag, "StageName") == 0) stg = &st->elements[i];
+                else if (_stricmp(st->elements[i].tag, "ScoreText") == 0) scr = &st->elements[i];
+                else if (_stricmp(st->elements[i].tag, "LivesPos") == 0) lp = &st->elements[i];
+            }
+            if (mb) {
+                if (mbtn) { mb->menuX = mbtn->x; mb->flags |= ATTR_HAS_MENU_X; }
+                if (pbar) { mb->zumaX = pbar->x; mb->flags |= ATTR_HAS_ZUMA_X; }
+                if (scr)  { mb->scoreRX = scr->x; mb->flags |= ATTR_HAS_SCORE_RX; }
+                if (stg)  { mb->stageCX = stg->centerX; mb->flags |= ATTR_HAS_STAGE_CX; }
+                if (lp)   { mb->livesX = lp->x; mb->flags |= ATTR_HAS_LIVES_X; }
+            }
+        }
 
         for (int i = 0; i < st->element_count; ++i) {
             LayoutElement *el = &st->elements[i];
@@ -2041,45 +2118,55 @@ static bool layout_xml_save(LayoutEditorState *st, const char *filepath) {
 
             if (el->flags & ATTR_HAS_ID) fprintf(fp, " id=\"%s\"", el->id);
 
-            /* Door pair priority */
-            if (el->flags & ATTR_IS_DOOR_PAIR) {
-                fprintf(fp, " doorX=\"%d\" doorY=\"%d\" frogX=\"%d\" frogY=\"%d\"",
-                        el->doorX, el->doorY, el->frogX, el->frogY);
-            } else {
-                if (el->flags & ATTR_HAS_X) fprintf(fp, " x=\"%d\"", el->x);
+            if (_stricmp(el->tag, "ScoreText") == 0) {
+                fprintf(fp, " rightX=\"%d\"", el->x);
                 if (el->flags & ATTR_HAS_Y) fprintf(fp, " y=\"%d\"", el->y);
+                fprintf(fp, " font=\"Cancun12\" color=\"#FFF000\"");
+            } else if (_stricmp(el->tag, "StageName") == 0) {
+                if (el->flags & ATTR_HAS_CENTER_X) fprintf(fp, " centerX=\"%d\"", el->centerX);
+                if (el->flags & ATTR_HAS_Y) fprintf(fp, " y=\"%d\"", el->y);
+                fprintf(fp, " font=\"Cancun12\" color=\"#FFF000\"");
+            } else {
+                /* Door pair priority */
+                if (el->flags & ATTR_IS_DOOR_PAIR) {
+                    fprintf(fp, " doorX=\"%d\" doorY=\"%d\" frogX=\"%d\" frogY=\"%d\"",
+                            el->doorX, el->doorY, el->frogX, el->frogY);
+                } else {
+                    if (el->flags & ATTR_HAS_X) fprintf(fp, " x=\"%d\"", el->x);
+                    if (el->flags & ATTR_HAS_Y) fprintf(fp, " y=\"%d\"", el->y);
+                }
+
+                if (el->flags & ATTR_HAS_W) fprintf(fp, " w=\"%d\"", el->w);
+                if (el->flags & ATTR_HAS_H) fprintf(fp, " h=\"%d\"", el->h);
+                if (el->flags & ATTR_HAS_CENTER_X) fprintf(fp, " centerX=\"%d\"", el->centerX);
+                if (el->flags & ATTR_HAS_CENTER_Y) fprintf(fp, " centerY=\"%d\"", el->centerY);
+                if (el->flags & ATTR_HAS_OFFSET_X) fprintf(fp, " offsetX=\"%d\"", el->offsetX);
+                if (el->flags & ATTR_HAS_OFFSET_Y) fprintf(fp, " offsetY=\"%d\"", el->offsetY);
+                if (el->flags & ATTR_HAS_MIN_TOP) fprintf(fp, " minTop=\"%d\"", el->minTop);
+                if (el->flags & ATTR_HAS_SPACING) fprintf(fp, " spacing=\"%d\"", el->spacing);
+
+                /* Menubar */
+                if (el->flags & ATTR_HAS_LIVES_X) fprintf(fp, " livesX=\"%d\"", el->livesX);
+                if (el->flags & ATTR_HAS_STAGE_CX) fprintf(fp, " stageCX=\"%d\"", el->stageCX);
+                if (el->flags & ATTR_HAS_SCORE_RX) fprintf(fp, " scoreRX=\"%d\"", el->scoreRX);
+                if (el->flags & ATTR_HAS_ZUMA_X) fprintf(fp, " zumaX=\"%d\"", el->zumaX);
+                if (el->flags & ATTR_HAS_MENU_X) fprintf(fp, " menuX=\"%d\"", el->menuX);
+
+                /* Margins */
+                if (el->flags & ATTR_HAS_TOP) fprintf(fp, " top=\"%d\"", el->top);
+                if (el->flags & ATTR_HAS_BOTTOM) fprintf(fp, " bottom=\"%d\"", el->bottom);
+                if (el->flags & ATTR_HAS_LEFT) fprintf(fp, " left=\"%d\"", el->left);
+                if (el->flags & ATTR_HAS_RIGHT) fprintf(fp, " right=\"%d\"", el->right);
+
+                /* Columns & Waypoints */
+                if (el->flags & ATTR_HAS_COL1_X) fprintf(fp, " col1X=\"%d\"", el->col1X);
+                if (el->flags & ATTR_HAS_COL2_X) fprintf(fp, " col2X=\"%d\"", el->col2X);
+                if (el->flags & ATTR_HAS_BX) fprintf(fp, " bx=\"%d\"", el->bx);
+                if (el->flags & ATTR_HAS_CX) fprintf(fp, " cx=\"%d\"", el->cx);
+                if (el->flags & ATTR_HAS_DX) fprintf(fp, " dx=\"%d\"", el->dx);
+
+                if (el->flags & ATTR_HAS_ALIGN && el->align[0]) fprintf(fp, " align=\"%s\"", el->align);
             }
-
-            if (el->flags & ATTR_HAS_W) fprintf(fp, " w=\"%d\"", el->w);
-            if (el->flags & ATTR_HAS_H) fprintf(fp, " h=\"%d\"", el->h);
-            if (el->flags & ATTR_HAS_CENTER_X) fprintf(fp, " centerX=\"%d\"", el->centerX);
-            if (el->flags & ATTR_HAS_CENTER_Y) fprintf(fp, " centerY=\"%d\"", el->centerY);
-            if (el->flags & ATTR_HAS_OFFSET_X) fprintf(fp, " offsetX=\"%d\"", el->offsetX);
-            if (el->flags & ATTR_HAS_OFFSET_Y) fprintf(fp, " offsetY=\"%d\"", el->offsetY);
-            if (el->flags & ATTR_HAS_MIN_TOP) fprintf(fp, " minTop=\"%d\"", el->minTop);
-            if (el->flags & ATTR_HAS_SPACING) fprintf(fp, " spacing=\"%d\"", el->spacing);
-
-            /* Menubar */
-            if (el->flags & ATTR_HAS_LIVES_X) fprintf(fp, " livesX=\"%d\"", el->livesX);
-            if (el->flags & ATTR_HAS_STAGE_CX) fprintf(fp, " stageCX=\"%d\"", el->stageCX);
-            if (el->flags & ATTR_HAS_SCORE_RX) fprintf(fp, " scoreRX=\"%d\"", el->scoreRX);
-            if (el->flags & ATTR_HAS_ZUMA_X) fprintf(fp, " zumaX=\"%d\"", el->zumaX);
-            if (el->flags & ATTR_HAS_MENU_X) fprintf(fp, " menuX=\"%d\"", el->menuX);
-
-            /* Margins */
-            if (el->flags & ATTR_HAS_TOP) fprintf(fp, " top=\"%d\"", el->top);
-            if (el->flags & ATTR_HAS_BOTTOM) fprintf(fp, " bottom=\"%d\"", el->bottom);
-            if (el->flags & ATTR_HAS_LEFT) fprintf(fp, " left=\"%d\"", el->left);
-            if (el->flags & ATTR_HAS_RIGHT) fprintf(fp, " right=\"%d\"", el->right);
-
-            /* Columns & Waypoints */
-            if (el->flags & ATTR_HAS_COL1_X) fprintf(fp, " col1X=\"%d\"", el->col1X);
-            if (el->flags & ATTR_HAS_COL2_X) fprintf(fp, " col2X=\"%d\"", el->col2X);
-            if (el->flags & ATTR_HAS_BX) fprintf(fp, " bx=\"%d\"", el->bx);
-            if (el->flags & ATTR_HAS_CX) fprintf(fp, " cx=\"%d\"", el->cx);
-            if (el->flags & ATTR_HAS_DX) fprintf(fp, " dx=\"%d\"", el->dx);
-
-            if (el->flags & ATTR_HAS_ALIGN && el->align[0]) fprintf(fp, " align=\"%s\"", el->align);
 
             fprintf(fp, " />\n");
         }
@@ -2277,6 +2364,9 @@ static void canonical_to_canvas(
         int dy = (st->target_h - 480) / 2;
         sx = (can_x == 320) ? ((float)st->target_w * 0.5f) : ((float)can_x * zscale);
         sy = (float)(can_y + dy);
+    } else if (scr == 4 && st && st->hud_space_w == st->target_w && st->hud_space_h == st->target_h) {
+        sx = (float)can_x;
+        sy = (float)can_y;
     } else {
         sx = (float)xo + (float)can_x * zscale;
         sy = (float)yo + (float)can_y * zscale;
@@ -2309,6 +2399,9 @@ static void canvas_to_canonical(
         int dy = (st->target_h - 480) / 2;
         can_x = (zscale > 0.0f) ? (sx / zscale) : sx;
         can_y = sy - (float)dy;
+    } else if (scr == 4 && st && st->hud_space_w == st->target_w && st->hud_space_h == st->target_h) {
+        can_x = sx;
+        can_y = sy;
     } else {
         can_x = (zscale > 0.0f) ? ((sx - (float)xo) / zscale) : (sx - (float)xo);
         can_y = (zscale > 0.0f) ? ((sy - (float)yo) / zscale) : (sy - (float)yo);
@@ -2600,11 +2693,18 @@ static void update_all_elements_canvas_rects(LayoutEditorState *st, int cv_w, in
                 target_y = delta_y + in_y;
             } else if (scr == 4) {
                 /* Mode B: InGameHUD */
+                bool hud_space_ok = (st->hud_space_w == st->target_w && st->hud_space_h == st->target_h);
                 if (_stricmp(el->tag, "LevelBanner") == 0 && (el->flags & ATTR_HAS_OFFSET_X)) {
                     int off_x = (el->flags & ATTR_HAS_OFFSET_X) ? el->offsetX : 40;
                     int off_y = (el->flags & ATTR_HAS_OFFSET_Y) ? el->offsetY : 40;
                     target_x = st->target_w - off_x - target_ew;
                     target_y = st->target_h - off_y - target_eh;
+                } else if (_stricmp(el->tag, "ScoreText") == 0) {
+                    target_x = hud_space_ok ? (in_x - target_ew) : ((int)roundf((float)in_x * zscale) - target_ew);
+                    target_y = hud_space_ok ? in_y : (int)roundf((float)in_y * zscale);
+                } else if (hud_space_ok) {
+                    target_x = in_x;
+                    target_y = in_y;
                 } else {
                     target_x = (int)roundf((float)in_x * zscale);
                     target_y = (int)roundf((float)in_y * zscale);
@@ -2842,6 +2942,9 @@ static void render_layout_sprite_element(
     /* Suppress duplicate blits for elements already composited in Step 2 */
     if (el->tag && (_stricmp(el->tag, "Menubar") == 0 ||
                     _stricmp(el->tag, "LivesBanner") == 0 ||
+                    _stricmp(el->tag, "LivesPos") == 0 ||
+                    _stricmp(el->tag, "StageName") == 0 ||
+                    _stricmp(el->tag, "ScoreText") == 0 ||
                     _stricmp(el->tag, "HelpBack") == 0 ||
                     _stricmp(el->tag, "DontShowCheckbox") == 0 ||
                     _stricmp(el->tag, "WhateverBtn") == 0 ||
@@ -4112,6 +4215,15 @@ static void draw_popcap_checkbox_tray(
 }
 
 /* Paint Canvas Viewport procedure */
+static LayoutElement* find_element_by_tag(LayoutEditorState *st, const char *section, const char *tag) {
+    if (!st || !tag) return NULL;
+    for (int i = 0; i < st->element_count; ++i) {
+        if (section && st->elements[i].section[0] && _stricmp(st->elements[i].section, section) != 0) continue;
+        if (_stricmp(st->elements[i].tag, tag) == 0) return &st->elements[i];
+    }
+    return NULL;
+}
+
 static void layout_canvas_paint(LayoutEditorState *st, HWND hwnd) {
     PAINTSTRUCT ps;
     HDC hdc = BeginPaint(hwnd, &ps);
@@ -4422,22 +4534,34 @@ static void layout_canvas_paint(LayoutEditorState *st, HWND hwnd) {
         }
 
         /* 2 Frog Lives Icons */
+        LayoutElement *el_lives = find_element_by_tag(st, "InGameHUD", "LivesPos");
+        float lx = el_lives ? (float)el_lives->x : 28.0f;
+        float ly = el_lives ? (float)el_lives->y : 6.0f;
+        float lsp = (el_lives && (el_lives->flags & ATTR_HAS_SPACING)) ? (float)el_lives->spacing : 26.0f;
         LayoutSprite *sp_ficon = layout_get_cached_sprite("toadlives", 1);
         if (!sp_ficon || !sp_ficon->loaded) sp_ficon = layout_get_cached_sprite("frogicon", 1);
         if (sp_ficon && sp_ficon->loaded && sp_ficon->img.hbm) {
             int fi_w = (int)roundf((float)sp_ficon->img.width * vscale);
             int fi_h = (int)roundf((float)sp_ficon->img.height * vscale);
             for (int l = 0; l < 2; ++l) {
-                AlphaBlend(mem_dc, tx + (int)roundf((28.0f + l * 26.0f) * vscale), ty + (int)roundf(6.0f * vscale),
+                AlphaBlend(mem_dc, tx + (int)roundf((lx + (float)l * lsp) * vscale), ty + (int)roundf(ly * vscale),
                            fi_w, fi_h, sp_ficon->img.hdc_mem, 0, 0, sp_ficon->img.width, sp_ficon->img.height, bf);
             }
         }
 
-        /* Stage text "RAB 1" & Score text "0" */
-        RECT rc_stg = { tx + (int)roundf(370.0f * vscale), ty + (int)roundf(8.0f * vscale),
-                        tx + (int)roundf(480.0f * vscale), ty + (int)roundf(36.0f * vscale) };
-        RECT rc_scr = { tx + (int)roundf(560.0f * vscale), ty + (int)roundf(8.0f * vscale),
-                        tx + (int)roundf(670.0f * vscale), ty + (int)roundf(36.0f * vscale) };
+        /* Stage text "RAB 1" & Score text "0" reading dynamically from layout elements */
+        LayoutElement *el_stg = find_element_by_tag(st, "InGameHUD", "StageName");
+        int stg_cx = el_stg ? el_stg->centerX : 290;
+        int stg_y = el_stg ? el_stg->y : 8;
+        RECT rc_stg = { tx + (int)roundf((float)(stg_cx - 55) * vscale), ty + (int)roundf((float)stg_y * vscale),
+                        tx + (int)roundf((float)(stg_cx + 55) * vscale), ty + (int)roundf((float)(stg_y + 28) * vscale) };
+
+        LayoutElement *el_scr = find_element_by_tag(st, "InGameHUD", "ScoreText");
+        int scr_rx = el_scr ? el_scr->x : 640;
+        int scr_y = el_scr ? el_scr->y : 8;
+        RECT rc_scr = { tx + (int)roundf((float)(scr_rx - 110) * vscale), ty + (int)roundf((float)scr_y * vscale),
+                        tx + (int)roundf((float)scr_rx * vscale), ty + (int)roundf((float)(scr_y + 28) * vscale) };
+
         if (g_popcap_cancun_12.loaded) {
             popcap_font_draw_text(mem_dc, &g_popcap_cancun_12, "RAB 1", &rc_stg, RGB(255, 240, 0), vscale, DT_CENTER);
         } else if (g_popcap_cancun_14.loaded) {
@@ -4449,23 +4573,7 @@ static void layout_canvas_paint(LayoutEditorState *st, HWND hwnd) {
             popcap_font_draw_text(mem_dc, &g_popcap_cancun_14, "0", &rc_scr, RGB(255, 240, 0), vscale, DT_RIGHT);
         }
 
-        /* Zuma Bar gauge */
-        LayoutSprite *sp_gauge = layout_get_cached_sprite("gauge", 1);
-        if (sp_gauge && sp_gauge->loaded && sp_gauge->img.hbm) {
-            int gw = (int)roundf((float)sp_gauge->img.width * vscale);
-            int gh = (int)roundf((float)(sp_gauge->img.height / sp_gauge->rows) * vscale);
-            AlphaBlend(mem_dc, tx + (int)roundf(885.0f * vscale), ty + (int)roundf(8.0f * vscale),
-                       gw, gh, sp_gauge->img.hdc_mem, 0, 0, sp_gauge->img.width, sp_gauge->img.height / sp_gauge->rows, bf);
-        }
-
-        /* Menubutton in top right */
-        LayoutSprite *sp_mbtn = layout_get_cached_sprite("menubutton", 3);
-        if (sp_mbtn && sp_mbtn->loaded && sp_mbtn->img.hbm) {
-            int bw = (int)roundf((float)(sp_mbtn->img.width / 3) * vscale);
-            int bh = (int)roundf((float)sp_mbtn->img.height * vscale);
-            AlphaBlend(mem_dc, tx + (int)roundf(1097.0f * vscale), ty + (int)roundf(4.0f * vscale),
-                       bw, bh, sp_mbtn->img.hdc_mem, 0, 0, sp_mbtn->img.width / 3, sp_mbtn->img.height, bf);
-        }
+        /* Note: Zuma Bar gauge and Menubutton are rendered dynamically in Step 3 via st->elements */
 
         /* Level intro banner at bottom right: RABBIT 1 / COMPLEX TALON */
         RECT rc_lb_title = { tx + tw - (int)roundf(380.0f * vscale), ty + th - (int)roundf(110.0f * vscale),
@@ -5081,7 +5189,11 @@ static void layout_editor_update_screen_elements_list(LayoutEditorState *st) {
             snprintf(item_txt, sizeof(item_txt), "Door %s (door: %d,%d | frog: %d,%d)",
                      el->id, el->doorX, el->doorY, el->frogX, el->frogY);
         } else if (el->flags & ATTR_HAS_CENTER_X) {
-            snprintf(item_txt, sizeof(item_txt), "%s (centerX: %d, %d)", el->tag, el->centerX, el->y);
+            if (el->flags & ATTR_HAS_CENTER_Y) {
+                snprintf(item_txt, sizeof(item_txt), "%s (center: %d, %d)", el->tag, el->centerX, el->centerY);
+            } else {
+                snprintf(item_txt, sizeof(item_txt), "%s (centerX: %d, %d)", el->tag, el->centerX, el->y);
+            }
         } else if (el->flags & ATTR_HAS_ID) {
             snprintf(item_txt, sizeof(item_txt), "%s [id=\"%s\"] (%d, %d)", el->tag, el->id, el->x, el->y);
         } else {
@@ -5190,7 +5302,8 @@ static LRESULT CALLBACK LayoutCanvasProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
                 int delta_canvas_x = mx - st->drag_start_mx;
                 int delta_canvas_y = my - st->drag_start_my;
 
-                float denom = vscale * zscale;
+                float denom = (st->cur_screen_idx == 4 && st->hud_space_w == st->target_w && st->hud_space_h == st->target_h)
+                              ? vscale : (vscale * zscale);
                 int delta_canon_x = (denom > 0.0001f) ? (int)roundf((float)delta_canvas_x / denom) : 0;
                 int delta_canon_y = (denom > 0.0001f) ? (int)roundf((float)delta_canvas_y / denom) : 0;
 
