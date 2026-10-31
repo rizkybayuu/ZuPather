@@ -176,6 +176,10 @@ typedef struct {
     int cur_sub_filter_idx;
     int hud_space_w;
     int hud_space_h;
+    int main_menu_space_w;
+    int main_menu_space_h;
+    int loading_space_w;
+    int loading_space_h;
     bool show_conditional_sprites;
     HWND hwnd_chk_conditional;
 
@@ -915,7 +919,7 @@ static const char* get_element_sprite_name(const LayoutElement *el, int *out_col
         if (_stricmp(el->tag, "QuitBtn") == 0)      { if (out_cols) *out_cols = 3; return "mmquitbutton"; }
         if (_stricmp(el->tag, "EyeIdle1") == 0)     return "mmeyeleft";
         if (_stricmp(el->tag, "EyeIdle2") == 0)     return "mmeyeright";
-        if (_stricmp(el->tag, "Sun") == 0 || _stricmp(el->tag, "Sun1") == 0 || _stricmp(el->tag, "Sun2") == 0) return "mmsun";
+        if (_stricmp(el->tag, "Sun") == 0 || _stricmp(el->tag, "Sun1") == 0 || _stricmp(el->tag, "Sun2") == 0) return "mmsunglow";
         if (_stricmp(el->tag, "Hat") == 0)          return "mmhat";
     }
 
@@ -1241,7 +1245,7 @@ static void assign_element_default_bounds(LayoutElement *el) {
             if (!(el->flags & ATTR_HAS_X)) { el->x = 191; el->flags |= ATTR_HAS_X; }
             if (!(el->flags & ATTR_HAS_Y)) { el->y = 331; el->flags |= ATTR_HAS_Y; }
         } else if (_stricmp(el->tag, "Sun") == 0 || _stricmp(el->tag, "Sun1") == 0 || _stricmp(el->tag, "Sun2") == 0) {
-            el->def_w = 120; el->def_h = 120;
+            el->def_w = 229; el->def_h = 227;
             if (!(el->flags & ATTR_HAS_X)) { el->x = -69; el->flags |= ATTR_HAS_X; }
             if (!(el->flags & ATTR_HAS_Y)) { el->y = -63; el->flags |= ATTR_HAS_Y; }
         } else if (_stricmp(el->tag, "Hat") == 0) {
@@ -1953,7 +1957,7 @@ static bool layout_xml_load(LayoutEditorState *st, const char *filepath) {
 
             if (_stricmp(tag_name, "Layout") == 0) continue;
 
-            /* Check if InGameHUD section header has space attribute, e.g. <InGameHUD space="1200x675"> */
+            /* Check section headers with space attribute, e.g. space="1200x675" */
             int is_hud_open = 0;
             if (_stricmp(tag_name, "InGameHUD") == 0 && !strstr(p, "/>")) {
                 is_hud_open = 1;
@@ -1962,6 +1966,20 @@ static bool layout_xml_load(LayoutEditorState *st, const char *filepath) {
                 if (sp && sscanf(sp + 7, "%dx%d", &sw, &sh) == 2) {
                     st->hud_space_w = sw;
                     st->hud_space_h = sh;
+                }
+            } else if (_stricmp(tag_name, "MainMenu") == 0 && !strstr(p, "/>")) {
+                const char *sp = strstr(p, "space=\"");
+                int sw = 0, sh = 0;
+                if (sp && sscanf(sp + 7, "%dx%d", &sw, &sh) == 2) {
+                    st->main_menu_space_w = sw;
+                    st->main_menu_space_h = sh;
+                }
+            } else if (_stricmp(tag_name, "LoadingScreen") == 0 && !strstr(p, "/>")) {
+                const char *sp = strstr(p, "space=\"");
+                int sw = 0, sh = 0;
+                if (sp && sscanf(sp + 7, "%dx%d", &sw, &sh) == 2) {
+                    st->loading_space_w = sw;
+                    st->loading_space_h = sh;
                 }
             }
 
@@ -1980,7 +1998,13 @@ static bool layout_xml_load(LayoutEditorState *st, const char *filepath) {
             LayoutElement *el = &st->elements[st->element_count];
             memset(el, 0, sizeof(LayoutElement));
             strncpy(el->section, cur_section[0] ? cur_section : "General", sizeof(el->section) - 1);
-            strncpy(el->tag, tag_name, sizeof(el->tag) - 1);
+            if (_stricmp(tag_name, "EyeBlink") == 0) {
+                strncpy(el->tag, "Hat", sizeof(el->tag) - 1);
+            } else if (_stricmp(tag_name, "Sun1") == 0 || _stricmp(tag_name, "Sun2") == 0) {
+                strncpy(el->tag, "Sun", sizeof(el->tag) - 1);
+            } else {
+                strncpy(el->tag, tag_name, sizeof(el->tag) - 1);
+            }
 
             /* Extract id */
             if (extract_xml_attr_str(p, "id", el->id, sizeof(el->id))) {
@@ -2105,6 +2129,10 @@ static bool layout_xml_save(LayoutEditorState *st, const char *filepath) {
             int sw = st->hud_space_w > 0 ? st->hud_space_w : 1200;
             int sh = st->hud_space_h > 0 ? st->hud_space_h : 675;
             fprintf(fp, "    <InGameHUD space=\"%dx%d\">\n", sw, sh);
+        } else if (_stricmp(sec_name, "MainMenu") == 0 && st->main_menu_space_w > 0) {
+            fprintf(fp, "    <MainMenu space=\"%dx%d\">\n", st->main_menu_space_w, st->main_menu_space_h);
+        } else if (_stricmp(sec_name, "LoadingScreen") == 0 && st->loading_space_w > 0) {
+            fprintf(fp, "    <LoadingScreen space=\"%dx%d\">\n", st->loading_space_w, st->loading_space_h);
         } else {
             fprintf(fp, "    <%s>\n", sec_name);
         }
@@ -2753,7 +2781,14 @@ static void update_all_elements_canvas_rects(LayoutEditorState *st, int cv_w, in
                         in_y -= 10; /* PopCap DrawString baseline 456 to top box 446 */
                     }
                 }
-                if (_stricmp(el->tag, "HighscoreScores") == 0) {
+                bool is_space_1to1 = false;
+                if (scr == 1 && st && st->main_menu_space_w == st->target_w && st->main_menu_space_h == st->target_h) is_space_1to1 = true;
+                if (scr == 0 && st && st->loading_space_w == st->target_w && st->loading_space_h == st->target_h) is_space_1to1 = true;
+
+                if (is_space_1to1) {
+                    target_x = in_x;
+                    target_y = in_y;
+                } else if (_stricmp(el->tag, "HighscoreScores") == 0) {
                     target_x = xo + (int)roundf((float)(in_x - el->def_w) * zscale);
                     target_y = yo + (int)roundf((float)in_y * zscale);
                 } else {
@@ -2990,13 +3025,26 @@ static void render_layout_sprite_element(
     }
 
     BLENDFUNCTION bf = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
-    BOOL ok = AlphaBlend(mem_dc, dst_x, dst_y, dst_w, dst_h,
-                         sp->img.hdc_mem, src_x, src_y, frame_w, frame_h, bf);
-    if (!ok) {
-        DWORD err = GetLastError();
-        char err_msg[64];
-        snprintf(err_msg, sizeof(err_msg), "BlendErr:%lu", err);
-        TextOutA(mem_dc, dst_x, dst_y, err_msg, (int)strlen(err_msg));
+    // Safe clipping for negative dst_x / dst_y coordinates (e.g. Sun glow at screen borders)
+    int blit_dx = dst_x, blit_dy = dst_y, blit_dw = dst_w, blit_dh = dst_h;
+    int blit_sx = src_x, blit_sy = src_y, blit_sw = frame_w, blit_sh = frame_h;
+    float sc_x = (float)frame_w / (float)(dst_w > 0 ? dst_w : 1);
+    float sc_y = (float)frame_h / (float)(dst_h > 0 ? dst_h : 1);
+    if (blit_dx < 0) {
+        int clip = -blit_dx;
+        int s_clip = (int)roundf((float)clip * sc_x);
+        blit_sx += s_clip; blit_sw -= s_clip;
+        blit_dw -= clip; blit_dx = 0;
+    }
+    if (blit_dy < 0) {
+        int clip = -blit_dy;
+        int s_clip = (int)roundf((float)clip * sc_y);
+        blit_sy += s_clip; blit_sh -= s_clip;
+        blit_dh -= clip; blit_dy = 0;
+    }
+    if (blit_dw > 0 && blit_dh > 0 && blit_sw > 0 && blit_sh > 0) {
+        AlphaBlend(mem_dc, blit_dx, blit_dy, blit_dw, blit_dh,
+                   sp->img.hdc_mem, blit_sx, blit_sy, blit_sw, blit_sh, bf);
     }
 
     if (is_selected || is_hovered || is_held) {
@@ -4352,6 +4400,17 @@ static void layout_canvas_paint(LayoutEditorState *st, HWND hwnd) {
             StretchBlt(mem_dc, cx, cy, rw, rh,
                        st->bg_image.hdc_mem, 0, 0, st->bg_image.width, st->bg_image.height, SRCCOPY);
         }
+        /* Fixed companion: Sun Face (mmsun) at (0, 2) canonical */
+        LayoutSprite *sp_mmsun = layout_get_cached_sprite("mmsun", 1);
+        if (sp_mmsun && sp_mmsun->loaded && sp_mmsun->img.hbm) {
+            int mmsun_px = cx + (int)roundf(0.0f * zscale * vscale);
+            int mmsun_py = cy + (int)roundf(2.0f * zscale * vscale);
+            int mmsun_pw = (int)roundf((float)sp_mmsun->img.width * vscale);
+            int mmsun_ph = (int)roundf((float)sp_mmsun->img.height * vscale);
+            BLENDFUNCTION bf = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
+            AlphaBlend(mem_dc, mmsun_px, mmsun_py, mmsun_pw, mmsun_ph,
+                       sp_mmsun->img.hdc_mem, 0, 0, sp_mmsun->img.width, sp_mmsun->img.height, bf);
+        }
         /* Static Top Header Text */
         RECT rc_welcome = { cx, cy - (int)roundf(4.0f * vscale), cx + rw, cy + (int)roundf(44.0f * vscale) };
         RECT rc_notyou  = { cx, cy + (int)roundf(38.0f * vscale), cx + rw, cy + (int)roundf(56.0f * vscale) };
@@ -5322,8 +5381,11 @@ static LRESULT CALLBACK LayoutCanvasProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
                 int delta_canvas_x = mx - st->drag_start_mx;
                 int delta_canvas_y = my - st->drag_start_my;
 
-                float denom = (st->cur_screen_idx == 4 && st->hud_space_w == st->target_w && st->hud_space_h == st->target_h)
-                              ? vscale : (vscale * zscale);
+                bool is_drag_1to1 = false;
+                if (st->cur_screen_idx == 4 && st->hud_space_w == st->target_w && st->hud_space_h == st->target_h) is_drag_1to1 = true;
+                if (st->cur_screen_idx == 1 && st->main_menu_space_w == st->target_w && st->main_menu_space_h == st->target_h) is_drag_1to1 = true;
+                if (st->cur_screen_idx == 0 && st->loading_space_w == st->target_w && st->loading_space_h == st->target_h) is_drag_1to1 = true;
+                float denom = is_drag_1to1 ? vscale : (vscale * zscale);
                 int delta_canon_x = (denom > 0.0001f) ? (int)roundf((float)delta_canvas_x / denom) : 0;
                 int delta_canon_y = (denom > 0.0001f) ? (int)roundf((float)delta_canvas_y / denom) : 0;
 
