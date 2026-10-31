@@ -82,6 +82,7 @@ typedef struct {
     int def_w, def_h;
     bool has_explicit_size;  /* True if explicit width/height was in XML */
     ElementHotspotMode hotspot; /* Hotspot mode: default TOPLEFT */
+    bool is_conditional;
 
     /* Editor State */
     bool selected;
@@ -175,6 +176,8 @@ typedef struct {
     int cur_sub_filter_idx;
     int hud_space_w;
     int hud_space_h;
+    bool show_conditional_sprites;
+    HWND hwnd_chk_conditional;
 
     /* Active Display Resolution (Strictly locked to Zuma.exe) */
     int target_w;
@@ -223,6 +226,7 @@ static LayoutEditorState *g_layout_editor = NULL;
 /* Control IDs */
 #define ID_LE_COMBO_SCREEN      2101
 #define ID_LE_COMBO_FILTER      2102
+#define ID_LE_CHK_CONDITIONAL   2105
 #define ID_LE_BTN_SAVE          2106
 #define ID_LE_BTN_RELOAD        2107
 #define ID_LE_BTN_CLOSE         2108
@@ -1236,18 +1240,15 @@ static void assign_element_default_bounds(LayoutElement *el) {
             el->def_w = 108; el->def_h = 45;
             if (!(el->flags & ATTR_HAS_X)) { el->x = 191; el->flags |= ATTR_HAS_X; }
             if (!(el->flags & ATTR_HAS_Y)) { el->y = 331; el->flags |= ATTR_HAS_Y; }
-        } else if (_stricmp(el->tag, "EyeBlink") == 0) {
-            el->def_w = 112; el->def_h = 50;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 188; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 247; el->flags |= ATTR_HAS_Y; }
         } else if (_stricmp(el->tag, "Sun1") == 0 || _stricmp(el->tag, "Sun2") == 0) {
             el->def_w = 120; el->def_h = 120;
             if (!(el->flags & ATTR_HAS_X)) { el->x = -63; el->flags |= ATTR_HAS_X; }
             if (!(el->flags & ATTR_HAS_Y)) { el->y = -69; el->flags |= ATTR_HAS_Y; }
         } else if (_stricmp(el->tag, "Hat") == 0) {
-            el->def_w = 112; el->def_h = 50;
+            el->def_w = 101; el->def_h = 107;
+            el->is_conditional = true;
             if (!(el->flags & ATTR_HAS_X)) { el->x = 188; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 237; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 247; el->flags |= ATTR_HAS_Y; }
         } else if (_stricmp(el->tag, "EyeIdle1") == 0) {
             el->hotspot = HOTSPOT_CENTER_BOTH;
             el->def_w = 32; el->def_h = 32;
@@ -1819,6 +1820,7 @@ static bool is_element_visible_in_editor(const LayoutElement *el, const LayoutEd
     if (!el || !st) return false;
     if (!is_element_in_screen(el, st->cur_screen_idx)) return false;
     if (!is_element_in_sub_filter(el, st->cur_screen_idx, st->cur_sub_filter_idx)) return false;
+    if (el->is_conditional && !st->show_conditional_sprites) return false;
 
     /* In Adventure Map "All Elements" view, Stage 13 labels share exact coords with Temples 1-4 labels.
        Default to showing Temples 1-4 labels; show Stage 13 labels when selected or hovered */
@@ -2524,7 +2526,7 @@ static int get_element_z_order(const LayoutElement *el, int screen_idx) {
         if (_stricmp(tag, "Sun1") == 0 || _stricmp(tag, "Sun2") == 0) return 5;
         if (_stricmp(tag, "EyeRay1") == 0 || _stricmp(tag, "EyeRay2") == 0) return 6;
         if (_stricmp(tag, "FrogEyes") == 0) return 10;
-        if (_stricmp(tag, "EyeIdle1") == 0 || _stricmp(tag, "EyeIdle2") == 0 || _stricmp(tag, "EyeBlink") == 0) return 15;
+        if (_stricmp(tag, "EyeIdle1") == 0 || _stricmp(tag, "EyeIdle2") == 0) return 15;
         if (_stricmp(tag, "Hat") == 0) return 25;
         return 50;
     }
@@ -2948,7 +2950,6 @@ static void render_layout_sprite_element(
                     _stricmp(el->tag, "HelpBack") == 0 ||
                     _stricmp(el->tag, "DontShowCheckbox") == 0 ||
                     _stricmp(el->tag, "WhateverBtn") == 0 ||
-                    _stricmp(el->tag, "EyeBlink") == 0 ||
                     _stricmp(el->tag, "FrogWriting") == 0 ||
                     (el->section && (_stricmp(el->section, "HelpScreen") == 0 || _stricmp(el->section, "DevHelpScreen") == 0) &&
                      (_stricmp(el->tag, "HelpFront") == 0 || _stricmp(el->tag, "OkButton") == 0 || _stricmp(el->tag, "Temple5Preview") == 0 ||
@@ -5790,6 +5791,11 @@ static LRESULT CALLBACK LayoutEditorWndProc(HWND hwnd, UINT msg, WPARAM wParam, 
                     layout_editor_sync_inspector_from_selection(st);
                     InvalidateRect(st->hwnd_canvas, NULL, FALSE);
                 }
+            } else if (id == ID_LE_CHK_CONDITIONAL && code == BN_CLICKED) {
+                LRESULT chk = SendMessage(st->hwnd_chk_conditional, BM_GETCHECK, 0, 0);
+                st->show_conditional_sprites = (chk == BST_CHECKED);
+                layout_editor_update_screen_elements_list(st);
+                InvalidateRect(st->hwnd_canvas, NULL, FALSE);
             } else if (id == ID_LE_COMBO_FILTER && code == CBN_SELCHANGE) {
                 int sub = (int)SendMessage(st->hwnd_combo_filter, CB_GETCURSEL, 0, 0);
                 if (sub >= 0) {
@@ -6051,6 +6057,12 @@ void show_layout_editor_dialog(HWND parent_hwnd) {
                                           tx, 14, 250, 24, hwnd_dlg, NULL, hinst, NULL);
     SendMessage(st->hwnd_lbl_res_info, WM_SETFONT, (WPARAM)font_mono, TRUE);
     tx += 260;
+
+    st->hwnd_chk_conditional = CreateWindowA("BUTTON", "Show Conditional", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
+                                             tx, 14, 130, 24, hwnd_dlg, (HMENU)ID_LE_CHK_CONDITIONAL, hinst, NULL);
+    SendMessage(st->hwnd_chk_conditional, WM_SETFONT, (WPARAM)font_ui, TRUE);
+    apply_control_dark_mode(st->hwnd_chk_conditional, is_dark);
+    tx += 136;
 
     st->hwnd_btn_save = CreateWindowA("BUTTON", "Save Layout", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
                                       tx, 11, 100, 28, hwnd_dlg, (HMENU)ID_LE_BTN_SAVE, hinst, NULL);
