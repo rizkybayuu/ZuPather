@@ -2660,7 +2660,9 @@ static bool is_text_element(const LayoutElement *el) {
         _stricmp(tag, "TopText1") == 0 ||
         _stricmp(tag, "TopText2") == 0 ||
         _stricmp(tag, "SwapClick") == 0 ||
-        _stricmp(tag, "BallTarget") == 0) {
+        _stricmp(tag, "BallTarget") == 0 ||
+        _stricmp(tag, "WelcomeText") == 0 ||
+        _stricmp(tag, "UserSwitchText") == 0) {
         return true;
     }
     return false;
@@ -4739,26 +4741,17 @@ static void layout_canvas_paint(LayoutEditorState *st, HWND hwnd) {
         RECT rc_welcome = { cx, cy + (int)roundf((float)wel_y * vscale), cx + rw, cy + (int)roundf((float)(wel_y + 44) * vscale) };
         RECT rc_notyou  = { cx, cy + (int)roundf((float)(us_y - 12) * vscale), cx + rw, cy + (int)roundf((float)(us_y + 12) * vscale) };
         if (g_popcap_native_alien_16.loaded) {
-            popcap_font_draw_text(mem_dc, &g_popcap_native_alien_16, "WELCOME TO ZUMA, DEVTESTER!", &rc_welcome, RGB(255, 234, 1), vscale, DT_CENTER);
+            popcap_font_draw_text(mem_dc, &g_popcap_native_alien_16, "Welcome to Zuma, DEVTESTER!", &rc_welcome, RGB(255, 255, 255), vscale, DT_CENTER);
         } else if (g_popcap_cancun_14.loaded) {
-            popcap_font_draw_text(mem_dc, &g_popcap_cancun_14, "WELCOME TO ZUMA, DEVTESTER!", &rc_welcome, RGB(255, 234, 1), vscale, DT_CENTER);
+            popcap_font_draw_text(mem_dc, &g_popcap_cancun_14, "Welcome to Zuma, DEVTESTER!", &rc_welcome, RGB(255, 255, 255), vscale, DT_CENTER);
         }
         if (g_popcap_cancun_10.loaded) {
-            popcap_font_draw_text(mem_dc, &g_popcap_cancun_10, "(IF THIS IS NOT YOU, CLICK HERE.)", &rc_notyou, RGB(91, 55, 0), vscale, DT_CENTER);
-            int ny_w = (int)roundf((float)popcap_font_get_line_width(&g_popcap_cancun_10, "(IF THIS IS NOT YOU, CLICK HERE.)", 33) * vscale);
-            int ny_x = cx + (rw - ny_w) / 2;
-            int ny_y = cy + (int)roundf(51.0f * vscale);
-            HPEN ny_pen = CreatePen(PS_SOLID, 1, RGB(91, 55, 0));
-            HPEN old_nypen = (HPEN)SelectObject(mem_dc, ny_pen);
-            MoveToEx(mem_dc, ny_x, ny_y, NULL);
-            LineTo(mem_dc, ny_x + ny_w, ny_y);
-            SelectObject(mem_dc, old_nypen);
-            DeleteObject(ny_pen);
+            popcap_font_draw_text(mem_dc, &g_popcap_cancun_10, "(If this is not you, click here.)", &rc_notyou, RGB(91, 55, 0), vscale, DT_CENTER);
         } else {
-            SetTextColor(mem_dc, RGB(255, 234, 1));
-            DrawTextA(mem_dc, "WELCOME TO ZUMA, DEVTESTER!", -1, &rc_welcome, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+            SetTextColor(mem_dc, RGB(255, 255, 255));
+            DrawTextA(mem_dc, "Welcome to Zuma, DEVTESTER!", -1, &rc_welcome, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
             SetTextColor(mem_dc, RGB(91, 55, 0));
-            DrawTextA(mem_dc, "(IF THIS IS NOT YOU, CLICK HERE.)", -1, &rc_notyou, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+            DrawTextA(mem_dc, "(If this is not you, click here.)", -1, &rc_notyou, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
         }
     } else if (st->cur_screen_idx == 2) {
         /* Screen 2: Adventure Map Composite */
