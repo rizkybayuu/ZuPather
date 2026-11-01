@@ -1226,11 +1226,13 @@ static void assign_element_default_bounds(LayoutElement *el, const LayoutEditorS
     /* 1. Loading Screen */
     if (_stricmp(el->section, "LoadingScreen") == 0) {
         if (_stricmp(el->tag, "LoadingBar") == 0) {
-            el->def_w = 384; el->def_h = 44;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 128;  }
+            int bar_w = (space_w > 640) ? (int)roundf(384.0f * ((float)space_w / 640.0f)) : 384;
+            int bar_h = (space_w > 640) ? (int)roundf(44.0f * ((float)space_w / 640.0f)) : 44;
+            el->def_w = bar_w; el->def_h = bar_h;
+            if (!(el->flags & ATTR_HAS_X)) { el->x = (space_w - bar_w) / 2; }
             if (!(el->flags & ATTR_HAS_Y)) { el->y = 349;  }
         } else if (_stricmp(el->tag, "ClickToPlay") == 0) {
-            el->def_w = 300; el->def_h = 32;
+            el->def_w = 260; el->def_h = 38;
             el->hotspot |= HOTSPOT_CENTER_X;
             if (!(el->flags & ATTR_HAS_X)) { el->x = space_w / 2;  }
             if (!(el->flags & ATTR_HAS_Y)) { el->y = 430;  }
@@ -2007,6 +2009,12 @@ static bool is_element_space_1to1(const LayoutElement *el, const LayoutEditorSta
     }
     if (_stricmp(el->section, "InGameHUD") == 0 && st->hud_space_w > 0) {
         return (st->hud_space_w == st->target_w && st->hud_space_h == st->target_h);
+    }
+    if (_stricmp(el->section, "LoadingScreen") == 0 && st->loading_space_w > 0) {
+        return (st->loading_space_w == st->target_w && st->loading_space_h == st->target_h);
+    }
+    if (_stricmp(el->section, "MainMenu") == 0 && st->main_menu_space_w > 0) {
+        return (st->main_menu_space_w == st->target_w && st->main_menu_space_h == st->target_h);
     }
     return false;
 }
@@ -2824,10 +2832,12 @@ static void update_all_elements_canvas_rects(LayoutEditorState *st, int cv_w, in
 
         /* LoadingBar visual boundary clamp */
         if (_stricmp(el->tag, "LoadingBar") == 0) {
-            elem_w = 384;
-            elem_h = 44;
-            el->def_w = 384;
-            el->def_h = 44;
+            int bw = (st && st->loading_space_w > 640) ? (int)roundf(384.0f * ((float)st->loading_space_w / 640.0f)) : 384;
+            int bh = (st && st->loading_space_w > 640) ? (int)roundf(44.0f * ((float)st->loading_space_w / 640.0f)) : 44;
+            elem_w = bw;
+            elem_h = bh;
+            el->def_w = bw;
+            el->def_h = bh;
         }
 
         /* DoorName & PracticeText full door frame width bounds */
@@ -2905,7 +2915,7 @@ static void update_all_elements_canvas_rects(LayoutEditorState *st, int cv_w, in
             } else if (scr == 5) {
                 /* Mode C: StageComplete */
                 int delta_y = (st->target_h - 480) / 2;
-                target_x = (in_x == 320) ? (st->target_w / 2) : (int)roundf((float)in_x * zscale);
+                target_x = (in_x == 320 || in_x == st->target_w / 2) ? (st->target_w / 2) : (int)roundf((float)in_x * zscale);
                 target_y = delta_y + in_y;
             } else if (scr == 4) {
                 /* Mode B: InGameHUD */
@@ -3956,9 +3966,10 @@ static void render_layout_text_element(
     PopCapFont *pfont = &g_popcap_cancun_10;
     bool is_multiline_custom = false;
 
-    /* Suppress duplicate text for elements already rendered in composite pass (HelpScreen, DevHelpScreen, DevDemo) */
+    /* Suppress duplicate text for elements already rendered in composite pass (HelpScreen, DevHelpScreen, DevDemo, MainMenu welcome) */
     if ((el->section && (_stricmp(el->section, "HelpScreen") == 0 || _stricmp(el->section, "DevHelpScreen") == 0)) ||
-        (_stricmp(tag, "DemoClear") == 0) || (_stricmp(tag, "DemoClick") == 0)) {
+        (_stricmp(tag, "DemoClear") == 0) || (_stricmp(tag, "DemoClick") == 0) ||
+        (_stricmp(tag, "WelcomeText") == 0) || (_stricmp(tag, "UserSwitchText") == 0)) {
         if (is_selected || is_hovered) {
             COLORREF border_color = is_selected ? RGB(56, 189, 248) : RGB(125, 211, 252);
             HPEN pen = CreatePen(PS_DOT, 1, border_color);
@@ -4189,25 +4200,22 @@ static void render_layout_text_element(
     } else {
         RECT rc_txt = el->canvas_rect;
         if (pfont && pfont->loaded) {
-            popcap_font_draw_text(mem_dc, pfont, disp_text, &rc_txt, text_color, vscale, draw_flags);
             if (_stricmp(tag, "ClickToPlay") == 0) {
                 int line_w = (int)roundf((float)popcap_font_get_line_width(pfont, disp_text, (int)strlen(disp_text)) * vscale);
                 int rc_w = rc_txt.right - rc_txt.left;
-                int cur_x = rc_txt.left;
-                if (draw_flags & DT_CENTER) {
-                    cur_x = rc_txt.left + (rc_w - line_w) / 2;
-                } else if (draw_flags & DT_RIGHT) {
-                    cur_x = rc_txt.right - line_w;
-                }
-                int aYOffset = pfont->ascent - pfont->ascent_padding;
-                int top_y = rc_txt.top;
-                if (draw_flags & DT_VCENTER) {
-                    int line_spacing = pfont->ascent + pfont->line_spacing_offset;
-                    if (line_spacing <= 0) line_spacing = 14;
-                    int line_h = (int)roundf((float)line_spacing * vscale);
-                    top_y = rc_txt.top + (rc_txt.bottom - rc_txt.top - line_h) / 2;
-                }
-                int baseline_y = top_y + (int)roundf((float)aYOffset * vscale);
+                int cur_x = rc_txt.left + (rc_w - line_w) / 2;
+
+                /* PopCap HyperlinkWidget button dimensions: btn_h = font_h + 20 */
+                int font_h = pfont->ascent + pfont->line_spacing_offset;
+                if (font_h <= 0) font_h = 18;
+                int btn_h = font_h + 20;
+
+                /* PopCap HyperlinkWidget::Draw baseline: widget_y + (GetAscent() + mHeight) / 2 - 1 */
+                int aY = (pfont->ascent + btn_h) / 2 - 1;
+                int baseline_y = rc_txt.top + (int)roundf((float)aY * vscale);
+
+                popcap_font_draw_line(mem_dc, pfont, disp_text, (int)strlen(disp_text), cur_x, baseline_y, text_color, vscale);
+
                 int uy = baseline_y + (int)roundf(3.0f * vscale);
                 int uh = (int)roundf(2.0f * vscale);
                 if (uh < 1) uh = 1;
@@ -4216,25 +4224,41 @@ static void render_layout_text_element(
                 RECT rc_ul = { cur_x, uy, cur_x + line_w, uy + uh };
                 FillRect(mem_dc, &rc_ul, br);
                 DeleteObject(br);
+            } else {
+                popcap_font_draw_text(mem_dc, pfont, disp_text, &rc_txt, text_color, vscale, draw_flags);
             }
         } else {
             SetBkMode(mem_dc, TRANSPARENT);
             SelectObject(mem_dc, font_bold);
-            RECT rc_sh = rc_txt;
-            OffsetRect(&rc_sh, 1, 1);
-            SetTextColor(mem_dc, RGB(0, 0, 0));
-            DrawTextA(mem_dc, disp_text, -1, &rc_sh, draw_flags);
-            SetTextColor(mem_dc, text_color);
-            DrawTextA(mem_dc, disp_text, -1, &rc_txt, draw_flags);
             if (_stricmp(tag, "ClickToPlay") == 0) {
                 SIZE sz;
                 GetTextExtentPoint32A(mem_dc, disp_text, (int)strlen(disp_text), &sz);
-                int cur_x = rc_txt.left + (rc_txt.right - rc_txt.left - sz.cx) / 2;
-                int uy = rc_txt.top + (rc_txt.bottom - rc_txt.top + sz.cy) / 2 + 1;
+                int rc_w = rc_txt.right - rc_txt.left;
+                int cur_x = rc_txt.left + (rc_w - sz.cx) / 2;
+                int btn_h = 38;
+                int aY = (18 + btn_h) / 2 - 1;
+                int baseline_y = rc_txt.top + (int)roundf((float)aY * vscale);
+                int top_y = baseline_y - sz.cy + (int)roundf(3.0f * vscale);
+                RECT rc_draw = { cur_x, top_y, cur_x + sz.cx, top_y + sz.cy };
+                RECT rc_sh = rc_draw;
+                OffsetRect(&rc_sh, 1, 1);
+                SetTextColor(mem_dc, RGB(0, 0, 0));
+                DrawTextA(mem_dc, disp_text, -1, &rc_sh, DT_LEFT | DT_TOP | DT_SINGLELINE);
+                SetTextColor(mem_dc, text_color);
+                DrawTextA(mem_dc, disp_text, -1, &rc_draw, DT_LEFT | DT_TOP | DT_SINGLELINE);
+
+                int uy = baseline_y + (int)roundf(3.0f * vscale);
                 HBRUSH br = CreateSolidBrush(text_color);
                 RECT rc_ul = { cur_x, uy, cur_x + sz.cx, uy + 2 };
                 FillRect(mem_dc, &rc_ul, br);
                 DeleteObject(br);
+            } else {
+                RECT rc_sh = rc_txt;
+                OffsetRect(&rc_sh, 1, 1);
+                SetTextColor(mem_dc, RGB(0, 0, 0));
+                DrawTextA(mem_dc, disp_text, -1, &rc_sh, draw_flags);
+                SetTextColor(mem_dc, text_color);
+                DrawTextA(mem_dc, disp_text, -1, &rc_txt, draw_flags);
             }
         }
     }
