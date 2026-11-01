@@ -933,11 +933,11 @@ static const char* get_element_sprite_name(const LayoutElement *el, int *out_col
     if (_stricmp(el->section, "GauntletButtons") == 0) {
         if (out_cols) *out_cols = 3;
         if (_stricmp(el->tag, "MainMenu") == 0) return "gauntmainmenubutton";
-        if (_stricmp(el->tag, "Practice") == 0) return "gauntbackbutton";
-        if (_stricmp(el->tag, "Survival") == 0) return "gauntplaybutton";
-        if (_stricmp(el->tag, "Back") == 0)     return "gauntnextbutton";
-        if (_stricmp(el->tag, "Next") == 0)     return "gauntsurvivalbutton";
-        if (_stricmp(el->tag, "Play") == 0)     return "gauntpracticebutton";
+        if (_stricmp(el->tag, "Practice") == 0) return "gauntpracticebutton";
+        if (_stricmp(el->tag, "Survival") == 0) return "gauntsurvivalbutton";
+        if (_stricmp(el->tag, "Back") == 0)     return "gauntbackbutton";
+        if (_stricmp(el->tag, "Next") == 0)     return "gauntnextbutton";
+        if (_stricmp(el->tag, "Play") == 0)     return "gauntplaybutton";
     }
 
     if (_stricmp(el->section, "GauntletLabels") == 0) {
@@ -1985,6 +1985,30 @@ static bool is_element_space_1to1(const LayoutElement *el, const LayoutEditorSta
     return false;
 }
 
+/* Check if current editor screen space matches target display resolution */
+static bool is_current_screen_space_1to1(const LayoutEditorState *st) {
+    if (!st || st->target_w <= 0 || st->target_h <= 0) return false;
+    int scr = st->cur_screen_idx;
+    if (scr == 4 && st->hud_space_w == st->target_w && st->hud_space_h == st->target_h) return true;
+    if (scr == 1 && st->main_menu_space_w == st->target_w && st->main_menu_space_h == st->target_h) return true;
+    if (scr == 0 && st->loading_space_w == st->target_w && st->loading_space_h == st->target_h) return true;
+    if (scr == 2 && st->adventure_space_w == st->target_w && st->adventure_space_h == st->target_h) return true;
+
+    const char *sec_name = (scr >= 0 && scr < NUM_SCREENS) ? g_screens[scr].filter_section : NULL;
+    if (!sec_name && scr == 2) sec_name = "AdventureTemples";
+    if (!sec_name && scr == 3) sec_name = "GauntletDoors";
+    if (sec_name) {
+        int sec_idx = get_canonical_section_index(sec_name);
+        if (sec_idx >= 0 && st->section_space[sec_idx][0] != '\0') {
+            int sw = 0, sh = 0;
+            if (sscanf(st->section_space[sec_idx], "%dx%d", &sw, &sh) == 2) {
+                return (sw == st->target_w && sh == st->target_h);
+            }
+        }
+    }
+    return false;
+}
+
 static bool layout_xml_load(LayoutEditorState *st, const char *filepath) {
     FILE *fp = fopen(filepath, "r");
     if (!fp) return false;
@@ -2480,7 +2504,7 @@ static void calculate_viewport_transforms(
     int yo = (th - ch) / 2;
 
     int scr = st ? st->cur_screen_idx : 0;
-    if (scr == 4 || scr == 5 || scr == 6 || (scr == 2 && st && st->adventure_space_w == st->target_w && st->adventure_space_h == st->target_h)) {
+    if (scr == 4 || scr == 5 || scr == 6) {
         /* Modes B and C: In-Game full widescreen without pillars */
         cw = tw;
         ch = th;
@@ -2520,8 +2544,7 @@ static void canonical_to_canvas(
         int dy = (st->target_h - 480) / 2;
         sx = (can_x == 320) ? ((float)st->target_w * 0.5f) : ((float)can_x * zscale);
         sy = (float)(can_y + dy);
-    } else if ((scr == 4 && st && st->hud_space_w == st->target_w && st->hud_space_h == st->target_h) ||
-               (scr == 2 && st && st->adventure_space_w == st->target_w && st->adventure_space_h == st->target_h)) {
+    } else if (is_current_screen_space_1to1(st)) {
         sx = (float)can_x;
         sy = (float)can_y;
     } else {
@@ -2556,8 +2579,7 @@ static void canvas_to_canonical(
         int dy = (st->target_h - 480) / 2;
         can_x = (zscale > 0.0f) ? (sx / zscale) : sx;
         can_y = sy - (float)dy;
-    } else if ((scr == 4 && st && st->hud_space_w == st->target_w && st->hud_space_h == st->target_h) ||
-               (scr == 2 && st && st->adventure_space_w == st->target_w && st->adventure_space_h == st->target_h)) {
+    } else if (is_current_screen_space_1to1(st)) {
         can_x = sx;
         can_y = sy;
     } else {
@@ -2780,6 +2802,16 @@ static void update_all_elements_canvas_rects(LayoutEditorState *st, int cv_w, in
             elem_h = 44;
             el->def_w = 384;
             el->def_h = 44;
+        }
+
+        /* DoorName & PracticeText full door frame width bounds */
+        if (_stricmp(el->tag, "DoorName") == 0 || _stricmp(el->tag, "PracticeText") == 0) {
+            if (el->def_w <= 0) {
+                elem_w = 450;
+                elem_h = 28;
+                el->def_w = 450;
+                el->def_h = 28;
+            }
         }
 
         /* LevelBanner bottom-right clamp */
@@ -3194,6 +3226,7 @@ typedef struct {
 typedef struct {
     char name[64];
     bool loaded;
+    bool has_outline;            /* True if Outline layer is present and loaded */
     LayoutSprite *sprite;        /* Colored sprite (e.g. NativeAlienExtended16, CancunFloat14) */
     CanvasImage mask_img;        /* Grayscale mask image (e.g. _Cancun10, _Arial12Bold) */
     CanvasImage outline_img;     /* Outline mask image (e.g. _CancunOUTLINE10) */
@@ -3201,7 +3234,11 @@ typedef struct {
     CanvasImage tinted_dib[32];   /* Pre-tinted ARGB DIBs for quick blitting */
     COLORREF tinted_color[32];
     int tinted_count;
-    int ascent;
+    int ascent;                  /* Main layer ascent (e.g. 10 for Cancun10) */
+    int ascent_padding;          /* Main layer ascent padding (e.g. 0 for Cancun10) */
+    int outline_ascent;          /* Outline layer ascent (e.g. 20 for Cancun10 Outline) */
+    int outline_ascent_padding;  /* Outline layer ascent padding (e.g. 10 for Cancun10 Outline) */
+    int line_spacing_offset;     /* Main layer line spacing offset (e.g. 4 for Cancun10) */
     int space_width;
     int point_size;
     int char_count;
@@ -3455,14 +3492,46 @@ static bool parse_popcap_font_txt(const char *filepath, PopCapFont *font) {
         }
     }
 
-    /* 7. LayerSetAscent */
-    p = strstr(buf, "LayerSetAscent");
-    if (p) {
-        p += 14;
-        p = font_skip_ws(p);
-        if (strncmp(p, "Main", 4) == 0) p += 4;
-        p = font_skip_ws(p);
-        font->ascent = (int)strtol(p, NULL, 10);
+    /* 7. LayerSetAscent / LayerSetAscentPadding / LayerSetLineSpacingOffset */
+    font->ascent = 10;
+    font->ascent_padding = 0;
+    font->outline_ascent = 20;
+    font->outline_ascent_padding = 10;
+    font->line_spacing_offset = 4;
+
+    p = strstr(buf, "LayerSetAscent ");
+    while (p) {
+        char *line_end = strchr(p, ';');
+        char layer_name[64] = {0};
+        int asc_val = 0;
+        if (sscanf(p, "LayerSetAscent %63s %d", layer_name, &asc_val) == 2) {
+            if (_stricmp(layer_name, "Main") == 0) font->ascent = asc_val;
+            else if (_stricmp(layer_name, "Outline") == 0) font->outline_ascent = asc_val;
+        }
+        p = line_end ? strstr(line_end, "LayerSetAscent ") : NULL;
+    }
+
+    p = strstr(buf, "LayerSetAscentPadding");
+    while (p) {
+        char *line_end = strchr(p, ';');
+        char layer_name[64] = {0};
+        int pad_val = 0;
+        if (sscanf(p, "LayerSetAscentPadding %63s %d", layer_name, &pad_val) == 2) {
+            if (_stricmp(layer_name, "Main") == 0) font->ascent_padding = pad_val;
+            else if (_stricmp(layer_name, "Outline") == 0) font->outline_ascent_padding = pad_val;
+        }
+        p = line_end ? strstr(line_end, "LayerSetAscentPadding") : NULL;
+    }
+
+    p = strstr(buf, "LayerSetLineSpacingOffset");
+    while (p) {
+        char *line_end = strchr(p, ';');
+        char layer_name[64] = {0};
+        int lso_val = 0;
+        if (sscanf(p, "LayerSetLineSpacingOffset %63s %d", layer_name, &lso_val) == 2) {
+            if (_stricmp(layer_name, "Main") == 0) font->line_spacing_offset = lso_val;
+        }
+        p = line_end ? strstr(line_end, "LayerSetLineSpacingOffset") : NULL;
     }
 
     /* 8. Space width: LayerSetCharWidths Main (' ') (12) */
@@ -3607,6 +3676,7 @@ static bool popcap_font_load(
     }
 
     /* 3. Outline Mask Image & DIB */
+    font->has_outline = false;
     if (outline_name && outline_name[0]) {
         char out_path[MAX_PATH];
         if (!layout_get_zuma_asset_path(outline_name, out_path, sizeof(out_path))) {
@@ -3622,6 +3692,7 @@ static bool popcap_font_load(
                         uint8_t a = (uint8_t)(src[i] & 0xFF);
                         dst[i] = ((uint32_t)a << 24); /* Pure black with outline alpha */
                     }
+                    font->has_outline = true;
                 }
             }
         }
@@ -3638,8 +3709,8 @@ static void ensure_popcap_fonts(void) {
     popcap_font_load(&g_popcap_cancun_14, "CancunFloat14", "fonts\\CancunFloat14", "_CancunFloat14", NULL);
     popcap_font_load(&g_popcap_cancun_12, "Cancun12", NULL, "_Cancun12", NULL);
     popcap_font_load(&g_popcap_cancun_13, "Cancun13", NULL, "_Cancun13", NULL);
-    popcap_font_load(&g_popcap_cancun_10, "Cancun10", NULL, "_Cancun10", "_CancunOUTLINE10");
-    popcap_font_load(&g_popcap_cancun_outline_10, "Cancun10", NULL, "_CancunOUTLINE10", NULL);
+    popcap_font_load(&g_popcap_cancun_10, "Cancun10", NULL, "_Cancun10", NULL);
+    popcap_font_load(&g_popcap_cancun_outline_10, "Cancun10", NULL, "_Cancun10", "_CancunOUTLINE10");
     popcap_font_load(&g_popcap_arial_12, "Arial12Bold", NULL, "_Arial12Bold", NULL);
 }
 
@@ -3673,7 +3744,7 @@ static int popcap_font_get_line_width(PopCapFont *font, const char *line, int le
 
 static void popcap_font_draw_line(
     HDC mem_dc, PopCapFont *font, const char *line, int len,
-    int pen_x, int pen_y, COLORREF color, float vscale
+    int pen_x, int baseline_y, COLORREF color, float vscale
 ) {
     if (!font || !font->loaded || !line || len <= 0) return;
 
@@ -3681,19 +3752,55 @@ static void popcap_font_draw_line(
     HDC tint_dc = (font->mask_img.bits) ? popcap_font_get_tinted_dc(font, color) : NULL;
     HDC sprite_dc = (font->sprite && font->sprite->loaded && font->sprite->img.hbm) ? font->sprite->img.hdc_mem : NULL;
 
-    int cur_x = pen_x;
+    /* Pass 1: Outline Layer (if font has outline) */
+    if (font->has_outline && font->outline_dib.hdc_mem) {
+        int cur_x = pen_x;
+        for (int i = 0; i < len; ++i) {
+            char c = line[i];
+            for (int m = 0; m < font->map_count; ++m) {
+                if (font->map_from[m] == c) { c = font->map_to[m]; break; }
+            }
+            if (c == ' ') {
+                cur_x += (int)roundf((float)font->space_width * vscale);
+                continue;
+            }
+            const PopCapCharDef *def = NULL;
+            for (int k = 0; k < font->char_count; ++k) {
+                if (font->chars[k].ch == c) { def = &font->chars[k]; break; }
+            }
+            if (!def && c >= 'a' && c <= 'z') {
+                char uc = (char)toupper((unsigned char)c);
+                for (int k = 0; k < font->char_count; ++k) {
+                    if (font->chars[k].ch == uc) { def = &font->chars[k]; break; }
+                }
+            }
+            if (!def) {
+                cur_x += (int)roundf((float)font->space_width * vscale);
+                continue;
+            }
+            if (def->out_w > 0 && def->out_h > 0) {
+                int ox = cur_x + (int)roundf((float)def->out_off_x * vscale);
+                int oy = baseline_y - (int)roundf((float)(font->outline_ascent - def->out_off_y) * vscale);
+                int ow = (int)roundf((float)def->out_w * vscale);
+                int oh = (int)roundf((float)def->out_h * vscale);
+                AlphaBlend(mem_dc, ox, oy, ow, oh,
+                           font->outline_dib.hdc_mem, def->out_x, def->out_y, def->out_w, def->out_h, bf);
+            }
+            cur_x += (int)roundf((float)def->width * vscale);
+        }
+    }
 
+    /* Pass 2: Main Glyph Layer */
+    int cur_x = pen_x;
     for (int i = 0; i < len; ++i) {
         char c = line[i];
         for (int m = 0; m < font->map_count; ++m) {
-            if (c == font->map_from[m]) { c = font->map_to[m]; break; }
+            if (font->map_from[m] == c) { c = font->map_to[m]; break; }
         }
-
         if (c == ' ') {
             cur_x += (int)roundf((float)font->space_width * vscale);
             continue;
         }
-
         const PopCapCharDef *def = NULL;
         for (int k = 0; k < font->char_count; ++k) {
             if (font->chars[k].ch == c) { def = &font->chars[k]; break; }
@@ -3708,31 +3815,19 @@ static void popcap_font_draw_line(
             cur_x += (int)roundf((float)font->space_width * vscale);
             continue;
         }
-
-        /* 1. Real PopCap Outline rendering via font->outline_dib (_CancunOUTLINE10.gif) */
-        if (font->outline_dib.hdc_mem && def->src_w > 0 && def->src_h > 0) {
-            int ox = cur_x + (int)roundf((float)def->off_x * vscale);
-            int oy = pen_y + (int)roundf((float)def->off_y * vscale);
-            int ow = (int)roundf((float)def->src_w * vscale);
-            int oh = (int)roundf((float)def->src_h * vscale);
-            AlphaBlend(mem_dc, ox, oy, ow, oh,
-                       font->outline_dib.hdc_mem, def->src_x, def->src_y, def->src_w, def->src_h, bf);
+        if (def->src_w > 0 && def->src_h > 0) {
+            int gx = cur_x + (int)roundf((float)def->off_x * vscale);
+            int gy = baseline_y - (int)roundf((float)(font->ascent - def->off_y) * vscale);
+            int gw = (int)roundf((float)def->src_w * vscale);
+            int gh = (int)roundf((float)def->src_h * vscale);
+            if (tint_dc) {
+                AlphaBlend(mem_dc, gx, gy, gw, gh,
+                           tint_dc, def->src_x, def->src_y, def->src_w, def->src_h, bf);
+            } else if (sprite_dc) {
+                AlphaBlend(mem_dc, gx, gy, gw, gh,
+                           sprite_dc, def->src_x, def->src_y, def->src_w, def->src_h, bf);
+            }
         }
-
-        /* 2. Draw Glyph */
-        int gx = cur_x + (int)roundf((float)def->off_x * vscale);
-        int gy = pen_y + (int)roundf((float)def->off_y * vscale);
-        int gw = (int)roundf((float)def->src_w * vscale);
-        int gh = (int)roundf((float)def->src_h * vscale);
-
-        if (tint_dc && def->src_w > 0 && def->src_h > 0) {
-            AlphaBlend(mem_dc, gx, gy, gw, gh,
-                       tint_dc, def->src_x, def->src_y, def->src_w, def->src_h, bf);
-        } else if (sprite_dc && def->src_w > 0 && def->src_h > 0) {
-            AlphaBlend(mem_dc, gx, gy, gw, gh,
-                       sprite_dc, def->src_x, def->src_y, def->src_w, def->src_h, bf);
-        }
-
         cur_x += (int)roundf((float)def->width * vscale);
     }
 }
@@ -3767,7 +3862,9 @@ static void popcap_font_draw_text(
 ) {
     if (!font || !font->loaded || !text || !rc) return;
 
-    int line_h = (int)roundf((float)(font->ascent + 4) * vscale);
+    int line_spacing = font->ascent + font->line_spacing_offset;
+    if (line_spacing <= 0) line_spacing = 14;
+    int line_h = (int)roundf((float)line_spacing * vscale);
     if (line_h <= 0) line_h = 16;
 
     const char *p = text;
@@ -3781,10 +3878,13 @@ static void popcap_font_draw_text(
     int rc_w = rc->right - rc->left;
     int total_text_h = total_lines * line_h;
 
-    int start_y = rc->top;
+    int top_y = rc->top;
     if (draw_flags & DT_VCENTER) {
-        start_y = rc->top + (rc_h - total_text_h) / 2;
+        top_y = rc->top + (rc_h - total_text_h) / 2;
     }
+
+    int aYOffset = font->ascent - font->ascent_padding;
+    int baseline_y = top_y + (int)roundf((float)aYOffset * vscale);
 
     const char *line_start = text;
     int line_idx = 0;
@@ -3800,7 +3900,7 @@ static void popcap_font_draw_text(
             cur_x = rc->right - line_w;
         }
 
-        popcap_font_draw_line(mem_dc, font, line_start, len, cur_x, start_y + line_idx * line_h, color, vscale);
+        popcap_font_draw_line(mem_dc, font, line_start, len, cur_x, baseline_y + line_idx * line_h, color, vscale);
 
         if (!line_end) break;
         line_start = line_end + 1;
@@ -3822,9 +3922,8 @@ static void render_layout_text_element(
     PopCapFont *pfont = &g_popcap_cancun_10;
     bool is_multiline_custom = false;
 
-    /* Suppress duplicate text for elements already rendered in composite pass (HelpScreen, DevHelpScreen, Gauntlet labels, DevDemo) */
+    /* Suppress duplicate text for elements already rendered in composite pass (HelpScreen, DevHelpScreen, DevDemo) */
     if ((el->section && (_stricmp(el->section, "HelpScreen") == 0 || _stricmp(el->section, "DevHelpScreen") == 0)) ||
-        (el->section && _stricmp(el->section, "GauntletLabels") == 0 && (_stricmp(tag, "DoorName") == 0 || _stricmp(tag, "PracticeText") == 0)) ||
         (_stricmp(tag, "DemoClear") == 0) || (_stricmp(tag, "DemoClick") == 0)) {
         if (is_selected || is_hovered) {
             COLORREF border_color = is_selected ? RGB(56, 189, 248) : RGB(125, 211, 252);
@@ -3961,7 +4060,7 @@ static void render_layout_text_element(
     } else if (_stricmp(tag, "Subtitle") == 0) {
         disp_text = "YOU ENTER THE RUINS ONE LAST TIME...";
         text_color = RGB(255, 234, 1);
-        pfont = &g_popcap_cancun_10;
+        pfont = &g_popcap_cancun_outline_10;
         draw_flags = DT_CENTER;
     } else if (_stricmp(tag, "Stage13Badge") == 0 || _stricmp(tag, "Stage13Num") == 0) {
         disp_text = "STAGE 13";
@@ -3976,18 +4075,18 @@ static void render_layout_text_element(
     } else if (_stricmp(tag, "Stage13Subtitle") == 0) {
         disp_text = "THE FINAL BATTLE";
         text_color = RGB(0, 229, 255);
-        pfont = &g_popcap_cancun_10;
+        pfont = &g_popcap_cancun_outline_10;
         draw_flags = DT_CENTER;
     } else if (_stricmp(tag, "DoorName") == 0) {
         disp_text = "RANDOM";
         text_color = RGB(255, 255, 255);
-        pfont = &g_popcap_cancun_10;
+        pfont = &g_popcap_cancun_outline_10;
         draw_flags = DT_CENTER;
     } else if (_stricmp(tag, "PracticeText") == 0) {
         disp_text = "PRACTICE";
         text_color = RGB(255, 234, 1);
-        pfont = &g_popcap_cancun_14;
-        draw_flags = DT_CENTER;
+        pfont = &g_popcap_cancun_outline_10;
+        draw_flags = DT_RIGHT | DT_VCENTER;
     } else if (_stricmp(tag, "CustomMapTag") == 0) {
         disp_text = "ORIGINAL MAPS";
         text_color = RGB(160, 255, 128);
@@ -4045,8 +4144,9 @@ static void render_layout_text_element(
             RECT rc_l = { el->canvas_rect.left, el->canvas_rect.top + l * sp_px,
                           el->canvas_rect.right, el->canvas_rect.top + (l + 1) * sp_px };
             if (g_popcap_cancun_10.loaded) {
+                int base_l = rc_l.top + (int)roundf((float)(g_popcap_cancun_10.ascent - g_popcap_cancun_10.ascent_padding) * vscale);
                 popcap_font_draw_line(mem_dc, &g_popcap_cancun_10, lines[l], (int)strlen(lines[l]),
-                                      rc_l.left, rc_l.top, line_cols[l], vscale);
+                                      rc_l.left, base_l, line_cols[l], vscale);
             } else {
                 SetTextColor(mem_dc, line_cols[l]);
                 DrawTextA(mem_dc, lines[l], -1, &rc_l, DT_LEFT | DT_TOP | DT_SINGLELINE);
@@ -4532,8 +4632,17 @@ static void layout_canvas_paint(LayoutEditorState *st, HWND hwnd) {
                        sp_mmsun->img.hdc_mem, 0, 0, sp_mmsun->img.width, sp_mmsun->img.height, bf);
         }
         /* Static Top Header Text */
-        RECT rc_welcome = { cx, cy - (int)roundf(4.0f * vscale), cx + rw, cy + (int)roundf(44.0f * vscale) };
-        RECT rc_notyou  = { cx, cy + (int)roundf(38.0f * vscale), cx + rw, cy + (int)roundf(56.0f * vscale) };
+        int wel_y = -6;
+        int us_y = 53;
+        for (int i = 0; i < st->element_count; ++i) {
+            if (_stricmp(st->elements[i].tag, "WelcomeText") == 0 && (st->elements[i].flags & ATTR_HAS_Y)) {
+                wel_y = st->elements[i].y;
+            } else if (_stricmp(st->elements[i].tag, "UserSwitchText") == 0 && (st->elements[i].flags & ATTR_HAS_Y)) {
+                us_y = st->elements[i].y;
+            }
+        }
+        RECT rc_welcome = { cx, cy + (int)roundf((float)wel_y * vscale), cx + rw, cy + (int)roundf((float)(wel_y + 44) * vscale) };
+        RECT rc_notyou  = { cx, cy + (int)roundf((float)(us_y - 12) * vscale), cx + rw, cy + (int)roundf((float)(us_y + 12) * vscale) };
         if (g_popcap_native_alien_16.loaded) {
             popcap_font_draw_text(mem_dc, &g_popcap_native_alien_16, "WELCOME TO ZUMA, DEVTESTER!", &rc_welcome, RGB(255, 234, 1), vscale, DT_CENTER);
         } else if (g_popcap_cancun_14.loaded) {
@@ -4618,13 +4727,32 @@ static void layout_canvas_paint(LayoutEditorState *st, HWND hwnd) {
         }
 
         /* The '?' Locked Level Doorway Preview (BEHIND gauntscreen) */
-        int dw_box = (int)roundf(310.0f * zscale * vscale);
-        int dh_box = (int)roundf(230.0f * zscale * vscale);
-        int dx_box = cx + (int)roundf(165.0f * zscale * vscale);
-        int dy_box = cy + (int)roundf(215.0f * zscale * vscale);
+        int df_x = 389, df_y = 309, df_w = 450, df_h = 338;
+        for (int i = 0; i < st->element_count; ++i) {
+            if (_stricmp(st->elements[i].tag, "DoorFrame") == 0) {
+                df_x = st->elements[i].x;
+                df_y = st->elements[i].y;
+                if (st->elements[i].w > 0) df_w = st->elements[i].w;
+                if (st->elements[i].h > 0) df_h = st->elements[i].h;
+                break;
+            }
+        }
+        int dx_box = tx + (int)roundf((float)df_x * vscale);
+        int dy_box = ty + (int)roundf((float)df_y * vscale);
+        int dw_box = (int)roundf((float)df_w * vscale);
+        int dh_box = (int)roundf((float)df_h * vscale);
+
+        /* Authentic vertical red gradient */
         for (int row = 0; row < dh_box; ++row) {
             float frac = (float)row / (float)(dh_box > 0 ? dh_box : 1);
-            int r_val = (int)(95.0f * frac);
+            int r_val;
+            if (frac < 0.5f) {
+                r_val = (int)(20.0f + 240.0f * (frac * 2.0f));
+            } else {
+                r_val = (int)(140.0f - 100.0f * ((frac - 0.5f) * 2.0f));
+            }
+            if (r_val < 0) r_val = 0;
+            if (r_val > 255) r_val = 255;
             HPEN gpen = CreatePen(PS_SOLID, 1, RGB(r_val, 0, 0));
             HPEN old_gpen = (HPEN)SelectObject(mem_dc, gpen);
             MoveToEx(mem_dc, dx_box, dy_box + row, NULL);
@@ -4632,7 +4760,7 @@ static void layout_canvas_paint(LayoutEditorState *st, HWND hwnd) {
             SelectObject(mem_dc, old_gpen);
             DeleteObject(gpen);
         }
-        RECT rc_glyph = { dx_box, dy_box + (int)roundf(30.0f * vscale), dx_box + dw_box, dy_box + dh_box - (int)roundf(20.0f * vscale) };
+        RECT rc_glyph = { dx_box, dy_box + (int)roundf(20.0f * vscale), dx_box + dw_box, dy_box + dh_box - (int)roundf(20.0f * vscale) };
         if (g_popcap_native_alien_48.loaded) {
             popcap_font_draw_text(mem_dc, &g_popcap_native_alien_48, "?", &rc_glyph, RGB(235, 215, 175), vscale, DT_CENTER | DT_VCENTER);
         }
@@ -4674,17 +4802,7 @@ static void layout_canvas_paint(LayoutEditorState *st, HWND hwnd) {
 
         /* Difficulty Gem is rendered dynamically in Step 3 from st->elements */
 
-        /* Dark name bar with "UNLOCKED IN ADVENTURE MODE" */
-        int bar_x = cx + (int)roundf(231.0f * zscale * vscale);
-        int bar_y = cy + (int)roundf(381.0f * zscale * vscale);
-        int bar_w = (int)roundf(179.0f * zscale * vscale);
-        int bar_h = (int)roundf(19.0f * zscale * vscale);
-        RECT rc_bar = { bar_x, bar_y, bar_x + bar_w, bar_y + bar_h };
-        if (g_popcap_cancun_12.loaded) {
-            popcap_font_draw_text(mem_dc, &g_popcap_cancun_12, "UNLOCKED IN ADVENTURE MODE", &rc_bar, RGB(255, 255, 0), vscale, DT_CENTER | DT_VCENTER);
-        } else if (g_popcap_cancun_14.loaded) {
-            popcap_font_draw_text(mem_dc, &g_popcap_cancun_14, "UNLOCKED IN ADVENTURE MODE", &rc_bar, RGB(255, 255, 0), vscale, DT_CENTER | DT_VCENTER);
-        }
+        /* Dynamic door name and practice text are rendered in Step 3 from XML layout elements */
     } else if (st->cur_screen_idx == 4) {
         /* Screen 4: In-Game HUD Full Widescreen */
         /* Board background (clawc.jpg 1200x675) */
