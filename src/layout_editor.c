@@ -1303,7 +1303,7 @@ static void assign_element_default_bounds(LayoutElement *el, const LayoutEditorS
             el->def_w = 400; el->def_h = 24;
             el->hotspot |= HOTSPOT_CENTER_X;
             if (!(el->flags & ATTR_HAS_X)) { el->x = space_w / 2; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 8; /* top box = baseline 32 - (ascent 36 - padding 10) = 6, x1.40625 = 8 */ }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 6; /* top box = engine baseline 32 (unscaled) - (ascent 36 - padding 10) = 6 */ }
         } else if (_stricmp(el->tag, "UserSwitchText") == 0) {
             el->def_w = 300; el->def_h = 24;
             el->hotspot |= HOTSPOT_CENTER_X;
@@ -4729,7 +4729,7 @@ static void layout_canvas_paint(LayoutEditorState *st, HWND hwnd) {
                        sp_mmsun->img.hdc_mem, 0, 0, sp_mmsun->img.width, sp_mmsun->img.height, bf);
         }
         /* Static Top Header Text */
-        int wel_y = 8; /* top box = baseline 32 - (ascent 36 - padding 10) = 6, x1.40625 = 8 */
+        int wel_y = 6; /* top box = engine baseline 32 (unscaled) - (ascent 36 - padding 10) = 6 */
         int us_y = 53;
         for (int i = 0; i < st->element_count; ++i) {
             if (_stricmp(st->elements[i].tag, "WelcomeText") == 0 && (st->elements[i].flags & ATTR_HAS_Y)) {
