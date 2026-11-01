@@ -180,6 +180,8 @@ typedef struct {
     int main_menu_space_h;
     int loading_space_w;
     int loading_space_h;
+    int adventure_space_w;
+    int adventure_space_h;
     bool show_conditional_sprites;
     HWND hwnd_chk_conditional;
 
@@ -1931,6 +1933,8 @@ static bool layout_xml_load(LayoutEditorState *st, const char *filepath) {
     st->element_count = 0;
     st->hud_space_w = 0;
     st->hud_space_h = 0;
+    st->adventure_space_w = 0;
+    st->adventure_space_h = 0;
     char line[1024];
     char cur_section[48] = {0};
 
@@ -1980,6 +1984,13 @@ static bool layout_xml_load(LayoutEditorState *st, const char *filepath) {
                 if (sp && sscanf(sp + 7, "%dx%d", &sw, &sh) == 2) {
                     st->loading_space_w = sw;
                     st->loading_space_h = sh;
+                }
+            } else if ((_stricmp(tag_name, "AdventureTemples") == 0 || _stricmp(tag_name, "AdventureDoors") == 0 || _stricmp(tag_name, "AdventureButtons") == 0 || _stricmp(tag_name, "AdventureLabels") == 0) && !strstr(p, "/>")) {
+                const char *sp = strstr(p, "space=\"");
+                int sw = 0, sh = 0;
+                if (sp && sscanf(sp + 7, "%dx%d", &sw, &sh) == 2) {
+                    st->adventure_space_w = sw;
+                    st->adventure_space_h = sh;
                 }
             }
 
@@ -2133,6 +2144,8 @@ static bool layout_xml_save(LayoutEditorState *st, const char *filepath) {
             fprintf(fp, "    <MainMenu space=\"%dx%d\">\n", st->main_menu_space_w, st->main_menu_space_h);
         } else if (_stricmp(sec_name, "LoadingScreen") == 0 && st->loading_space_w > 0) {
             fprintf(fp, "    <LoadingScreen space=\"%dx%d\">\n", st->loading_space_w, st->loading_space_h);
+        } else if ((_stricmp(sec_name, "AdventureTemples") == 0 || _stricmp(sec_name, "AdventureDoors") == 0 || _stricmp(sec_name, "AdventureButtons") == 0 || _stricmp(sec_name, "AdventureLabels") == 0) && st->adventure_space_w > 0) {
+            fprintf(fp, "    <%s space=\"%dx%d\">\n", sec_name, st->adventure_space_w, st->adventure_space_h);
         } else {
             fprintf(fp, "    <%s>\n", sec_name);
         }
@@ -2373,7 +2386,7 @@ static void calculate_viewport_transforms(
     int yo = (th - ch) / 2;
 
     int scr = st ? st->cur_screen_idx : 0;
-    if (scr == 4 || scr == 5 || scr == 6) {
+    if (scr == 4 || scr == 5 || scr == 6 || (scr == 2 && st && st->adventure_space_w == st->target_w && st->adventure_space_h == st->target_h)) {
         /* Modes B and C: In-Game full widescreen without pillars */
         cw = tw;
         ch = th;
@@ -2413,7 +2426,8 @@ static void canonical_to_canvas(
         int dy = (st->target_h - 480) / 2;
         sx = (can_x == 320) ? ((float)st->target_w * 0.5f) : ((float)can_x * zscale);
         sy = (float)(can_y + dy);
-    } else if (scr == 4 && st && st->hud_space_w == st->target_w && st->hud_space_h == st->target_h) {
+    } else if ((scr == 4 && st && st->hud_space_w == st->target_w && st->hud_space_h == st->target_h) ||
+               (scr == 2 && st && st->adventure_space_w == st->target_w && st->adventure_space_h == st->target_h)) {
         sx = (float)can_x;
         sy = (float)can_y;
     } else {
@@ -2448,7 +2462,8 @@ static void canvas_to_canonical(
         int dy = (st->target_h - 480) / 2;
         can_x = (zscale > 0.0f) ? (sx / zscale) : sx;
         can_y = sy - (float)dy;
-    } else if (scr == 4 && st && st->hud_space_w == st->target_w && st->hud_space_h == st->target_h) {
+    } else if ((scr == 4 && st && st->hud_space_w == st->target_w && st->hud_space_h == st->target_h) ||
+               (scr == 2 && st && st->adventure_space_w == st->target_w && st->adventure_space_h == st->target_h)) {
         can_x = sx;
         can_y = sy;
     } else {
@@ -2703,7 +2718,7 @@ static void update_all_elements_canvas_rects(LayoutEditorState *st, int cv_w, in
 
         if (el->flags & ATTR_IS_DOOR_PAIR) {
             int target_dx, target_dy, target_fx, target_fy;
-            if (scr == 4 || scr == 5 || scr == 6) {
+            if (scr == 4 || scr == 5 || scr == 6 || (scr == 2 && st && st->adventure_space_w == st->target_w && st->adventure_space_h == st->target_h)) {
                 target_dx = el->doorX; target_dy = el->doorY;
                 target_fx = el->frogX; target_fy = el->frogY;
             } else {
@@ -2773,17 +2788,28 @@ static void update_all_elements_canvas_rects(LayoutEditorState *st, int cv_w, in
                     }
                 }
                 if (scr == 2 && el->section && _stricmp(el->section, "AdventureLabels") == 0) {
-                    if (_stricmp(el->tag, "StageText") == 0 || _stricmp(el->tag, "Stage13Title") == 0) {
-                        in_y -= 26; /* PopCap DrawString baseline 422 to top box 396 */
-                    } else if (_stricmp(el->tag, "StageNum") == 0) {
-                        in_y -= 16; /* PopCap DrawString baseline 396 to top box 380, aligning with advstage */
-                    } else if (_stricmp(el->tag, "Subtitle") == 0 || _stricmp(el->tag, "Stage13Subtitle") == 0) {
-                        in_y -= 10; /* PopCap DrawString baseline 456 to top box 446 */
+                    if (st && st->adventure_space_w == st->target_w && st->adventure_space_h == st->target_h) {
+                        if (_stricmp(el->tag, "StageText") == 0 || _stricmp(el->tag, "Stage13Title") == 0) {
+                            in_y -= (int)roundf(26.0f * 1.40625f);
+                        } else if (_stricmp(el->tag, "StageNum") == 0) {
+                            in_y -= (int)roundf(16.0f * 1.40625f);
+                        } else if (_stricmp(el->tag, "Subtitle") == 0 || _stricmp(el->tag, "Stage13Subtitle") == 0) {
+                            in_y -= (int)roundf(10.0f * 1.40625f);
+                        }
+                    } else {
+                        if (_stricmp(el->tag, "StageText") == 0 || _stricmp(el->tag, "Stage13Title") == 0) {
+                            in_y -= 26; /* PopCap DrawString baseline 422 to top box 396 */
+                        } else if (_stricmp(el->tag, "StageNum") == 0) {
+                            in_y -= 16; /* PopCap DrawString baseline 396 to top box 380, aligning with advstage */
+                        } else if (_stricmp(el->tag, "Subtitle") == 0 || _stricmp(el->tag, "Stage13Subtitle") == 0) {
+                            in_y -= 10; /* PopCap DrawString baseline 456 to top box 446 */
+                        }
                     }
                 }
                 bool is_space_1to1 = false;
                 if (scr == 1 && st && st->main_menu_space_w == st->target_w && st->main_menu_space_h == st->target_h) is_space_1to1 = true;
                 if (scr == 0 && st && st->loading_space_w == st->target_w && st->loading_space_h == st->target_h) is_space_1to1 = true;
+                if (scr == 2 && st && st->adventure_space_w == st->target_w && st->adventure_space_h == st->target_h) is_space_1to1 = true;
 
                 if (is_space_1to1) {
                     target_x = in_x;
@@ -5385,6 +5411,7 @@ static LRESULT CALLBACK LayoutCanvasProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
                 if (st->cur_screen_idx == 4 && st->hud_space_w == st->target_w && st->hud_space_h == st->target_h) is_drag_1to1 = true;
                 if (st->cur_screen_idx == 1 && st->main_menu_space_w == st->target_w && st->main_menu_space_h == st->target_h) is_drag_1to1 = true;
                 if (st->cur_screen_idx == 0 && st->loading_space_w == st->target_w && st->loading_space_h == st->target_h) is_drag_1to1 = true;
+                if (st->cur_screen_idx == 2 && st->adventure_space_w == st->target_w && st->adventure_space_h == st->target_h) is_drag_1to1 = true;
                 float denom = is_drag_1to1 ? vscale : (vscale * zscale);
                 int delta_canon_x = (denom > 0.0001f) ? (int)roundf((float)delta_canvas_x / denom) : 0;
                 int delta_canon_y = (denom > 0.0001f) ? (int)roundf((float)delta_canvas_y / denom) : 0;
