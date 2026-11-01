@@ -1968,6 +1968,22 @@ static bool is_known_section_name(const char *name) {
     return (get_canonical_section_index(name) >= 0);
 }
 
+/* Check if an element belongs to a canonical section whose space matches target display resolution */
+static bool is_element_space_1to1(const LayoutElement *el, const LayoutEditorState *st) {
+    if (!el || !st || st->target_w <= 0 || st->target_h <= 0) return false;
+    int sec_idx = get_canonical_section_index(el->section);
+    if (sec_idx >= 0 && st->section_space[sec_idx][0] != '\0') {
+        int sw = 0, sh = 0;
+        if (sscanf(st->section_space[sec_idx], "%dx%d", &sw, &sh) == 2) {
+            return (sw == st->target_w && sh == st->target_h);
+        }
+    }
+    if (_stricmp(el->section, "InGameHUD") == 0 && st->hud_space_w > 0) {
+        return (st->hud_space_w == st->target_w && st->hud_space_h == st->target_h);
+    }
+    return false;
+}
+
 static bool layout_xml_load(LayoutEditorState *st, const char *filepath) {
     FILE *fp = fopen(filepath, "r");
     if (!fp) return false;
@@ -2755,7 +2771,7 @@ static void update_all_elements_canvas_rects(LayoutEditorState *st, int cv_w, in
         if (has_sprite) {
             target_ew = sp->img.width / cols;
             target_eh = sp->img.height / rows;
-        } else if (scr == 4 || scr == 5 || scr == 6) {
+        } else if (is_element_space_1to1(el, st) || scr == 4 || scr == 5 || scr == 6) {
             target_ew = el->def_w;
             target_eh = el->def_h;
         } else {
@@ -2770,7 +2786,7 @@ static void update_all_elements_canvas_rects(LayoutEditorState *st, int cv_w, in
 
         if (el->flags & ATTR_IS_DOOR_PAIR) {
             int target_dx, target_dy, target_fx, target_fy;
-            if (scr == 4 || scr == 5 || scr == 6 || (scr == 2 && st && st->adventure_space_w == st->target_w && st->adventure_space_h == st->target_h)) {
+            if (is_element_space_1to1(el, st) || scr == 4 || scr == 5 || scr == 6 || (scr == 2 && st && st->adventure_space_w == st->target_w && st->adventure_space_h == st->target_h)) {
                 target_dx = el->doorX; target_dy = el->doorY;
                 target_fx = el->frogX; target_fy = el->frogY;
             } else {
@@ -2858,7 +2874,7 @@ static void update_all_elements_canvas_rects(LayoutEditorState *st, int cv_w, in
                         }
                     }
                 }
-                bool is_space_1to1 = false;
+                bool is_space_1to1 = is_element_space_1to1(el, st);
                 if (scr == 1 && st && st->main_menu_space_w == st->target_w && st->main_menu_space_h == st->target_h) is_space_1to1 = true;
                 if (scr == 0 && st && st->loading_space_w == st->target_w && st->loading_space_h == st->target_h) is_space_1to1 = true;
                 if (scr == 2 && st && st->adventure_space_w == st->target_w && st->adventure_space_h == st->target_h) is_space_1to1 = true;
@@ -5463,11 +5479,7 @@ static LRESULT CALLBACK LayoutCanvasProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
                 int delta_canvas_x = mx - st->drag_start_mx;
                 int delta_canvas_y = my - st->drag_start_my;
 
-                bool is_drag_1to1 = false;
-                if (st->cur_screen_idx == 4 && st->hud_space_w == st->target_w && st->hud_space_h == st->target_h) is_drag_1to1 = true;
-                if (st->cur_screen_idx == 1 && st->main_menu_space_w == st->target_w && st->main_menu_space_h == st->target_h) is_drag_1to1 = true;
-                if (st->cur_screen_idx == 0 && st->loading_space_w == st->target_w && st->loading_space_h == st->target_h) is_drag_1to1 = true;
-                if (st->cur_screen_idx == 2 && st->adventure_space_w == st->target_w && st->adventure_space_h == st->target_h) is_drag_1to1 = true;
+                bool is_drag_1to1 = is_element_space_1to1(st->held_elem, st);
                 float denom = is_drag_1to1 ? vscale : (vscale * zscale);
                 int delta_canon_x = (denom > 0.0001f) ? (int)roundf((float)delta_canvas_x / denom) : 0;
                 int delta_canon_y = (denom > 0.0001f) ? (int)roundf((float)delta_canvas_y / denom) : 0;
