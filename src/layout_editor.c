@@ -185,6 +185,7 @@ typedef struct {
     int adventure_space_w;
     int adventure_space_h;
     char section_space[32][64];
+    char xml_header[4096];
     bool show_conditional_sprites;
     HWND hwnd_chk_conditional;
 
@@ -1994,10 +1995,30 @@ static bool layout_xml_load(LayoutEditorState *st, const char *filepath) {
     st->adventure_space_w = 0;
     st->adventure_space_h = 0;
     memset(st->section_space, 0, sizeof(st->section_space));
+    memset(st->xml_header, 0, sizeof(st->xml_header));
     char line[1024];
     char cur_section[48] = {0};
+    bool in_header = true;
 
     while (fgets(line, sizeof(line), fp)) {
+        if (in_header) {
+            char *chk = line;
+            while (*chk && isspace((unsigned char)*chk)) chk++;
+            if (*chk == '<') {
+                char tag[32] = {0};
+                if (sscanf(chk + 1, "%31[^> \t\r\n/]", tag) == 1 && _stricmp(tag, "Layout") == 0) {
+                    in_header = false;
+                    continue;
+                }
+            }
+            size_t clen = strlen(st->xml_header);
+            size_t llen = strlen(line);
+            if (clen + llen + 1 < sizeof(st->xml_header)) {
+                memcpy(st->xml_header + clen, line, llen + 1);
+            }
+            continue;
+        }
+
         char *p = line;
         while (*p && isspace((unsigned char)*p)) p++;
         if (*p == '\0' || *p == '#') continue;
@@ -2148,14 +2169,19 @@ static bool layout_xml_save(LayoutEditorState *st, const char *filepath) {
     FILE *fp = fopen(filepath, "wb");
     if (!fp) return false;
 
-    fprintf(fp, "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n");
-    fprintf(fp, "<!--\n");
-    fprintf(fp, "  =============================================================================\n");
-    fprintf(fp, "  ZuCompleluxe UI Layout Configuration (properties/layout.xml)\n");
-    fprintf(fp, "  Exported cleanly by ZuPather Layout Editor\n");
-    fprintf(fp, "  =============================================================================\n");
-    fprintf(fp, "-->\n");
-    fprintf(fp, "<Layout>\n");
+    if (st->xml_header[0] != '\0') {
+        fputs(st->xml_header, fp);
+        fprintf(fp, "<Layout>\n");
+    } else {
+        fprintf(fp, "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n");
+        fprintf(fp, "<!--\n");
+        fprintf(fp, "  =============================================================================\n");
+        fprintf(fp, "  ZuCompleluxe UI Layout Configuration (properties/layout.xml)\n");
+        fprintf(fp, "  Exported cleanly by ZuPather Layout Editor\n");
+        fprintf(fp, "  =============================================================================\n");
+        fprintf(fp, "-->\n");
+        fprintf(fp, "<Layout>\n");
+    }
 
     /* Canonical section list */
     static const char *canonical_sections[] = {
