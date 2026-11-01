@@ -28,7 +28,9 @@ levels.xml.bak
 canvas/
 
 # Local Unit Tests, Verification Captures & Scratches (git-ignored)
-tests/
+tests/*
+!tests/test_layout_roundtrip.c
+!tests/run_tests.bat
 wasm/
 web/
 *.bmp

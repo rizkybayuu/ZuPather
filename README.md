@@ -149,6 +149,14 @@ The build script will:
 3. Compile all C source modules into the single unified binary: **`ZuPather.exe`** (~2.3 MB).
 4. Perform binary verification and report compiled artifact size.
 
+### Running Regression & Unit Tests
+ZuPather includes a dedicated regression test suite validating layout XML parsing, word-boundary attribute extraction, coordinate space normalization, and semantic roundtrip parity:
+```cmd
+build_windows.bat --test
+# or directly via:
+tests\run_tests.bat
+```
+
 ---
 
 ## Technical Specifications: Binary Curve Format (`.dat`)
