@@ -3651,10 +3651,7 @@ static HDC popcap_font_get_tinted_dc(PopCapFont *font, COLORREF cr) {
             uint8_t pg = (uint8_t)((sg * g) / 255);
             uint8_t pb = (uint8_t)((sb * b) / 255);
 
-            uint8_t dst_r = (uint8_t)((pr * a) / 255);
-            uint8_t dst_g = (uint8_t)((pg * a) / 255);
-            uint8_t dst_b = (uint8_t)((pb * a) / 255);
-            dst[i] = ((uint32_t)a << 24) | ((uint32_t)dst_r << 16) | ((uint32_t)dst_g << 8) | (uint32_t)dst_b;
+            dst[i] = ((uint32_t)a << 24) | ((uint32_t)pr << 16) | ((uint32_t)pg << 8) | (uint32_t)pb;
         }
     } else {
         for (int i = 0; i < total; ++i) {
@@ -3678,8 +3675,16 @@ static bool popcap_font_load(
     char root_dir[MAX_PATH] = {0};
     if (!get_zuma_game_root_dir(root_dir, sizeof(root_dir))) return false;
 
-    char txt_path[MAX_PATH];
-    snprintf(txt_path, sizeof(txt_path), "%s\\fonts\\%s.txt", root_dir, font_name);
+    char txt_path[MAX_PATH] = {0};
+    if (root_dir[0] != '\0') {
+        snprintf(txt_path, sizeof(txt_path), "%s\\fonts\\%s.txt", root_dir, font_name);
+    }
+    if (txt_path[0] == '\0' || GetFileAttributesA(txt_path) == INVALID_FILE_ATTRIBUTES) {
+        snprintf(txt_path, sizeof(txt_path), "%s\\..\\Zuma Compleluxe\\fonts\\%s.txt", root_dir, font_name);
+    }
+    if (GetFileAttributesA(txt_path) == INVALID_FILE_ATTRIBUTES) {
+        snprintf(txt_path, sizeof(txt_path), "D:\\Files\\Project\\Reverse Engineer\\Zuma Compleluxe\\fonts\\%s.txt", font_name);
+    }
     if (GetFileAttributesA(txt_path) == INVALID_FILE_ATTRIBUTES) return false;
 
     if (!parse_popcap_font_txt(txt_path, font)) return false;
@@ -3695,6 +3700,9 @@ static bool popcap_font_load(
         char mask_path[MAX_PATH];
         if (!layout_get_zuma_asset_path(mask_name, mask_path, sizeof(mask_path))) {
             snprintf(mask_path, sizeof(mask_path), "%s\\fonts\\%s.gif", root_dir, mask_name);
+            if (GetFileAttributesA(mask_path) == INVALID_FILE_ATTRIBUTES) {
+                snprintf(mask_path, sizeof(mask_path), "D:\\Files\\Project\\Reverse Engineer\\Zuma Compleluxe\\fonts\\%s.gif", mask_name);
+            }
         }
         if (GetFileAttributesA(mask_path) != INVALID_FILE_ATTRIBUTES) {
             image_load_from_file(mask_path, &font->mask_img);
@@ -4046,7 +4054,7 @@ static void render_layout_text_element(
         draw_flags = DT_CENTER;
     } else if (_stricmp(tag, "ClickToPlay") == 0) {
         disp_text = "CLICK HERE TO PLAY!";
-        text_color = RGB(255, 234, 1);
+        text_color = RGB(255, 236, 145); /* PopCap authentic 0xffec91 */
         pfont = &g_popcap_cancun_14;
         draw_flags = DT_CENTER;
     } else if (_stricmp(tag, "HighscoreScores") == 0) {
@@ -4182,6 +4190,33 @@ static void render_layout_text_element(
         RECT rc_txt = el->canvas_rect;
         if (pfont && pfont->loaded) {
             popcap_font_draw_text(mem_dc, pfont, disp_text, &rc_txt, text_color, vscale, draw_flags);
+            if (_stricmp(tag, "ClickToPlay") == 0) {
+                int line_w = (int)roundf((float)popcap_font_get_line_width(pfont, disp_text, (int)strlen(disp_text)) * vscale);
+                int rc_w = rc_txt.right - rc_txt.left;
+                int cur_x = rc_txt.left;
+                if (draw_flags & DT_CENTER) {
+                    cur_x = rc_txt.left + (rc_w - line_w) / 2;
+                } else if (draw_flags & DT_RIGHT) {
+                    cur_x = rc_txt.right - line_w;
+                }
+                int aYOffset = pfont->ascent - pfont->ascent_padding;
+                int top_y = rc_txt.top;
+                if (draw_flags & DT_VCENTER) {
+                    int line_spacing = pfont->ascent + pfont->line_spacing_offset;
+                    if (line_spacing <= 0) line_spacing = 14;
+                    int line_h = (int)roundf((float)line_spacing * vscale);
+                    top_y = rc_txt.top + (rc_txt.bottom - rc_txt.top - line_h) / 2;
+                }
+                int baseline_y = top_y + (int)roundf((float)aYOffset * vscale);
+                int uy = baseline_y + (int)roundf(3.0f * vscale);
+                int uh = (int)roundf(2.0f * vscale);
+                if (uh < 1) uh = 1;
+
+                HBRUSH br = CreateSolidBrush(text_color);
+                RECT rc_ul = { cur_x, uy, cur_x + line_w, uy + uh };
+                FillRect(mem_dc, &rc_ul, br);
+                DeleteObject(br);
+            }
         } else {
             SetBkMode(mem_dc, TRANSPARENT);
             SelectObject(mem_dc, font_bold);
@@ -4191,6 +4226,16 @@ static void render_layout_text_element(
             DrawTextA(mem_dc, disp_text, -1, &rc_sh, draw_flags);
             SetTextColor(mem_dc, text_color);
             DrawTextA(mem_dc, disp_text, -1, &rc_txt, draw_flags);
+            if (_stricmp(tag, "ClickToPlay") == 0) {
+                SIZE sz;
+                GetTextExtentPoint32A(mem_dc, disp_text, (int)strlen(disp_text), &sz);
+                int cur_x = rc_txt.left + (rc_txt.right - rc_txt.left - sz.cx) / 2;
+                int uy = rc_txt.top + (rc_txt.bottom - rc_txt.top + sz.cy) / 2 + 1;
+                HBRUSH br = CreateSolidBrush(text_color);
+                RECT rc_ul = { cur_x, uy, cur_x + sz.cx, uy + 2 };
+                FillRect(mem_dc, &rc_ul, br);
+                DeleteObject(br);
+            }
         }
     }
 
