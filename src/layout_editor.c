@@ -48,7 +48,8 @@ typedef enum {
     ATTR_HAS_BX          = (1 << 27),
     ATTR_HAS_CX          = (1 << 28),
     ATTR_HAS_DX          = (1 << 29),
-    ATTR_IS_DOOR_PAIR    = (1 << 30)
+    ATTR_IS_DOOR_PAIR    = (1 << 30),
+    ATTR_HAS_LINESPACING = 0x80000000U
 } LayoutAttrFlags;
 
 /* Element Hotspot Mode for anchor alignment (TopLeft default vs Center on specific axes vs BottomCenter) */
@@ -72,7 +73,7 @@ typedef struct {
     int doorX, doorY, frogX, frogY;
     int centerX, centerY;
     int offsetX, offsetY;
-    int minTop, spacing;
+    int minTop, spacing, lineSpacing;
     int livesX, stageCX, scoreRX, zumaX, menuX;
     int top, bottom, left, right;
     int col1X, col2X;
@@ -182,6 +183,7 @@ typedef struct {
     int loading_space_h;
     int adventure_space_w;
     int adventure_space_h;
+    char section_space[32][32];
     bool show_conditional_sprites;
     HWND hwnd_chk_conditional;
 
@@ -1918,12 +1920,16 @@ static const char *g_canonical_sections[] = {
 };
 static const int g_num_canonical_sections = (int)(sizeof(g_canonical_sections) / sizeof(g_canonical_sections[0]));
 
-static bool is_known_section_name(const char *name) {
-    if (!name || !*name) return false;
+static int get_canonical_section_index(const char *name) {
+    if (!name || !*name) return -1;
     for (int s = 0; s < g_num_canonical_sections; ++s) {
-        if (_stricmp(name, g_canonical_sections[s]) == 0) return true;
+        if (_stricmp(name, g_canonical_sections[s]) == 0) return s;
     }
-    return false;
+    return -1;
+}
+
+static bool is_known_section_name(const char *name) {
+    return (get_canonical_section_index(name) >= 0);
 }
 
 static bool layout_xml_load(LayoutEditorState *st, const char *filepath) {
@@ -1935,6 +1941,7 @@ static bool layout_xml_load(LayoutEditorState *st, const char *filepath) {
     st->hud_space_h = 0;
     st->adventure_space_w = 0;
     st->adventure_space_h = 0;
+    memset(st->section_space, 0, sizeof(st->section_space));
     char line[1024];
     char cur_section[48] = {0};
 
@@ -1961,36 +1968,32 @@ static bool layout_xml_load(LayoutEditorState *st, const char *filepath) {
 
             if (_stricmp(tag_name, "Layout") == 0) continue;
 
-            /* Check section headers with space attribute, e.g. space="1200x675" */
+            /* Check section headers with space attribute, e.g. space="1200x675" or any custom value */
+            int sec_idx = get_canonical_section_index(tag_name);
+            int is_sec_header = (sec_idx >= 0 && !strstr(p, "/>"));
             int is_hud_open = 0;
-            if (_stricmp(tag_name, "InGameHUD") == 0 && !strstr(p, "/>")) {
-                is_hud_open = 1;
-                const char *sp = strstr(p, "space=\"");
-                int sw = 0, sh = 0;
-                if (sp && sscanf(sp + 7, "%dx%d", &sw, &sh) == 2) {
-                    st->hud_space_w = sw;
-                    st->hud_space_h = sh;
-                }
-            } else if (_stricmp(tag_name, "MainMenu") == 0 && !strstr(p, "/>")) {
-                const char *sp = strstr(p, "space=\"");
-                int sw = 0, sh = 0;
-                if (sp && sscanf(sp + 7, "%dx%d", &sw, &sh) == 2) {
-                    st->main_menu_space_w = sw;
-                    st->main_menu_space_h = sh;
-                }
-            } else if (_stricmp(tag_name, "LoadingScreen") == 0 && !strstr(p, "/>")) {
-                const char *sp = strstr(p, "space=\"");
-                int sw = 0, sh = 0;
-                if (sp && sscanf(sp + 7, "%dx%d", &sw, &sh) == 2) {
-                    st->loading_space_w = sw;
-                    st->loading_space_h = sh;
-                }
-            } else if ((_stricmp(tag_name, "AdventureTemples") == 0 || _stricmp(tag_name, "AdventureDoors") == 0 || _stricmp(tag_name, "AdventureButtons") == 0 || _stricmp(tag_name, "AdventureLabels") == 0) && !strstr(p, "/>")) {
-                const char *sp = strstr(p, "space=\"");
-                int sw = 0, sh = 0;
-                if (sp && sscanf(sp + 7, "%dx%d", &sw, &sh) == 2) {
-                    st->adventure_space_w = sw;
-                    st->adventure_space_h = sh;
+            if (is_sec_header) {
+                if (_stricmp(tag_name, "InGameHUD") == 0) is_hud_open = 1;
+                char space_val[32] = {0};
+                if (extract_xml_attr_str(p, "space", space_val, sizeof(space_val))) {
+                    strncpy(st->section_space[sec_idx], space_val, sizeof(st->section_space[sec_idx]) - 1);
+                    st->section_space[sec_idx][sizeof(st->section_space[sec_idx]) - 1] = 0;
+                    int sw = 0, sh = 0;
+                    if (sscanf(space_val, "%dx%d", &sw, &sh) == 2) {
+                        if (_stricmp(tag_name, "InGameHUD") == 0) {
+                            st->hud_space_w = sw;
+                            st->hud_space_h = sh;
+                        } else if (_stricmp(tag_name, "MainMenu") == 0) {
+                            st->main_menu_space_w = sw;
+                            st->main_menu_space_h = sh;
+                        } else if (_stricmp(tag_name, "LoadingScreen") == 0) {
+                            st->loading_space_w = sw;
+                            st->loading_space_h = sh;
+                        } else if (_strnicmp(tag_name, "Adventure", 9) == 0) {
+                            st->adventure_space_w = sw;
+                            st->adventure_space_h = sh;
+                        }
+                    }
                 }
             }
 
@@ -2057,6 +2060,7 @@ static bool layout_xml_load(LayoutEditorState *st, const char *filepath) {
             /* Spacing and margins */
             if (extract_xml_attr_int(p, "minTop", &el->minTop)) el->flags |= ATTR_HAS_MIN_TOP;
             if (extract_xml_attr_int(p, "spacing", &el->spacing)) el->flags |= ATTR_HAS_SPACING;
+            if (extract_xml_attr_int(p, "lineSpacing", &el->lineSpacing)) el->flags |= ATTR_HAS_LINESPACING;
 
             /* InGame Menubar HUD positions */
             if (extract_xml_attr_int(p, "livesX", &el->livesX)) el->flags |= ATTR_HAS_LIVES_X;
@@ -2136,7 +2140,12 @@ static bool layout_xml_save(LayoutEditorState *st, const char *filepath) {
         }
         if (!has_sec) continue;
 
-        if (_stricmp(sec_name, "InGameHUD") == 0) {
+        int sec_idx = get_canonical_section_index(sec_name);
+        const char *sec_space = (sec_idx >= 0 && st->section_space[sec_idx][0]) ? st->section_space[sec_idx] : NULL;
+
+        if (sec_space && *sec_space) {
+            fprintf(fp, "    <%s space=\"%s\">\n", sec_name, sec_space);
+        } else if (_stricmp(sec_name, "InGameHUD") == 0) {
             int sw = st->hud_space_w > 0 ? st->hud_space_w : 1200;
             int sh = st->hud_space_h > 0 ? st->hud_space_h : 675;
             fprintf(fp, "    <InGameHUD space=\"%dx%d\">\n", sw, sh);
@@ -2144,7 +2153,7 @@ static bool layout_xml_save(LayoutEditorState *st, const char *filepath) {
             fprintf(fp, "    <MainMenu space=\"%dx%d\">\n", st->main_menu_space_w, st->main_menu_space_h);
         } else if (_stricmp(sec_name, "LoadingScreen") == 0 && st->loading_space_w > 0) {
             fprintf(fp, "    <LoadingScreen space=\"%dx%d\">\n", st->loading_space_w, st->loading_space_h);
-        } else if ((_stricmp(sec_name, "AdventureTemples") == 0 || _stricmp(sec_name, "AdventureDoors") == 0 || _stricmp(sec_name, "AdventureButtons") == 0 || _stricmp(sec_name, "AdventureLabels") == 0) && st->adventure_space_w > 0) {
+        } else if (_strnicmp(sec_name, "Adventure", 9) == 0 && st->adventure_space_w > 0) {
             fprintf(fp, "    <%s space=\"%dx%d\">\n", sec_name, st->adventure_space_w, st->adventure_space_h);
         } else {
             fprintf(fp, "    <%s>\n", sec_name);
@@ -2206,6 +2215,7 @@ static bool layout_xml_save(LayoutEditorState *st, const char *filepath) {
                 if (el->flags & ATTR_HAS_OFFSET_Y) fprintf(fp, " offsetY=\"%d\"", el->offsetY);
                 if (el->flags & ATTR_HAS_MIN_TOP) fprintf(fp, " minTop=\"%d\"", el->minTop);
                 if (el->flags & ATTR_HAS_SPACING) fprintf(fp, " spacing=\"%d\"", el->spacing);
+                if (el->flags & ATTR_HAS_LINESPACING) fprintf(fp, " lineSpacing=\"%d\"", el->lineSpacing);
 
                 /* Menubar */
                 if (el->flags & ATTR_HAS_LIVES_X) fprintf(fp, " livesX=\"%d\"", el->livesX);
