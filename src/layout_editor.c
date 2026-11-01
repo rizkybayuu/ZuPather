@@ -268,6 +268,7 @@ static bool is_element_in_sub_filter(const LayoutElement *el, int screen_idx, in
 static bool is_element_visible_in_editor(const LayoutElement *el, const LayoutEditorState *st);
 static LRESULT CALLBACK LayoutEditorWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 static LRESULT CALLBACK LayoutCanvasProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
+static int get_canonical_section_index(const char *name);
 
 /* Helper function to find Zuma Deluxe game root directory by climbing up parent directories */
 static bool get_zuma_game_root_dir(char *out_dir, size_t max_len) {
@@ -1165,6 +1166,8 @@ static const ElementHotspotRule g_hotspot_rules[] = {
     { "TempleCleared",   "TikiHead",          HOTSPOT_TOPLEFT },   /* PopCap DrawImage(50, 160) top-left confirmed by disassembly */
     { "TempleCleared",   "FrogMedallion",     HOTSPOT_CENTER_BOTH },/* Center (120, 380) keeps medallion inside 480 boundary */
     { "TempleCleared",   "ContinueBtn",       HOTSPOT_TOPLEFT },
+    { "MainMenu",        "WelcomeText",       HOTSPOT_CENTER_X },
+    { "MainMenu",        "UserSwitchText",    HOTSPOT_CENTER_X },
     { "MainMenu",        "EyeIdle1",          HOTSPOT_CENTER_BOTH },/* Pupil resting center */
     { "MainMenu",        "EyeIdle2",          HOTSPOT_CENTER_BOTH },/* Pupil resting center */
     { "GauntletLabels",  "Gem",               HOTSPOT_BOTTOM_CENTER },/* 560 horizontally centered, bottom aligned at 220 */
@@ -1188,8 +1191,21 @@ static const ElementHotspotRule g_hotspot_rules[] = {
 };
 
 /* Helper to assign canonical visual bounding box dimensions, hotspot modes and defaults across all 17 sections */
-static void assign_element_default_bounds(LayoutElement *el) {
+static void assign_element_default_bounds(LayoutElement *el, const LayoutEditorState *st) {
     if (!el) return;
+
+    int space_w = 640;
+    if (st) {
+        int sec_idx = get_canonical_section_index(el->section);
+        if (sec_idx >= 0 && st->section_space[sec_idx][0] != '\0') {
+            int sw = 0, sh = 0;
+            if (sscanf(st->section_space[sec_idx], "%dx%d", &sw, &sh) == 2 && sw > 0) space_w = sw;
+        } else if (_stricmp(el->section, "LoadingScreen") == 0 && st->loading_space_w > 0) {
+            space_w = st->loading_space_w;
+        } else if (_stricmp(el->section, "MainMenu") == 0 && st->main_menu_space_w > 0) {
+            space_w = st->main_menu_space_w;
+        }
+    }
 
     el->hotspot = HOTSPOT_TOPLEFT;
     el->has_explicit_size = ((el->flags & ATTR_HAS_W) != 0 && (el->flags & ATTR_HAS_H) != 0);
@@ -1216,7 +1232,7 @@ static void assign_element_default_bounds(LayoutElement *el) {
         } else if (_stricmp(el->tag, "ClickToPlay") == 0) {
             el->def_w = 300; el->def_h = 32;
             el->hotspot |= HOTSPOT_CENTER_X;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 320;  }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = space_w / 2;  }
             if (!(el->flags & ATTR_HAS_Y)) { el->y = 430;  }
             if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "top-center", sizeof(el->align)-1);  }
         } else {
@@ -1281,6 +1297,16 @@ static void assign_element_default_bounds(LayoutElement *el) {
             el->def_w = 640; el->def_h = 100;
             if (!(el->flags & ATTR_HAS_X)) { el->x = 0;  }
             if (!(el->flags & ATTR_HAS_Y)) { el->y = 0;  }
+        } else if (_stricmp(el->tag, "WelcomeText") == 0) {
+            el->def_w = 400; el->def_h = 24;
+            el->hotspot |= HOTSPOT_CENTER_X;
+            if (!(el->flags & ATTR_HAS_X)) { el->x = space_w / 2; }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = -6; }
+        } else if (_stricmp(el->tag, "UserSwitchText") == 0) {
+            el->def_w = 300; el->def_h = 24;
+            el->hotspot |= HOTSPOT_CENTER_X;
+            if (!(el->flags & ATTR_HAS_X)) { el->x = space_w / 2; }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 53; }
         } else {
             el->def_w = 80; el->def_h = 32;
         }
@@ -2179,7 +2205,7 @@ static bool layout_xml_load(LayoutEditorState *st, const char *filepath) {
             if (extract_xml_attr_int(p, "cx", &el->cx)) el->flags |= ATTR_HAS_CX;
             if (extract_xml_attr_int(p, "dx", &el->dx)) el->flags |= ATTR_HAS_DX;
 
-            assign_element_default_bounds(el);
+            assign_element_default_bounds(el, st);
             st->element_count++;
         }
     }
@@ -5517,6 +5543,8 @@ static void layout_editor_update_screen_elements_list(LayoutEditorState *st) {
             }
         } else if (el->flags & ATTR_HAS_ID) {
             snprintf(item_txt, sizeof(item_txt), "%s [id=\"%s\"] (%d, %d)", el->tag, el->id, el->x, el->y);
+        } else if (!(el->flags & ATTR_HAS_X) && (_stricmp(el->tag, "ClickToPlay") == 0 || _stricmp(el->tag, "WelcomeText") == 0 || _stricmp(el->tag, "UserSwitchText") == 0)) {
+            snprintf(item_txt, sizeof(item_txt), "%s (Center, %d)", el->tag, el->y);
         } else {
             snprintf(item_txt, sizeof(item_txt), "%s (%d, %d)", el->tag, el->x, el->y);
         }
@@ -6174,11 +6202,11 @@ static LRESULT CALLBACK LayoutEditorWndProc(HWND hwnd, UINT msg, WPARAM wParam, 
                     } else if (id == ID_LE_EDIT_W) {
                         sel_el->w = v;
                         sel_el->flags |= ATTR_HAS_W;
-                        assign_element_default_bounds(sel_el);
+                        assign_element_default_bounds(sel_el, st);
                     } else if (id == ID_LE_EDIT_H) {
                         sel_el->h = v;
                         sel_el->flags |= ATTR_HAS_H;
-                        assign_element_default_bounds(sel_el);
+                        assign_element_default_bounds(sel_el, st);
                     } else if (id == ID_LE_EDIT_CENTER_X) {
                         sel_el->centerX = v;
                         sel_el->flags |= ATTR_HAS_CENTER_X;
