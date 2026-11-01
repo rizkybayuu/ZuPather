@@ -74,6 +74,7 @@ typedef struct {
     int centerX, centerY;
     int offsetX, offsetY;
     int minTop, spacing, lineSpacing;
+    bool use_width_height_names;
     int livesX, stageCX, scoreRX, zumaX, menuX;
     int top, bottom, left, right;
     int col1X, col2X;
@@ -183,7 +184,7 @@ typedef struct {
     int loading_space_h;
     int adventure_space_w;
     int adventure_space_h;
-    char section_space[32][32];
+    char section_space[32][64];
     bool show_conditional_sprites;
     HWND hwnd_chk_conditional;
 
@@ -1209,14 +1210,14 @@ static void assign_element_default_bounds(LayoutElement *el) {
     if (_stricmp(el->section, "LoadingScreen") == 0) {
         if (_stricmp(el->tag, "LoadingBar") == 0) {
             el->def_w = 384; el->def_h = 44;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 128; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 349; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 128;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 349;  }
         } else if (_stricmp(el->tag, "ClickToPlay") == 0) {
             el->def_w = 300; el->def_h = 32;
             el->hotspot |= HOTSPOT_CENTER_X;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 320; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 430; el->flags |= ATTR_HAS_Y; }
-            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "top-center", sizeof(el->align)-1); el->flags |= ATTR_HAS_ALIGN; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 320;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 430;  }
+            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "top-center", sizeof(el->align)-1);  }
         } else {
             el->def_w = 120; el->def_h = 32;
         }
@@ -1226,59 +1227,59 @@ static void assign_element_default_bounds(LayoutElement *el) {
     else if (_stricmp(el->section, "MainMenu") == 0) {
         if (_stricmp(el->tag, "AdventureBtn") == 0) {
             el->def_w = 163; el->def_h = 92;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 452; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 64; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 452;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 64;  }
         } else if (_stricmp(el->tag, "GauntletBtn") == 0) {
             el->def_w = 180; el->def_h = 83;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 436; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 153; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 436;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 153;  }
         } else if (_stricmp(el->tag, "OptionsBtn") == 0) {
             el->def_w = 199; el->def_h = 86;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 418; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 236; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 418;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 236;  }
         } else if (_stricmp(el->tag, "MoreGamesBtn") == 0) {
             el->def_w = 118; el->def_h = 127;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 394; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 305; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 394;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 305;  }
         } else if (_stricmp(el->tag, "QuitBtn") == 0) {
             el->def_w = 120; el->def_h = 141;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 496; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 315; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 496;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 315;  }
         } else if (_stricmp(el->tag, "FrogEyes") == 0) {
             el->def_w = 108; el->def_h = 45;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 191; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 331; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 191;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 331;  }
         } else if (_stricmp(el->tag, "Sun") == 0 || _stricmp(el->tag, "Sun1") == 0 || _stricmp(el->tag, "Sun2") == 0) {
             el->def_w = 229; el->def_h = 227;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = -69; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = -63; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = -69;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = -63;  }
         } else if (_stricmp(el->tag, "Hat") == 0) {
             el->def_w = 101; el->def_h = 107;
             el->is_conditional = true;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 188; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 247; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 188;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 247;  }
         } else if (_stricmp(el->tag, "EyeIdle1") == 0) {
             el->hotspot = HOTSPOT_CENTER_BOTH;
             el->def_w = 32; el->def_h = 32;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 219; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 368; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 219;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 368;  }
         } else if (_stricmp(el->tag, "EyeIdle2") == 0) {
             el->hotspot = HOTSPOT_CENTER_BOTH;
             el->def_w = 32; el->def_h = 32;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 276; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 355; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 276;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 355;  }
         } else if (_stricmp(el->tag, "EyeRay1") == 0) {
             el->def_w = 16; el->def_h = 16;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 29; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 25; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 29;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 25;  }
         } else if (_stricmp(el->tag, "EyeRay2") == 0) {
             el->def_w = 16; el->def_h = 16;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 87; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 16; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 87;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 16;  }
         } else if (_stricmp(el->tag, "Sky") == 0) {
             el->def_w = 640; el->def_h = 100;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 0; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 0; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 0;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 0;  }
         } else {
             el->def_w = 80; el->def_h = 32;
         }
@@ -1286,81 +1287,81 @@ static void assign_element_default_bounds(LayoutElement *el) {
 
     /* 3. Adventure Map */
     else if (_stricmp(el->section, "AdventureTemples") == 0) {
-        if (_stricmp(el->tag, "Temple1") == 0) { el->def_w = 192; el->def_h = 100; if (!(el->flags & ATTR_HAS_X)) { el->x = 0; el->flags |= ATTR_HAS_X; } if (!(el->flags & ATTR_HAS_Y)) { el->y = 188; el->flags |= ATTR_HAS_Y; } }
-        else if (_stricmp(el->tag, "Temple2") == 0 || _stricmp(el->tag, "Temple2V") == 0) { el->def_w = 190; el->def_h = 100; if (!(el->flags & ATTR_HAS_X)) { el->x = 0; el->flags |= ATTR_HAS_X; } if (!(el->flags & ATTR_HAS_Y)) { el->y = 112; el->flags |= ATTR_HAS_Y; } }
-        else if (_stricmp(el->tag, "Temple3") == 0 || _stricmp(el->tag, "Temple3V") == 0) { el->def_w = 190; el->def_h = 100; if (!(el->flags & ATTR_HAS_X)) { el->x = 395; el->flags |= ATTR_HAS_X; } if (!(el->flags & ATTR_HAS_Y)) { el->y = 125; el->flags |= ATTR_HAS_Y; } }
-        else if (_stricmp(el->tag, "Temple4") == 0) { el->def_w = 292; el->def_h = 140; if (!(el->flags & ATTR_HAS_X)) { el->x = 174; el->flags |= ATTR_HAS_X; } if (!(el->flags & ATTR_HAS_Y)) { el->y = 1; el->flags |= ATTR_HAS_Y; } }
-        else if (_stricmp(el->tag, "Temple5") == 0) { el->def_w = 391; el->def_h = 100; if (!(el->flags & ATTR_HAS_X)) { el->x = 126; el->flags |= ATTR_HAS_X; } if (!(el->flags & ATTR_HAS_Y)) { el->y = 148; el->flags |= ATTR_HAS_Y; } }
-        else if (_stricmp(el->tag, "Middle") == 0) { el->def_w = 640; el->def_h = 150; if (!(el->flags & ATTR_HAS_X)) { el->x = 0; el->flags |= ATTR_HAS_X; } if (!(el->flags & ATTR_HAS_Y)) { el->y = 72; el->flags |= ATTR_HAS_Y; } }
+        if (_stricmp(el->tag, "Temple1") == 0) { el->def_w = 192; el->def_h = 100; if (!(el->flags & ATTR_HAS_X)) { el->x = 0;  } if (!(el->flags & ATTR_HAS_Y)) { el->y = 188;  } }
+        else if (_stricmp(el->tag, "Temple2") == 0 || _stricmp(el->tag, "Temple2V") == 0) { el->def_w = 190; el->def_h = 100; if (!(el->flags & ATTR_HAS_X)) { el->x = 0;  } if (!(el->flags & ATTR_HAS_Y)) { el->y = 112;  } }
+        else if (_stricmp(el->tag, "Temple3") == 0 || _stricmp(el->tag, "Temple3V") == 0) { el->def_w = 190; el->def_h = 100; if (!(el->flags & ATTR_HAS_X)) { el->x = 395;  } if (!(el->flags & ATTR_HAS_Y)) { el->y = 125;  } }
+        else if (_stricmp(el->tag, "Temple4") == 0) { el->def_w = 292; el->def_h = 140; if (!(el->flags & ATTR_HAS_X)) { el->x = 174;  } if (!(el->flags & ATTR_HAS_Y)) { el->y = 1;  } }
+        else if (_stricmp(el->tag, "Temple5") == 0) { el->def_w = 391; el->def_h = 100; if (!(el->flags & ATTR_HAS_X)) { el->x = 126;  } if (!(el->flags & ATTR_HAS_Y)) { el->y = 148;  } }
+        else if (_stricmp(el->tag, "Middle") == 0) { el->def_w = 640; el->def_h = 150; if (!(el->flags & ATTR_HAS_X)) { el->x = 0;  } if (!(el->flags & ATTR_HAS_Y)) { el->y = 72;  } }
         else { el->def_w = 160; el->def_h = 90; }
     } else if (_stricmp(el->section, "AdventureDoors") == 0 || _stricmp(el->tag, "Door") == 0) {
         el->def_w = 64; el->def_h = 50;
     } else if (_stricmp(el->section, "AdventureButtons") == 0) {
         if (_stricmp(el->tag, "MainMenu") == 0) {
             el->def_w = 125; el->def_h = 42;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 0; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 438; el->flags |= ATTR_HAS_Y; }
-            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "bottom-left", sizeof(el->align)-1); el->flags |= ATTR_HAS_ALIGN; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 0;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 438;  }
+            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "bottom-left", sizeof(el->align)-1);  }
         } else if (_stricmp(el->tag, "Play") == 0) {
             el->def_w = 97; el->def_h = 39;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 542; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 441; el->flags |= ATTR_HAS_Y; }
-            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "bottom-right", sizeof(el->align)-1); el->flags |= ATTR_HAS_ALIGN; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 542;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 441;  }
+            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "bottom-right", sizeof(el->align)-1);  }
         } else { el->def_w = 120; el->def_h = 40; }
     } else if (_stricmp(el->section, "AdventureLabels") == 0) {
         if (_stricmp(el->tag, "HighscoreTitle") == 0) {
             el->def_w = 140; el->def_h = 30;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 456; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 0; el->flags |= ATTR_HAS_Y; } /* Zuma.exe 0x43641B: y = 0 */
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 456;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 0;  } /* Zuma.exe 0x43641B: y = 0 */
         } else if (_stricmp(el->tag, "BottomBox") == 0 || _stricmp(el->tag, "Stage13Badge") == 0) {
             el->def_w = 76; el->def_h = 16;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 289; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 382; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 289;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 382;  }
         } else if (_stricmp(el->tag, "StageNum") == 0 || _stricmp(el->tag, "Stage13Num") == 0) {
             el->def_w = 30; el->def_h = 20;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 344; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 396; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 344;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 396;  }
         } else if (_stricmp(el->tag, "StageText") == 0) {
             el->def_w = 300; el->def_h = 32;
             el->hotspot |= HOTSPOT_CENTER_X;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = (el->flags & ATTR_HAS_CENTER_X) ? el->centerX : 326; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 422; el->flags |= ATTR_HAS_Y; }
-            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "center", sizeof(el->align)-1); el->flags |= ATTR_HAS_ALIGN; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = (el->flags & ATTR_HAS_CENTER_X) ? el->centerX : 326;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 422;  }
+            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "center", sizeof(el->align)-1);  }
         } else if (_stricmp(el->tag, "Subtitle") == 0) {
             el->def_w = 300; el->def_h = 24;
             el->hotspot |= HOTSPOT_CENTER_X;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = (el->flags & ATTR_HAS_CENTER_X) ? el->centerX : 326; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 456; el->flags |= ATTR_HAS_Y; }
-            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "center", sizeof(el->align)-1); el->flags |= ATTR_HAS_ALIGN; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = (el->flags & ATTR_HAS_CENTER_X) ? el->centerX : 326;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 456;  }
+            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "center", sizeof(el->align)-1);  }
         } else if (_stricmp(el->tag, "HighscoreScores") == 0) {
             el->def_w = 60; el->def_h = 80;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 575; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 70; el->flags |= ATTR_HAS_Y; } /* Zuma.exe 0x436836: y = 70 */
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 575;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 70;  } /* Zuma.exe 0x436836: y = 70 */
         } else if (_stricmp(el->tag, "HighscoreNames") == 0) {
             el->def_w = 90; el->def_h = 80;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 470; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 70; el->flags |= ATTR_HAS_Y; } /* Zuma.exe 0x4368DB: y = 70 */
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 470;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 70;  } /* Zuma.exe 0x4368DB: y = 70 */
         } else if (_stricmp(el->tag, "HighscoreDate") == 0 || _stricmp(el->tag, "HighscoreClip") == 0) {
             el->def_w = 97; el->def_h = 60;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 567; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 70; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 567;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 70;  }
         } else if (_stricmp(el->tag, "Stage13Title") == 0) {
             el->def_w = 300; el->def_h = 32;
             el->hotspot |= HOTSPOT_CENTER_X;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 326; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 422; el->flags |= ATTR_HAS_Y; }
-            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "center", sizeof(el->align)-1); el->flags |= ATTR_HAS_ALIGN; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 326;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 422;  }
+            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "center", sizeof(el->align)-1);  }
         } else if (_stricmp(el->tag, "Stage13Subtitle") == 0) {
             el->def_w = 300; el->def_h = 24;
             el->hotspot |= HOTSPOT_CENTER_X;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 326; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 456; el->flags |= ATTR_HAS_Y; }
-            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "center", sizeof(el->align)-1); el->flags |= ATTR_HAS_ALIGN; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 326;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 456;  }
+            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "center", sizeof(el->align)-1);  }
         } else if (_stricmp(el->tag, "InfoBox") == 0) {
             el->def_w = (el->flags & ATTR_HAS_W && el->w > 0) ? el->w : 150;
             el->def_h = (el->flags & ATTR_HAS_H && el->h > 0) ? el->h : 100;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 20; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 60; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 20;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 60;  }
         } else { el->def_w = 110; el->def_h = 32; }
     }
 
@@ -1368,78 +1369,78 @@ static void assign_element_default_bounds(LayoutElement *el) {
     else if (_stricmp(el->section, "GauntletButtons") == 0) {
         if (_stricmp(el->tag, "Practice") == 0) {
             el->def_w = 127; el->def_h = 32;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 177; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 444; el->flags |= ATTR_HAS_Y; }
-            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "bottom-middle", sizeof(el->align)-1); el->flags |= ATTR_HAS_ALIGN; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 177;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 444;  }
+            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "bottom-middle", sizeof(el->align)-1);  }
         } else if (_stricmp(el->tag, "Survival") == 0) {
             el->def_w = 127; el->def_h = 28;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 277; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 444; el->flags |= ATTR_HAS_Y; }
-            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "bottom-middle", sizeof(el->align)-1); el->flags |= ATTR_HAS_ALIGN; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 277;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 444;  }
+            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "bottom-middle", sizeof(el->align)-1);  }
         } else if (_stricmp(el->tag, "Back") == 0) {
             el->def_w = 124; el->def_h = 33;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 390; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 444; el->flags |= ATTR_HAS_Y; }
-            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "bottom-middle", sizeof(el->align)-1); el->flags |= ATTR_HAS_ALIGN; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 390;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 444;  }
+            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "bottom-middle", sizeof(el->align)-1);  }
         } else if (_stricmp(el->tag, "MainMenu") == 0) {
             el->def_w = 141; el->def_h = 56;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 10; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 422; el->flags |= ATTR_HAS_Y; }
-            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "bottom-left", sizeof(el->align)-1); el->flags |= ATTR_HAS_ALIGN; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 10;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 422;  }
+            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "bottom-left", sizeof(el->align)-1);  }
         } else if (_stricmp(el->tag, "Next") == 0) {
             el->def_w = 125; el->def_h = 33;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 506; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 413; el->flags |= ATTR_HAS_Y; }
-            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "bottom-right", sizeof(el->align)-1); el->flags |= ATTR_HAS_ALIGN; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 506;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 413;  }
+            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "bottom-right", sizeof(el->align)-1);  }
         } else if (_stricmp(el->tag, "Play") == 0) {
             el->def_w = 140; el->def_h = 33;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 505; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 446; el->flags |= ATTR_HAS_Y; }
-            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "bottom-right", sizeof(el->align)-1); el->flags |= ATTR_HAS_ALIGN; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 505;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 446;  }
+            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "bottom-right", sizeof(el->align)-1);  }
         } else { el->def_w = 120; el->def_h = 36; }
     } else if (_stricmp(el->section, "GauntletLabels") == 0) {
         if (_stricmp(el->tag, "DoorFrame") == 0) {
             el->def_w = 320; el->def_h = 240;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 170; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 220; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 170;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 220;  }
         } else if (_stricmp(el->tag, "HighscoreTitle") == 0) {
             el->def_w = 140; el->def_h = 30;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 434; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 0; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 434;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 0;  }
         } else if (_stricmp(el->tag, "DoorName") == 0) {
             el->def_w = 320; el->def_h = 24;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 170; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 427; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 170;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 427;  }
         } else if (_stricmp(el->tag, "PracticeText") == 0) {
             el->def_w = (el->flags & ATTR_HAS_W && el->w > 0) ? el->w : 320; el->def_h = 40;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 150; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 260; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 150;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 260;  }
         } else if (_stricmp(el->tag, "CustomMapTag") == 0) {
             el->def_w = 120; el->def_h = 24;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 150; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 260; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 150;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 260;  }
         } else if (_stricmp(el->tag, "Gem") == 0) {
             el->hotspot = HOTSPOT_BOTTOM_CENTER;
             el->def_w = 56; el->def_h = 56;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 560; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 220; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 560;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 220;  }
         } else if (_stricmp(el->tag, "HighscoreScores") == 0) {
             el->def_w = 60; el->def_h = 80;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 575; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 70; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 575;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 70;  }
         } else if (_stricmp(el->tag, "HighscoreNames") == 0) {
             el->def_w = 90; el->def_h = 80;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 445; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 70; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 445;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 70;  }
         } else if (_stricmp(el->tag, "HighscoreClip") == 0) {
             el->def_w = (el->flags & ATTR_HAS_W && el->w > 0) ? el->w : 567; el->def_h = 60;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 567; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 70; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 567;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 70;  }
         } else if (_stricmp(el->tag, "InfoBox") == 0) {
             el->def_w = (el->flags & ATTR_HAS_W && el->w > 0) ? el->w : 150;
             el->def_h = (el->flags & ATTR_HAS_H && el->h > 0) ? el->h : 100;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 20; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 60; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 20;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 60;  }
         } else { el->def_w = 110; el->def_h = 32; }
     }
 
@@ -1447,39 +1448,39 @@ static void assign_element_default_bounds(LayoutElement *el) {
     else if (_stricmp(el->section, "InGameHUD") == 0) {
         if (_stricmp(el->tag, "LevelBanner") == 0) {
             el->def_w = 140; el->def_h = 24;
-            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "bottom-right", sizeof(el->align)-1); el->flags |= ATTR_HAS_ALIGN; }
+            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "bottom-right", sizeof(el->align)-1);  }
         } else if (_stricmp(el->tag, "LivesBanner") == 0) {
             el->hotspot = HOTSPOT_CENTER_BOTH;
             el->def_w = 260; el->def_h = 40;
             if (!(el->flags & ATTR_HAS_CENTER_X)) { el->centerX = 600; el->flags |= ATTR_HAS_CENTER_X; }
             if (!(el->flags & ATTR_HAS_CENTER_Y)) { el->centerY = 337; el->flags |= ATTR_HAS_CENTER_Y; }
-            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "center", sizeof(el->align)-1); el->flags |= ATTR_HAS_ALIGN; }
+            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "center", sizeof(el->align)-1);  }
         } else if (_stricmp(el->tag, "Menubar") == 0) {
             el->def_w = 1200; el->def_h = 42;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 0; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 0; el->flags |= ATTR_HAS_Y; }
-            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "top-center", sizeof(el->align)-1); el->flags |= ATTR_HAS_ALIGN; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 0;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 0;  }
+            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "top-center", sizeof(el->align)-1);  }
         } else if (_stricmp(el->tag, "MenuBtn") == 0) {
             el->def_w = 67; el->def_h = 27;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 1100; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 4; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 1100;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 4;  }
         } else if (_stricmp(el->tag, "ProgressBar") == 0) {
             el->def_w = 178; el->def_h = 24;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 879; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 2; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 879;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 2;  }
         } else if (_stricmp(el->tag, "StageName") == 0) {
             el->hotspot = HOTSPOT_CENTER_X;
             el->def_w = 110; el->def_h = 28;
             if (!(el->flags & ATTR_HAS_CENTER_X)) { el->centerX = 290; el->flags |= ATTR_HAS_CENTER_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 8; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 8;  }
         } else if (_stricmp(el->tag, "ScoreText") == 0) {
             el->def_w = 110; el->def_h = 28;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 640; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 8; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 640;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 8;  }
         } else if (_stricmp(el->tag, "LivesPos") == 0) {
             el->def_w = 50; el->def_h = 23;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 28; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 6; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 28;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 6;  }
         } else if (_stricmp(el->tag, "MenubarMargins") == 0) {
             el->def_w = 1200; el->def_h = 675;
         } else { el->def_w = 120; el->def_h = 36; }
@@ -1490,26 +1491,26 @@ static void assign_element_default_bounds(LayoutElement *el) {
         if (_stricmp(el->tag, "StageText") == 0) {
             el->hotspot |= HOTSPOT_CENTER_X;
             el->def_w = 280; el->def_h = 44;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 320; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 150; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 320;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 150;  }
         } else if (_stricmp(el->tag, "CompleteText") == 0) {
             el->hotspot |= HOTSPOT_CENTER_X;
             el->def_w = 320; el->def_h = 48;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 320; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 250; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 320;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 250;  }
         } else if (_stricmp(el->tag, "BonusBar") == 0) {
             el->def_w = 218; el->def_h = 20;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 211; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 240; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 211;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 240;  }
         } else if (_stricmp(el->tag, "FrogTarget") == 0) {
             el->hotspot = HOTSPOT_CENTER_BOTH;
             el->def_w = 48; el->def_h = 48;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 320; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 200; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 320;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 200;  }
         } else if (_stricmp(el->tag, "ContinueBtn") == 0) {
             el->def_w = 180; el->def_h = 55;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 230; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 340; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 230;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 340;  }
         } else {
             el->def_w = 120; el->def_h = 32;
         }
@@ -1520,37 +1521,37 @@ static void assign_element_default_bounds(LayoutElement *el) {
         if (_stricmp(el->tag, "Title") == 0) {
             el->def_w = 360; el->def_h = 40;
             el->hotspot |= HOTSPOT_CENTER_X;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 320; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 120; el->flags |= ATTR_HAS_Y; }
-            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "center", sizeof(el->align)-1); el->flags |= ATTR_HAS_ALIGN; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 320;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 120;  }
+            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "center", sizeof(el->align)-1);  }
         } else if (_stricmp(el->tag, "TikiHead") == 0) {
             el->hotspot = HOTSPOT_TOPLEFT;
             el->def_w = 147; el->def_h = 175;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 50; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 160; el->flags |= ATTR_HAS_Y; }
-            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "center", sizeof(el->align)-1); el->flags |= ATTR_HAS_ALIGN; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 50;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 160;  }
+            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "center", sizeof(el->align)-1);  }
         } else if (_stricmp(el->tag, "DialogText") == 0) {
             el->def_w = (el->flags & ATTR_HAS_W && el->w > 0) ? el->w : 380;
             el->def_h = (el->flags & ATTR_HAS_H && el->h > 0) ? el->h : 150;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 220; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 180; el->flags |= ATTR_HAS_Y; }
-            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "center", sizeof(el->align)-1); el->flags |= ATTR_HAS_ALIGN; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 220;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 180;  }
+            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "center", sizeof(el->align)-1);  }
         } else if (_stricmp(el->tag, "FrogMedallion") == 0) {
             el->hotspot = HOTSPOT_CENTER_BOTH;
             el->def_w = 108; el->def_h = 108;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 120; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 380; el->flags |= ATTR_HAS_Y; }
-            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "center", sizeof(el->align)-1); el->flags |= ATTR_HAS_ALIGN; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 120;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 380;  }
+            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "center", sizeof(el->align)-1);  }
         } else if (_stricmp(el->tag, "FrogReply") == 0) {
             el->def_w = 350; el->def_h = 100;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 200; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 280; el->flags |= ATTR_HAS_Y; }
-            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "center", sizeof(el->align)-1); el->flags |= ATTR_HAS_ALIGN; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 200;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 280;  }
+            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "center", sizeof(el->align)-1);  }
         } else if (_stricmp(el->tag, "ContinueBtn") == 0) {
             el->def_w = 180; el->def_h = 48;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 410; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 450; el->flags |= ATTR_HAS_Y; }
-            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "center", sizeof(el->align)-1); el->flags |= ATTR_HAS_ALIGN; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 410;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 450;  }
+            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "center", sizeof(el->align)-1);  }
         } else { el->def_w = 120; el->def_h = 36; }
     }
 
@@ -1558,28 +1559,28 @@ static void assign_element_default_bounds(LayoutElement *el) {
     else if (_stricmp(el->section, "CreditsScreen") == 0) {
         if (_stricmp(el->tag, "WhateverBtn") == 0) {
             el->def_w = 120; el->def_h = 40;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 510; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 430; el->flags |= ATTR_HAS_Y; }
-            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "bottom-right", sizeof(el->align)-1); el->flags |= ATTR_HAS_ALIGN; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 510;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 430;  }
+            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "bottom-right", sizeof(el->align)-1);  }
         } else if (_stricmp(el->tag, "CreditsText") == 0) {
             el->def_w = 420; el->def_h = 240;
             el->hotspot |= HOTSPOT_CENTER_X;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 320; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 180; el->flags |= ATTR_HAS_Y; }
-            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "top-center", sizeof(el->align)-1); el->flags |= ATTR_HAS_ALIGN; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 320;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 180;  }
+            if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "top-center", sizeof(el->align)-1);  }
         } else if (_stricmp(el->tag, "ScrollStart") == 0) {
             el->def_w = 320; el->def_h = 24;
             el->hotspot |= HOTSPOT_CENTER_X;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 320; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 480; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 320;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 480;  }
         } else if (_stricmp(el->tag, "Tiki1") == 0) {
             el->def_w = 147; el->def_h = 175;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 30; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 150; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 30;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 150;  }
         } else if (_stricmp(el->tag, "Tiki2") == 0) {
             el->def_w = 147; el->def_h = 175;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 470; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 280; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 470;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 280;  }
         } else { el->def_w = 160; el->def_h = 32; }
     }
 
@@ -1587,71 +1588,71 @@ static void assign_element_default_bounds(LayoutElement *el) {
     else if (_stricmp(el->section, "Dialogs") == 0) {
         el->def_w = (el->flags & ATTR_HAS_W && el->w > 0) ? el->w : 400;
         el->def_h = (el->flags & ATTR_HAS_H && el->h > 0) ? el->h : 320;
-        if (!(el->flags & ATTR_HAS_X)) { el->x = 120; el->flags |= ATTR_HAS_X; }
-        if (!(el->flags & ATTR_HAS_Y)) { el->y = 80; el->flags |= ATTR_HAS_Y; }
-        if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "center", sizeof(el->align)-1); el->flags |= ATTR_HAS_ALIGN; }
+        if (!(el->flags & ATTR_HAS_X)) { el->x = 120;  }
+        if (!(el->flags & ATTR_HAS_Y)) { el->y = 80;  }
+        if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "center", sizeof(el->align)-1);  }
     }
 
     /* 10. Help Screen */
     else if (_stricmp(el->section, "HelpScreen") == 0) {
         if (_stricmp(el->tag, "HelpBack") == 0) {
             el->def_w = 618; el->def_h = 378;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 11; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 51; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 11;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 51;  }
         } else if (_stricmp(el->tag, "Title") == 0) {
             el->hotspot |= HOTSPOT_CENTER_X;
             el->def_w = 320; el->def_h = 36;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 320; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 55; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 320;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 55;  }
         } else if (_stricmp(el->tag, "Skull") == 0) {
             el->def_w = 70; el->def_h = 70;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 65; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 20; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 65;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 20;  }
         } else if (_stricmp(el->tag, "Coin") == 0) {
             el->def_w = 48; el->def_h = 48;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 282; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 45; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 282;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 45;  }
         } else if (_stricmp(el->tag, "Frog") == 0) {
             el->hotspot |= HOTSPOT_CENTER_BOTH;
             el->def_w = 108; el->def_h = 108;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 500; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 65; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 500;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 65;  }
         } else if (_stricmp(el->tag, "DevTemple5") == 0) {
             el->def_w = 190; el->def_h = 75;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 225; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 114; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 225;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 114;  }
         } else if (_stricmp(el->tag, "SwapMouse") == 0) {
             el->def_w = 32; el->def_h = 40;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 580; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 60; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 580;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 60;  }
         } else if (_stricmp(el->tag, "SwapClick") == 0) {
             el->def_w = 180; el->def_h = 24;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 560; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 55; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 560;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 55;  }
         } else if (_stricmp(el->tag, "TopText1") == 0) {
             el->def_w = 260; el->def_h = 32;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 30; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 40; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 30;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 40;  }
         } else if (_stricmp(el->tag, "TopText2") == 0) {
             el->def_w = 260; el->def_h = 32;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 8; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 40; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 8;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 40;  }
         } else if (_stricmp(el->tag, "BallTarget") == 0) {
             el->def_w = 32; el->def_h = 32;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 240; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 160; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 240;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 160;  }
         } else if (_stricmp(el->tag, "DevMouseM") == 0) {
             el->def_w = 40; el->def_h = 29;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 465; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 145; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 465;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 145;  }
         } else if (_stricmp(el->tag, "DontShowCheckbox") == 0) {
             el->def_w = 260; el->def_h = 24;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 60; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 430; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 60;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 430;  }
         } else if (_stricmp(el->tag, "WhateverBtn") == 0) {
             el->def_w = 140; el->def_h = 40;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 450; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 422; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 450;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 422;  }
         } else { el->def_w = 110; el->def_h = 32; }
     }
 
@@ -1660,49 +1661,49 @@ static void assign_element_default_bounds(LayoutElement *el) {
         if (_stricmp(el->tag, "HeaderTitle") == 0) {
             el->hotspot |= HOTSPOT_CENTER_X;
             el->def_w = 360; el->def_h = 36;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 320; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 28; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 320;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 28;  }
         } else if (_stricmp(el->tag, "HeaderSubtitle") == 0) {
             el->hotspot |= HOTSPOT_CENTER_X;
             el->def_w = 460; el->def_h = 24;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 320; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 78; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 320;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 78;  }
         } else if (_stricmp(el->tag, "AdvHeader") == 0) {
             el->hotspot |= HOTSPOT_CENTER_X;
             el->def_w = 200; el->def_h = 24;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 162; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 108; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 162;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 108;  }
         } else if (_stricmp(el->tag, "GauntHeader") == 0) {
             el->hotspot |= HOTSPOT_CENTER_X;
             el->def_w = 200; el->def_h = 24;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 478; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 108; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 478;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 108;  }
         } else if (_stricmp(el->tag, "CheatHeader") == 0) {
             el->hotspot |= HOTSPOT_CENTER_X;
             el->def_w = 260; el->def_h = 24;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 162; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 282; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 162;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 282;  }
         } else if (_stricmp(el->tag, "Temple5Preview") == 0) {
             el->def_w = 190; el->def_h = 75;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 67; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 114; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 67;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 114;  }
         } else if (_stricmp(el->tag, "AdvBullets") == 0) {
             el->def_w = 260; el->def_h = 70;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 30; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 206; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 30;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 206;  }
         } else if (_stricmp(el->tag, "GauntBullets") == 0) {
             el->def_w = 260; el->def_h = 90;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 343; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 132; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 343;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 132;  }
         } else if (_stricmp(el->tag, "CheatBullets") == 0) {
             el->def_w = 260; el->def_h = 70;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 30; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 304; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 30;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 304;  }
         } else if (_stricmp(el->tag, "FooterHint") == 0) {
             el->hotspot |= HOTSPOT_CENTER_X;
             el->def_w = 320; el->def_h = 24;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 320; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 420; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 320;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 420;  }
         } else {
             el->def_w = 120; el->def_h = 32;
         }
@@ -1713,12 +1714,12 @@ static void assign_element_default_bounds(LayoutElement *el) {
         if (strstr(el->tag, "Thumb")) { el->def_w = 250; el->def_h = 150; }
         else if (_stricmp(el->tag, "MoreGamesBtn") == 0) {
             el->def_w = 118; el->def_h = 127;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 355; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 290; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 355;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 290;  }
         } else if (_stricmp(el->tag, "BackBtn") == 0) {
             el->def_w = 120; el->def_h = 36;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 164; el->flags |= ATTR_HAS_X; }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 445; el->flags |= ATTR_HAS_Y; }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 164;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 445;  }
         } else { el->def_w = 120; el->def_h = 36; }
     }
 
@@ -1854,22 +1855,40 @@ static bool is_element_visible_in_editor(const LayoutElement *el, const LayoutEd
 
 /* XML Attribute extraction helper */
 static bool extract_xml_attr_int(const char *tag_str, const char *attr_name, int *out_val) {
+    if (!tag_str || !attr_name) return false;
     char pattern[64];
     snprintf(pattern, sizeof(pattern), "%s=\"", attr_name);
     const char *p = strstr(tag_str, pattern);
-    if (!p) {
-        snprintf(pattern, sizeof(pattern), "%s='", attr_name);
-        p = strstr(tag_str, pattern);
-    }
-    if (p) {
-        p += strlen(pattern);
-        char *end = NULL;
-        long val = strtol(p, &end, 10);
-        if (end != p) {
-            if (out_val) *out_val = (int)val;
-            return true;
+    while (p) {
+        if (p == tag_str || isspace((unsigned char)*(p - 1))) {
+            p += strlen(pattern);
+            char *end = NULL;
+            long val = strtol(p, &end, 10);
+            if (end != p) {
+                if (out_val) *out_val = (int)val;
+                return true;
+            }
+            break;
         }
+        p = strstr(p + 1, pattern);
     }
+
+    snprintf(pattern, sizeof(pattern), "%s='", attr_name);
+    p = strstr(tag_str, pattern);
+    while (p) {
+        if (p == tag_str || isspace((unsigned char)*(p - 1))) {
+            p += strlen(pattern);
+            char *end = NULL;
+            long val = strtol(p, &end, 10);
+            if (end != p) {
+                if (out_val) *out_val = (int)val;
+                return true;
+            }
+            break;
+        }
+        p = strstr(p + 1, pattern);
+    }
+
     /* Fallback for unquoted attributes (e.g. rows=30) */
     snprintf(pattern, sizeof(pattern), "%s=", attr_name);
     p = strstr(tag_str, pattern);
@@ -1890,23 +1909,40 @@ static bool extract_xml_attr_int(const char *tag_str, const char *attr_name, int
 }
 
 static bool extract_xml_attr_str(const char *tag_str, const char *attr_name, char *out_str, size_t max_len) {
+    if (!tag_str || !attr_name || !out_str || max_len == 0) return false;
     char pattern[64];
     snprintf(pattern, sizeof(pattern), "%s=\"", attr_name);
     const char *p = strstr(tag_str, pattern);
     char quote = '\"';
-    if (!p) {
-        snprintf(pattern, sizeof(pattern), "%s='", attr_name);
-        p = strstr(tag_str, pattern);
-        quote = '\'';
-        if (!p) return false;
+    while (p) {
+        if (p == tag_str || isspace((unsigned char)*(p - 1))) {
+            p += strlen(pattern);
+            size_t i = 0;
+            while (*p && *p != quote && i + 1 < max_len) {
+                out_str[i++] = *p++;
+            }
+            out_str[i] = '\0';
+            return (i > 0);
+        }
+        p = strstr(p + 1, pattern);
     }
-    p += strlen(pattern);
-    size_t i = 0;
-    while (*p && *p != quote && i + 1 < max_len) {
-        out_str[i++] = *p++;
+
+    snprintf(pattern, sizeof(pattern), "%s='", attr_name);
+    p = strstr(tag_str, pattern);
+    quote = '\'';
+    while (p) {
+        if (p == tag_str || isspace((unsigned char)*(p - 1))) {
+            p += strlen(pattern);
+            size_t i = 0;
+            while (*p && *p != quote && i + 1 < max_len) {
+                out_str[i++] = *p++;
+            }
+            out_str[i] = '\0';
+            return (i > 0);
+        }
+        p = strstr(p + 1, pattern);
     }
-    out_str[i] = '\0';
-    return (i > 0);
+    return false;
 }
 
 /* Parse layout.xml into structured elements array */
@@ -1974,7 +2010,7 @@ static bool layout_xml_load(LayoutEditorState *st, const char *filepath) {
             int is_hud_open = 0;
             if (is_sec_header) {
                 if (_stricmp(tag_name, "InGameHUD") == 0) is_hud_open = 1;
-                char space_val[32] = {0};
+                char space_val[64] = {0};
                 if (extract_xml_attr_str(p, "space", space_val, sizeof(space_val))) {
                     strncpy(st->section_space[sec_idx], space_val, sizeof(st->section_space[sec_idx]) - 1);
                     st->section_space[sec_idx][sizeof(st->section_space[sec_idx]) - 1] = 0;
@@ -2036,8 +2072,8 @@ static bool layout_xml_load(LayoutEditorState *st, const char *filepath) {
             if (extract_xml_attr_int(p, "y", &el->y)) el->flags |= ATTR_HAS_Y;
             if (extract_xml_attr_int(p, "w", &el->w)) el->flags |= ATTR_HAS_W;
             if (extract_xml_attr_int(p, "h", &el->h)) el->flags |= ATTR_HAS_H;
-            if (extract_xml_attr_int(p, "width", &el->w)) el->flags |= ATTR_HAS_W;
-            if (extract_xml_attr_int(p, "height", &el->h)) el->flags |= ATTR_HAS_H;
+            if (extract_xml_attr_int(p, "width", &el->w)) { el->flags |= ATTR_HAS_W; el->use_width_height_names = true; }
+            if (extract_xml_attr_int(p, "height", &el->h)) { el->flags |= ATTR_HAS_H; el->use_width_height_names = true; }
 
             /* Extract AdventureDoor specific coordinates */
             if (extract_xml_attr_int(p, "doorX", &el->doorX)) { el->flags |= ATTR_HAS_DOOR_X; el->flags |= ATTR_IS_DOOR_PAIR; }
@@ -2153,7 +2189,7 @@ static bool layout_xml_save(LayoutEditorState *st, const char *filepath) {
             fprintf(fp, "    <MainMenu space=\"%dx%d\">\n", st->main_menu_space_w, st->main_menu_space_h);
         } else if (_stricmp(sec_name, "LoadingScreen") == 0 && st->loading_space_w > 0) {
             fprintf(fp, "    <LoadingScreen space=\"%dx%d\">\n", st->loading_space_w, st->loading_space_h);
-        } else if (_strnicmp(sec_name, "Adventure", 9) == 0 && st->adventure_space_w > 0) {
+        } else if ((_stricmp(sec_name, "AdventureTemples") == 0 || _stricmp(sec_name, "AdventureDoors") == 0 || _stricmp(sec_name, "AdventureButtons") == 0 || _stricmp(sec_name, "AdventureLabels") == 0) && st->adventure_space_w > 0) {
             fprintf(fp, "    <%s space=\"%dx%d\">\n", sec_name, st->adventure_space_w, st->adventure_space_h);
         } else {
             fprintf(fp, "    <%s>\n", sec_name);
@@ -2207,8 +2243,14 @@ static bool layout_xml_save(LayoutEditorState *st, const char *filepath) {
                     if (el->flags & ATTR_HAS_Y) fprintf(fp, " y=\"%d\"", el->y);
                 }
 
-                if (el->flags & ATTR_HAS_W) fprintf(fp, " w=\"%d\"", el->w);
-                if (el->flags & ATTR_HAS_H) fprintf(fp, " h=\"%d\"", el->h);
+                if (el->flags & ATTR_HAS_W) {
+                    if (el->use_width_height_names) fprintf(fp, " width=\"%d\"", el->w);
+                    else fprintf(fp, " w=\"%d\"", el->w);
+                }
+                if (el->flags & ATTR_HAS_H) {
+                    if (el->use_width_height_names) fprintf(fp, " height=\"%d\"", el->h);
+                    else fprintf(fp, " h=\"%d\"", el->h);
+                }
                 if (el->flags & ATTR_HAS_CENTER_X) fprintf(fp, " centerX=\"%d\"", el->centerX);
                 if (el->flags & ATTR_HAS_CENTER_Y) fprintf(fp, " centerY=\"%d\"", el->centerY);
                 if (el->flags & ATTR_HAS_OFFSET_X) fprintf(fp, " offsetX=\"%d\"", el->offsetX);
@@ -5253,8 +5295,12 @@ static void layout_editor_sync_inspector_from_selection(LayoutEditorState *st) {
         snprintf(buf, sizeof(buf), "%d", sel->frogX); SetWindowTextA(st->hwnd_edit_frog_x, buf);
         snprintf(buf, sizeof(buf), "%d", sel->frogY); SetWindowTextA(st->hwnd_edit_frog_y, buf);
     } else {
-        snprintf(buf, sizeof(buf), "%d", sel->x); SetWindowTextA(st->hwnd_edit_x, buf);
-        snprintf(buf, sizeof(buf), "%d", sel->y); SetWindowTextA(st->hwnd_edit_y, buf);
+        if (sel->flags & ATTR_HAS_X) { snprintf(buf, sizeof(buf), "%d", sel->x); SetWindowTextA(st->hwnd_edit_x, buf); }
+        else SetWindowTextA(st->hwnd_edit_x, "---");
+
+        if (sel->flags & ATTR_HAS_Y) { snprintf(buf, sizeof(buf), "%d", sel->y); SetWindowTextA(st->hwnd_edit_y, buf); }
+        else SetWindowTextA(st->hwnd_edit_y, "---");
+
         SetWindowTextA(st->hwnd_edit_frog_x, "---");
         SetWindowTextA(st->hwnd_edit_frog_y, "---");
     }
@@ -5960,31 +6006,38 @@ static LRESULT CALLBACK LayoutEditorWndProc(HWND hwnd, UINT msg, WPARAM wParam, 
                     int v = atoi(val_buf);
 
                     if (id == ID_LE_EDIT_X) {
-                        if (sel_el->flags & ATTR_IS_DOOR_PAIR) sel_el->doorX = v;
-                        else sel_el->x = v;
+                        if (sel_el->flags & ATTR_IS_DOOR_PAIR) { sel_el->doorX = v; sel_el->flags |= ATTR_HAS_DOOR_X; }
+                        else { sel_el->x = v; sel_el->flags |= ATTR_HAS_X; }
                     } else if (id == ID_LE_EDIT_Y) {
-                        if (sel_el->flags & ATTR_IS_DOOR_PAIR) sel_el->doorY = v;
-                        else sel_el->y = v;
+                        if (sel_el->flags & ATTR_IS_DOOR_PAIR) { sel_el->doorY = v; sel_el->flags |= ATTR_HAS_DOOR_Y; }
+                        else { sel_el->y = v; sel_el->flags |= ATTR_HAS_Y; }
                     } else if (id == ID_LE_EDIT_FROG_X) {
-                        if (sel_el->flags & ATTR_IS_DOOR_PAIR) sel_el->frogX = v;
+                        if (sel_el->flags & ATTR_IS_DOOR_PAIR) { sel_el->frogX = v; sel_el->flags |= ATTR_HAS_FROG_X; }
                     } else if (id == ID_LE_EDIT_FROG_Y) {
-                        if (sel_el->flags & ATTR_IS_DOOR_PAIR) sel_el->frogY = v;
+                        if (sel_el->flags & ATTR_IS_DOOR_PAIR) { sel_el->frogY = v; sel_el->flags |= ATTR_HAS_FROG_Y; }
                     } else if (id == ID_LE_EDIT_W) {
                         sel_el->w = v;
+                        sel_el->flags |= ATTR_HAS_W;
                         assign_element_default_bounds(sel_el);
                     } else if (id == ID_LE_EDIT_H) {
                         sel_el->h = v;
+                        sel_el->flags |= ATTR_HAS_H;
                         assign_element_default_bounds(sel_el);
                     } else if (id == ID_LE_EDIT_CENTER_X) {
                         sel_el->centerX = v;
+                        sel_el->flags |= ATTR_HAS_CENTER_X;
                     } else if (id == ID_LE_EDIT_CENTER_Y) {
                         sel_el->centerY = v;
+                        sel_el->flags |= ATTR_HAS_CENTER_Y;
                     } else if (id == ID_LE_EDIT_OFFSET_X) {
                         sel_el->offsetX = v;
+                        sel_el->flags |= ATTR_HAS_OFFSET_X;
                     } else if (id == ID_LE_EDIT_OFFSET_Y) {
                         sel_el->offsetY = v;
+                        sel_el->flags |= ATTR_HAS_OFFSET_Y;
                     } else if (id == ID_LE_EDIT_SPACING) {
                         sel_el->spacing = v;
+                        sel_el->flags |= ATTR_HAS_SPACING;
                     }
 
                     InvalidateRect(st->hwnd_canvas, NULL, FALSE);
