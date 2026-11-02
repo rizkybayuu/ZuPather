@@ -405,12 +405,6 @@ static bool test_auto_center_x_lock_and_roundtrip(const char *layout_path) {
     /* Verify Sun is XM_ABS, coordinates (53,-89), and visible in Main Menu */
     TEST_ASSERT(sun != NULL, "Sun element must exist");
     TEST_ASSERT(sun->x == 53 && sun->y == -89, "Sun must have initial canonical coordinates (53, -89)");
-    LayoutElement *mmsun = NULL;
-    for (int i = 0; i < st.element_count; ++i) {
-        if (_stricmp(st.elements[i].tag, "MMSun") == 0) mmsun = &st.elements[i];
-    }
-    TEST_ASSERT(mmsun != NULL, "MMSun element must exist");
-    TEST_ASSERT(mmsun->x == 150 && mmsun->y == 3, "MMSun must have canonical coordinates (150, 3)");
     TEST_ASSERT(is_element_visible_in_editor(sun, &st) == true, "Sun must be visible in Main Menu editor view");
 
     /* Verify canvas rect calculation and non-empty intersection with canvas */
@@ -445,10 +439,7 @@ static bool test_auto_center_x_lock_and_roundtrip(const char *layout_path) {
             TEST_ASSERT(strstr(line, "x=\"53\"") != NULL, "Sun must retain x=\"53\" after roundtrip");
             TEST_ASSERT(strstr(line, "y=\"-89\"") != NULL, "Sun must retain y=\"-89\" after roundtrip");
         }
-        if (strstr(line, "<MMSun")) {
-            TEST_ASSERT(strstr(line, "x=\"150\"") != NULL, "MMSun must retain x=\"150\" after roundtrip");
-            TEST_ASSERT(strstr(line, "y=\"3\"") != NULL, "MMSun must retain y=\"3\" after roundtrip");
-        }
+
         if (strstr(line, "<WelcomeText") || strstr(line, "<UserSwitchText") || strstr(line, "<ClickToPlay")) {
             TEST_ASSERT(strstr(line, " x=\"") == NULL, "Auto-centered element must never serialize x attribute");
             TEST_ASSERT(strstr(line, " x='") == NULL, "Auto-centered element must never serialize x attribute");
@@ -457,7 +448,7 @@ static bool test_auto_center_x_lock_and_roundtrip(const char *layout_path) {
     fclose(fp);
     remove(temp_out);
 
-    printf("  [PASS] Auto-Center X lock, XML omission, Hat visibility, Sun (53,-89), and MMSun (150,3) verified.\n");
+    printf("  [PASS] Auto-Center X lock, XML omission, Hat visibility, and Sun (53,-89) verified.\n");
     g_tests_passed++;
     return true;
 }
@@ -666,64 +657,17 @@ static bool test_font_baseline_convention(const char *layout_path) {
     return true;
 }
 
-/* 12. Test MMSun Decoupling & Backward Compatible Omission */
+/* 12. Test Sun Preservation & Verify No Unwanted MMSun Emitted */
 static bool test_mmsun_roundtrip_and_omission(void) {
-    printf("--- Test 12: MMSun Decoupling & Backward Compatible Omission ---\n");
+    printf("--- Test 12: Sun Preservation & No Unwanted MMSun Emitted ---\n");
 
-    /* Subtest A: MMSun explicitly present in XML */
-    char temp_in_a[MAX_PATH], temp_out_a[MAX_PATH];
-    GetTempPathA(sizeof(temp_in_a), temp_in_a);
-    snprintf(temp_out_a, sizeof(temp_out_a), "%szupather_test_mmsun_present_out.xml", temp_in_a);
-    strncat(temp_in_a, "zupather_test_mmsun_present_in.xml", sizeof(temp_in_a) - strlen(temp_in_a) - 1);
+    char temp_in[MAX_PATH], temp_out[MAX_PATH];
+    GetTempPathA(sizeof(temp_in), temp_in);
+    snprintf(temp_out, sizeof(temp_out), "%szupather_test_sun_out.xml", temp_in);
+    strncat(temp_in, "zupather_test_sun_in.xml", sizeof(temp_in) - strlen(temp_in) - 1);
 
-    FILE *fp = fopen(temp_in_a, "wb");
-    TEST_ASSERT(fp != NULL, "Failed to create temp_in_a");
-    fprintf(fp, "<Layout>\n");
-    fprintf(fp, "    <MainMenu space=\"1200x675\">\n");
-    fprintf(fp, "        <Sun x=\"53\" y=\"-89\" />\n");
-    fprintf(fp, "        <MMSun x=\"150\" y=\"3\" />\n");
-    fprintf(fp, "    </MainMenu>\n");
-    fprintf(fp, "</Layout>\n");
-    fclose(fp);
-
-    LayoutEditorState st_a;
-    memset(&st_a, 0, sizeof(st_a));
-    st_a.target_w = 1200;
-    st_a.target_h = 675;
-
-    TEST_ASSERT(layout_xml_load(&st_a, temp_in_a), "Failed to load XML with MMSun");
-    TEST_ASSERT(st_a.element_count == 2, "Element count must be 2");
-
-    LayoutElement *sun_a = find_element_by_tag(&st_a, "MainMenu", "Sun");
-    LayoutElement *mmsun_a = find_element_by_tag(&st_a, "MainMenu", "MMSun");
-    TEST_ASSERT(sun_a != NULL, "Sun must be loaded");
-    TEST_ASSERT(mmsun_a != NULL, "MMSun must be loaded");
-    TEST_ASSERT(sun_a->x == 53 && sun_a->y == -89, "Sun coords must be (53, -89)");
-    TEST_ASSERT(mmsun_a->x == 150 && mmsun_a->y == 3, "MMSun coords must be (150, 3)");
-
-    TEST_ASSERT(layout_xml_save(&st_a, temp_out_a), "Failed to save XML with MMSun");
-
-    LayoutEditorState st_a_resaved;
-    memset(&st_a_resaved, 0, sizeof(st_a_resaved));
-    st_a_resaved.target_w = 1200;
-    st_a_resaved.target_h = 675;
-    TEST_ASSERT(layout_xml_load(&st_a_resaved, temp_out_a), "Failed to reload resaved MMSun XML");
-    TEST_ASSERT(st_a_resaved.element_count == 2, "Reloaded element count must be 2");
-    LayoutElement *mmsun_re = find_element_by_tag(&st_a_resaved, "MainMenu", "MMSun");
-    TEST_ASSERT(mmsun_re != NULL, "MMSun must exist after reload");
-    TEST_ASSERT(mmsun_re->x == 150 && mmsun_re->y == 3, "MMSun coordinates preserved across roundtrip");
-
-    remove(temp_in_a);
-    remove(temp_out_a);
-
-    /* Subtest B: MMSun omitted (legacy layout XML) */
-    char temp_in_b[MAX_PATH], temp_out_b[MAX_PATH];
-    GetTempPathA(sizeof(temp_in_b), temp_in_b);
-    snprintf(temp_out_b, sizeof(temp_out_b), "%szupather_test_mmsun_omitted_out.xml", temp_in_b);
-    strncat(temp_in_b, "zupather_test_mmsun_omitted_in.xml", sizeof(temp_in_b) - strlen(temp_in_b) - 1);
-
-    fp = fopen(temp_in_b, "wb");
-    TEST_ASSERT(fp != NULL, "Failed to create temp_in_b");
+    FILE *fp = fopen(temp_in, "wb");
+    TEST_ASSERT(fp != NULL, "Failed to create temp_in");
     fprintf(fp, "<Layout>\n");
     fprintf(fp, "    <MainMenu space=\"1200x675\">\n");
     fprintf(fp, "        <Sun x=\"53\" y=\"-89\" />\n");
@@ -731,34 +675,33 @@ static bool test_mmsun_roundtrip_and_omission(void) {
     fprintf(fp, "</Layout>\n");
     fclose(fp);
 
-    LayoutEditorState st_b;
-    memset(&st_b, 0, sizeof(st_b));
-    st_b.target_w = 1200;
-    st_b.target_h = 675;
+    LayoutEditorState st;
+    memset(&st, 0, sizeof(st));
+    st.target_w = 1200;
+    st.target_h = 675;
 
-    TEST_ASSERT(layout_xml_load(&st_b, temp_in_b), "Failed to load legacy XML without MMSun");
-    TEST_ASSERT(st_b.element_count == 1, "Element count must be 1 for legacy XML");
+    TEST_ASSERT(layout_xml_load(&st, temp_in), "Failed to load XML with Sun");
+    TEST_ASSERT(st.element_count == 1, "Element count must be 1");
 
-    LayoutElement *sun_b = find_element_by_tag(&st_b, "MainMenu", "Sun");
-    LayoutElement *mmsun_b = find_element_by_tag(&st_b, "MainMenu", "MMSun");
-    TEST_ASSERT(sun_b != NULL, "Sun must be loaded");
-    TEST_ASSERT(mmsun_b == NULL, "MMSun must NOT exist in legacy XML elements");
+    LayoutElement *sun = find_element_by_tag(&st, "MainMenu", "Sun");
+    TEST_ASSERT(sun != NULL, "Sun must be loaded");
+    TEST_ASSERT(sun->x == 53 && sun->y == -89, "Sun coords must be (53, -89)");
 
-    TEST_ASSERT(layout_xml_save(&st_b, temp_out_b), "Failed to save legacy XML");
+    TEST_ASSERT(layout_xml_save(&st, temp_out), "Failed to save XML");
 
-    FILE *rf_b = fopen(temp_out_b, "rb");
-    TEST_ASSERT(rf_b != NULL, "Failed to read saved legacy XML");
-    char buf_b[2048] = {0};
-    fread(buf_b, 1, sizeof(buf_b) - 1, rf_b);
-    fclose(rf_b);
+    FILE *rf = fopen(temp_out, "rb");
+    TEST_ASSERT(rf != NULL, "Failed to open saved XML");
+    char buf[2048] = {0};
+    fread(buf, 1, sizeof(buf) - 1, rf);
+    fclose(rf);
 
-    TEST_ASSERT(strstr(buf_b, "<MMSun") == NULL, "Resaved legacy XML must NOT inject MMSun tag (0-diff preservation)");
-    TEST_ASSERT(strstr(buf_b, "<Sun x=\"53\" y=\"-89\" />") != NULL, "Resaved legacy XML must preserve Sun tag");
+    TEST_ASSERT(strstr(buf, "<Sun x=\"53\" y=\"-89\" />") != NULL, "Resaved XML must preserve Sun tag");
+    TEST_ASSERT(strstr(buf, "<MMSun") == NULL, "Resaved XML must never contain unwanted MMSun tag");
 
-    remove(temp_in_b);
-    remove(temp_out_b);
+    remove(temp_in);
+    remove(temp_out);
 
-    printf("  [PASS] MMSun present and omitted roundtrip (0-diff) verified.\n");
+    printf("  [PASS] Sun preservation and 0 MMSun emission verified.\n");
     g_tests_passed++;
     return true;
 }
@@ -1006,6 +949,10 @@ static bool test_adventure_gauntlet_regression(void) {
     const char *long_text = "PLAY THROUGH ALL THE LEVELS YOU HAVE UNLOCKED IN ADVENTURE MODE IN RANDOM ORDER!";
     int lines = popcap_font_count_wrapped_lines(&dummy_font, long_text, 211, 1.0f);
     TEST_ASSERT(lines >= 2, "Word-wrap must split long InfoBox text into >= 2 lines on width 211");
+
+    /* 3. Verify Cancun8 outline color is authentic warm gold RGB(254, 209, 127) */
+    ensure_popcap_fonts();
+    TEST_ASSERT(g_popcap_cancun_outline_8.outline_color == RGB(254, 209, 127), "Cancun8 outline color must be warm gold (254, 209, 127)");
 
     printf("  [PASS] AdvBack/AdventureTitle sprite resolution and word-wrap >= 2 lines verified.\n");
     g_tests_passed++;

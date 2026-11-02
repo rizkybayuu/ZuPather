@@ -3330,6 +3330,7 @@ typedef struct {
     char map_from[32];
     char map_to[32];
     int map_count;
+    COLORREF outline_color;
 } PopCapFont;
 
 static PopCapFont g_popcap_native_alien_48 = {0};
@@ -3800,6 +3801,9 @@ static bool popcap_font_load(
         char out_path[MAX_PATH];
         if (!layout_get_zuma_asset_path(outline_name, out_path, sizeof(out_path))) {
             snprintf(out_path, sizeof(out_path), "%s\\fonts\\%s.gif", root_dir, outline_name);
+            if (GetFileAttributesA(out_path) == INVALID_FILE_ATTRIBUTES) {
+                snprintf(out_path, sizeof(out_path), "D:\\Files\\Project\\Reverse Engineer\\Zuma Compleluxe\\fonts\\%s.gif", outline_name);
+            }
         }
         if (GetFileAttributesA(out_path) != INVALID_FILE_ATTRIBUTES) {
             if (image_load_from_file(out_path, &font->outline_img)) {
@@ -3807,9 +3811,16 @@ static bool popcap_font_load(
                     uint32_t *dst = (uint32_t*)font->outline_dib.bits;
                     uint32_t *src = (uint32_t*)font->outline_img.bits;
                     int total = font->outline_img.width * font->outline_img.height;
+                    COLORREF out_col = font->outline_color;
+                    uint8_t or_val = GetRValue(out_col);
+                    uint8_t og_val = GetGValue(out_col);
+                    uint8_t ob_val = GetBValue(out_col);
                     for (int i = 0; i < total; ++i) {
                         uint8_t a = (uint8_t)(src[i] & 0xFF);
-                        dst[i] = ((uint32_t)a << 24); /* Pure black with outline alpha */
+                        uint8_t pr = (uint8_t)(((int)or_val * a) / 255);
+                        uint8_t pg = (uint8_t)(((int)og_val * a) / 255);
+                        uint8_t pb = (uint8_t)(((int)ob_val * a) / 255);
+                        dst[i] = ((uint32_t)a << 24) | ((uint32_t)pr << 16) | ((uint32_t)pg << 8) | (uint32_t)pb;
                     }
                     font->has_outline = true;
                 }
@@ -3830,6 +3841,7 @@ static void ensure_popcap_fonts(void) {
     popcap_font_load(&g_popcap_cancun_13, "Cancun13", NULL, "_Cancun13", NULL);
     popcap_font_load(&g_popcap_cancun_10, "Cancun10", NULL, "_Cancun10", NULL);
     popcap_font_load(&g_popcap_cancun_outline_10, "Cancun10", NULL, "_Cancun10", "_CancunOUTLINE10");
+    g_popcap_cancun_outline_8.outline_color = RGB(254, 209, 127); /* PopCap authentic Cancun8 LayerSetColorAdd (1.0, 0.82, 0.5) */
     popcap_font_load(&g_popcap_cancun_outline_8, "Cancun8", NULL, "_Cancun8", "_CancunFAT8");
     popcap_font_load(&g_popcap_arial_12, "Arial12Bold", NULL, "_Arial12Bold", NULL);
 }
@@ -4481,12 +4493,25 @@ static void render_layout_text_element(
                 FillRect(mem_dc, &rc_ul, br);
                 DeleteObject(br);
             } else {
-                RECT rc_sh = rc_txt;
-                OffsetRect(&rc_sh, 1, 1);
-                SetTextColor(mem_dc, RGB(0, 0, 0));
-                DrawTextA(mem_dc, disp_text, -1, &rc_sh, draw_flags);
-                SetTextColor(mem_dc, text_color);
-                DrawTextA(mem_dc, disp_text, -1, &rc_txt, draw_flags);
+                if (_stricmp(tag, "HighscoreScores") == 0 || _stricmp(tag, "HighscoreNames") == 0 || _stricmp(tag, "InfoBox") == 0) {
+                    COLORREF out_color = RGB(254, 209, 127);
+                    int off[8][2] = {{-1,0},{1,0},{0,-1},{0,1},{-1,-1},{1,-1},{-1,1},{1,1}};
+                    SetTextColor(mem_dc, out_color);
+                    for (int oi = 0; oi < 8; ++oi) {
+                        RECT rc_o = rc_txt;
+                        OffsetRect(&rc_o, off[oi][0], off[oi][1]);
+                        DrawTextA(mem_dc, disp_text, -1, &rc_o, draw_flags);
+                    }
+                    SetTextColor(mem_dc, text_color);
+                    DrawTextA(mem_dc, disp_text, -1, &rc_txt, draw_flags);
+                } else {
+                    RECT rc_sh = rc_txt;
+                    OffsetRect(&rc_sh, 1, 1);
+                    SetTextColor(mem_dc, RGB(0, 0, 0));
+                    DrawTextA(mem_dc, disp_text, -1, &rc_sh, draw_flags);
+                    SetTextColor(mem_dc, text_color);
+                    DrawTextA(mem_dc, disp_text, -1, &rc_txt, draw_flags);
+                }
             }
         }
     }
@@ -4967,17 +4992,26 @@ static void layout_canvas_paint(LayoutEditorState *st, HWND hwnd) {
         RECT rc_welcome = { cx, cy + (int)roundf((float)wel_y * vscale), cx + rw, cy + (int)roundf((float)(wel_y + 44) * vscale) };
         RECT rc_notyou  = { cx, cy + (int)roundf((float)(us_y - 12) * vscale), cx + rw, cy + (int)roundf((float)(us_y + 12) * vscale) };
         if (g_popcap_native_alien_16.loaded) {
-            popcap_font_draw_text(mem_dc, &g_popcap_native_alien_16, "Welcome to Zuma, DEVTESTER!", &rc_welcome, RGB(255, 255, 255), vscale, DT_CENTER);
+            popcap_font_draw_text(mem_dc, &g_popcap_native_alien_16, "WELCOME TO ZUMA, DEVTESTER!", &rc_welcome, RGB(255, 234, 1), vscale, DT_CENTER);
         } else if (g_popcap_cancun_14.loaded) {
-            popcap_font_draw_text(mem_dc, &g_popcap_cancun_14, "Welcome to Zuma, DEVTESTER!", &rc_welcome, RGB(255, 255, 255), vscale, DT_CENTER);
+            popcap_font_draw_text(mem_dc, &g_popcap_cancun_14, "WELCOME TO ZUMA, DEVTESTER!", &rc_welcome, RGB(255, 234, 1), vscale, DT_CENTER);
         }
         if (g_popcap_cancun_10.loaded) {
-            popcap_font_draw_text(mem_dc, &g_popcap_cancun_10, "(If this is not you, click here.)", &rc_notyou, RGB(91, 55, 0), vscale, DT_CENTER);
+            popcap_font_draw_text(mem_dc, &g_popcap_cancun_10, "(IF THIS IS NOT YOU, CLICK HERE.)", &rc_notyou, RGB(91, 55, 0), vscale, DT_CENTER);
+            int ny_w = (int)roundf((float)popcap_font_get_line_width(&g_popcap_cancun_10, "(IF THIS IS NOT YOU, CLICK HERE.)", 33) * vscale);
+            int ny_x = cx + (rw - ny_w) / 2;
+            int ny_y = cy + (int)roundf(51.0f * vscale);
+            HPEN ny_pen = CreatePen(PS_SOLID, 1, RGB(91, 55, 0));
+            HPEN old_nypen = (HPEN)SelectObject(mem_dc, ny_pen);
+            MoveToEx(mem_dc, ny_x, ny_y, NULL);
+            LineTo(mem_dc, ny_x + ny_w, ny_y);
+            SelectObject(mem_dc, old_nypen);
+            DeleteObject(ny_pen);
         } else {
-            SetTextColor(mem_dc, RGB(255, 255, 255));
-            DrawTextA(mem_dc, "Welcome to Zuma, DEVTESTER!", -1, &rc_welcome, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+            SetTextColor(mem_dc, RGB(255, 234, 1));
+            DrawTextA(mem_dc, "WELCOME TO ZUMA, DEVTESTER!", -1, &rc_welcome, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
             SetTextColor(mem_dc, RGB(91, 55, 0));
-            DrawTextA(mem_dc, "(If this is not you, click here.)", -1, &rc_notyou, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+            DrawTextA(mem_dc, "(IF THIS IS NOT YOU, CLICK HERE.)", -1, &rc_notyou, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
         }
     } else if (st->cur_screen_idx == 2) {
         /* Screen 2: Adventure Map Composite */
