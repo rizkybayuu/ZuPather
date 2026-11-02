@@ -184,6 +184,8 @@ typedef struct {
     int loading_space_h;
     int adventure_space_w;
     int adventure_space_h;
+    int gauntlet_space_w;
+    int gauntlet_space_h;
     char section_space[32][64];
     char xml_header[4096];
     bool show_conditional_sprites;
@@ -421,12 +423,15 @@ static const SpriteMetadata g_sprite_metadata_table[] = {
     { "pitcover", 1, 12, 0 },
     { "coin", 1, 30, 0 },
     { "explosion", 1, 17, 0 },
+    { "advback", 1, 1, 0 },
+    { "advtitle", 1, 1, 0 },
     { "advmainmenubutton", 3, 1, 0 },
     { "advplaybutton", 3, 1, 0 },
-    { "gauntbackbutton", 3, 1, 0 },
+    { "gaunttitle", 1, 1, 0 },
+    { "gauntbackbutton", 4, 1, 0 },
     { "gauntmainmenubutton", 3, 1, 0 },
-    { "gauntnextbutton", 3, 1, 0 },
-    { "gauntplaybutton", 3, 1, 0 },
+    { "gauntnextbutton", 4, 1, 0 },
+    { "gauntplaybutton", 4, 1, 0 },
     { "gauntpracticebutton", 3, 1, 0 },
     { "gauntsurvivalbutton", 3, 1, 0 },
     { "Dialogbutton", 3, 1, 0 },
@@ -896,6 +901,7 @@ static const char* get_element_sprite_name(const LayoutElement *el, int *out_col
     }
 
     if (_stricmp(el->section, "AdventureTemples") == 0) {
+        if (_stricmp(el->tag, "AdvBack") == 0) return "advback";
         if (_stricmp(el->tag, "Temple1") == 0) return "advtemple1";
         if (_stricmp(el->tag, "Temple2") == 0) return "advtemple2";
         if (_stricmp(el->tag, "Temple2V") == 0) return "advtemple2v";
@@ -913,6 +919,7 @@ static const char* get_element_sprite_name(const LayoutElement *el, int *out_col
     }
 
     if (_stricmp(el->section, "AdventureLabels") == 0) {
+        if (_stricmp(el->tag, "AdventureTitle") == 0) return "advtitle";
         if (_stricmp(el->tag, "BottomBox") == 0 || _stricmp(el->tag, "Stage13Badge") == 0) return "advstage";
         if (_stricmp(el->tag, "HighscoreTitle") == 0) return "advhighscore";
     }
@@ -932,7 +939,11 @@ static const char* get_element_sprite_name(const LayoutElement *el, int *out_col
 
     /* 3. Gauntlet */
     if (_stricmp(el->section, "GauntletButtons") == 0) {
-        if (out_cols) *out_cols = 3;
+        if (_stricmp(el->tag, "Back") == 0 || _stricmp(el->tag, "Next") == 0 || _stricmp(el->tag, "Play") == 0) {
+            if (out_cols) *out_cols = 4;
+        } else {
+            if (out_cols) *out_cols = 3;
+        }
         if (_stricmp(el->tag, "MainMenu") == 0) return "gauntmainmenubutton";
         if (_stricmp(el->tag, "Practice") == 0) return "gauntpracticebutton";
         if (_stricmp(el->tag, "Survival") == 0) return "gauntsurvivalbutton";
@@ -942,6 +953,7 @@ static const char* get_element_sprite_name(const LayoutElement *el, int *out_col
     }
 
     if (_stricmp(el->section, "GauntletLabels") == 0) {
+        if (_stricmp(el->tag, "GauntletTitle") == 0) return "gaunttitle";
         if (_stricmp(el->tag, "HighscoreTitle") == 0) return "gaunthighscore";
         if (_stricmp(el->tag, "Gem") == 0) return "gaunteaglegem";
     }
@@ -1274,7 +1286,6 @@ static void assign_element_default_bounds(LayoutElement *el, const LayoutEditorS
             if (!(el->flags & ATTR_HAS_Y)) { el->y = -63;  }
         } else if (_stricmp(el->tag, "Hat") == 0) {
             el->def_w = 101; el->def_h = 107;
-            el->is_conditional = true;
             if (!(el->flags & ATTR_HAS_X)) { el->x = 188;  }
             if (!(el->flags & ATTR_HAS_Y)) { el->y = 247;  }
         } else if (_stricmp(el->tag, "EyeIdle1") == 0) {
@@ -1316,6 +1327,8 @@ static void assign_element_default_bounds(LayoutElement *el, const LayoutEditorS
 
     /* 3. Adventure Map */
     else if (_stricmp(el->section, "AdventureTemples") == 0) {
+        if (_stricmp(el->tag, "AdvBack") == 0) { el->def_w = 640; el->def_h = 250; if (!(el->flags & ATTR_HAS_X)) { el->x = 0; } if (!(el->flags & ATTR_HAS_Y)) { el->y = 0; } }
+        else 
         if (_stricmp(el->tag, "Temple1") == 0) { el->def_w = 192; el->def_h = 100; if (!(el->flags & ATTR_HAS_X)) { el->x = 0;  } if (!(el->flags & ATTR_HAS_Y)) { el->y = 188;  } }
         else if (_stricmp(el->tag, "Temple2") == 0 || _stricmp(el->tag, "Temple2V") == 0) { el->def_w = 190; el->def_h = 100; if (!(el->flags & ATTR_HAS_X)) { el->x = 0;  } if (!(el->flags & ATTR_HAS_Y)) { el->y = 112;  } }
         else if (_stricmp(el->tag, "Temple3") == 0 || _stricmp(el->tag, "Temple3V") == 0) { el->def_w = 190; el->def_h = 100; if (!(el->flags & ATTR_HAS_X)) { el->x = 395;  } if (!(el->flags & ATTR_HAS_Y)) { el->y = 125;  } }
@@ -1338,6 +1351,11 @@ static void assign_element_default_bounds(LayoutElement *el, const LayoutEditorS
             if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "bottom-right", sizeof(el->align)-1);  }
         } else { el->def_w = 120; el->def_h = 40; }
     } else if (_stricmp(el->section, "AdventureLabels") == 0) {
+        if (_stricmp(el->tag, "AdventureTitle") == 0) {
+            el->def_w = 184; el->def_h = 73;
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 0; }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 0; }
+        } else 
         if (_stricmp(el->tag, "HighscoreTitle") == 0) {
             el->def_w = 140; el->def_h = 30;
             if (!(el->flags & ATTR_HAS_X)) { el->x = 456;  }
@@ -1380,6 +1398,11 @@ static void assign_element_default_bounds(LayoutElement *el, const LayoutEditorS
             if (!(el->flags & ATTR_HAS_X)) { el->x = 326;  }
             if (!(el->flags & ATTR_HAS_Y)) { el->y = 422;  }
             if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "center", sizeof(el->align)-1);  }
+        } else if (_stricmp(el->tag, "InfoBox") == 0) {
+            el->def_w = (el->flags & ATTR_HAS_W && el->w > 0) ? el->w : 211;
+            el->def_h = (el->flags & ATTR_HAS_H && el->h > 0) ? el->h : 141;
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 178; }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 84; }
         } else if (_stricmp(el->tag, "Stage13Subtitle") == 0) {
             el->def_w = 300; el->def_h = 24;
             el->hotspot |= HOTSPOT_CENTER_X;
@@ -1407,7 +1430,7 @@ static void assign_element_default_bounds(LayoutElement *el, const LayoutEditorS
             if (!(el->flags & ATTR_HAS_Y)) { el->y = 444;  }
             if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "bottom-middle", sizeof(el->align)-1);  }
         } else if (_stricmp(el->tag, "Back") == 0) {
-            el->def_w = 124; el->def_h = 33;
+            el->def_w = 93; el->def_h = 33;
             if (!(el->flags & ATTR_HAS_X)) { el->x = 390;  }
             if (!(el->flags & ATTR_HAS_Y)) { el->y = 444;  }
             if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "bottom-middle", sizeof(el->align)-1);  }
@@ -1417,59 +1440,67 @@ static void assign_element_default_bounds(LayoutElement *el, const LayoutEditorS
             if (!(el->flags & ATTR_HAS_Y)) { el->y = 422;  }
             if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "bottom-left", sizeof(el->align)-1);  }
         } else if (_stricmp(el->tag, "Next") == 0) {
-            el->def_w = 125; el->def_h = 33;
+            el->def_w = 94; el->def_h = 33;
             if (!(el->flags & ATTR_HAS_X)) { el->x = 506;  }
             if (!(el->flags & ATTR_HAS_Y)) { el->y = 413;  }
             if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "bottom-right", sizeof(el->align)-1);  }
         } else if (_stricmp(el->tag, "Play") == 0) {
-            el->def_w = 140; el->def_h = 33;
+            el->def_w = 105; el->def_h = 33;
             if (!(el->flags & ATTR_HAS_X)) { el->x = 505;  }
             if (!(el->flags & ATTR_HAS_Y)) { el->y = 446;  }
             if (!(el->flags & ATTR_HAS_ALIGN)) { strncpy(el->align, "bottom-right", sizeof(el->align)-1);  }
         } else { el->def_w = 120; el->def_h = 36; }
     } else if (_stricmp(el->section, "GauntletLabels") == 0) {
-        if (_stricmp(el->tag, "DoorFrame") == 0) {
-            el->def_w = 320; el->def_h = 240;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 170;  }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 220;  }
+        if (_stricmp(el->tag, "GauntletTitle") == 0) {
+            el->def_w = 168; el->def_h = 68;
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 150;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 0;  }
+        } else if (_stricmp(el->tag, "DoorFrame") == 0) {
+            el->def_w = (el->flags & ATTR_HAS_W && el->w > 0) ? el->w : 450;
+            el->def_h = (el->flags & ATTR_HAS_H && el->h > 0) ? el->h : 338;
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 389;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 309;  }
         } else if (_stricmp(el->tag, "HighscoreTitle") == 0) {
             el->def_w = 140; el->def_h = 30;
             if (!(el->flags & ATTR_HAS_X)) { el->x = 434;  }
             if (!(el->flags & ATTR_HAS_Y)) { el->y = 0;  }
         } else if (_stricmp(el->tag, "DoorName") == 0) {
-            el->def_w = 320; el->def_h = 24;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 170;  }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 427;  }
+            el->def_w = (el->flags & ATTR_HAS_W && el->w > 0) ? el->w : 450;
+            el->def_h = 24;
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 389;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 600;  }
         } else if (_stricmp(el->tag, "PracticeText") == 0) {
-            el->def_w = (el->flags & ATTR_HAS_W && el->w > 0) ? el->w : 320; el->def_h = 40;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 150;  }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 260;  }
+            el->def_w = (el->flags & ATTR_HAS_W && el->w > 0) ? el->w : 450;
+            el->def_h = 40;
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 361;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 366;  }
         } else if (_stricmp(el->tag, "CustomMapTag") == 0) {
             el->def_w = 120; el->def_h = 24;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 150;  }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 260;  }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 417;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 366;  }
         } else if (_stricmp(el->tag, "Gem") == 0) {
             el->hotspot = HOTSPOT_BOTTOM_CENTER;
             el->def_w = 56; el->def_h = 56;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 560;  }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 220;  }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 938;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 309;  }
         } else if (_stricmp(el->tag, "HighscoreScores") == 0) {
             el->def_w = 60; el->def_h = 80;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 575;  }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 70;  }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 959;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 98;  }
         } else if (_stricmp(el->tag, "HighscoreNames") == 0) {
             el->def_w = 90; el->def_h = 80;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 445;  }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 70;  }
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 776;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 98;  }
         } else if (_stricmp(el->tag, "HighscoreClip") == 0) {
-            el->def_w = (el->flags & ATTR_HAS_W && el->w > 0) ? el->w : 567; el->def_h = 60;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 567;  }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 70;  }
+            el->def_w = (el->flags & ATTR_HAS_W && el->w > 0) ? el->w : 797;
+            el->def_h = 60;
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 0;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 0;  }
         } else if (_stricmp(el->tag, "InfoBox") == 0) {
             el->def_w = (el->flags & ATTR_HAS_W && el->w > 0) ? el->w : 150;
-            el->def_h = (el->flags & ATTR_HAS_H && el->h > 0) ? el->h : 100;
-            if (!(el->flags & ATTR_HAS_X)) { el->x = 20;  }
-            if (!(el->flags & ATTR_HAS_Y)) { el->y = 60;  }
+            el->def_h = (el->flags & ATTR_HAS_H && el->h > 0) ? el->h : 141;
+            if (!(el->flags & ATTR_HAS_X)) { el->x = 178;  }
+            if (!(el->flags & ATTR_HAS_Y)) { el->y = 84;  }
         } else { el->def_w = 110; el->def_h = 32; }
     }
 
@@ -1868,11 +1899,6 @@ static bool is_element_visible_in_editor(const LayoutElement *el, const LayoutEd
         }
     }
 
-    /* In Gauntlet "All Elements" view, CustomMapTag shares coords with PracticeText.
-       Show primary unless selected or hovered. All 6 Gauntlet buttons are distinct and always visible! */
-    if (st->cur_screen_idx == 3 && st->cur_sub_filter_idx == 0) {
-        if (_stricmp(el->tag, "CustomMapTag") == 0 && !el->selected && (st->hovered_elem != el)) return false;
-    }
 
     /* In HelpScreen (Screen 8), hide Dev items (DevTemple5, DevMouseM) unless explicitly selected or hovered */
     if (st->cur_screen_idx == 8) {
@@ -2027,6 +2053,7 @@ static bool is_current_screen_space_1to1(const LayoutEditorState *st) {
     if (scr == 1 && st->main_menu_space_w == st->target_w && st->main_menu_space_h == st->target_h) return true;
     if (scr == 0 && st->loading_space_w == st->target_w && st->loading_space_h == st->target_h) return true;
     if (scr == 2 && st->adventure_space_w == st->target_w && st->adventure_space_h == st->target_h) return true;
+    if (scr == 3 && st->gauntlet_space_w == st->target_w && st->gauntlet_space_h == st->target_h) return true;
 
     const char *sec_name = (scr >= 0 && scr < NUM_SCREENS) ? g_screens[scr].filter_section : NULL;
     if (!sec_name && scr == 2) sec_name = "AdventureTemples";
@@ -2052,6 +2079,8 @@ static bool layout_xml_load(LayoutEditorState *st, const char *filepath) {
     st->hud_space_h = 0;
     st->adventure_space_w = 0;
     st->adventure_space_h = 0;
+    st->gauntlet_space_w = 0;
+    st->gauntlet_space_h = 0;
     memset(st->section_space, 0, sizeof(st->section_space));
     memset(st->xml_header, 0, sizeof(st->xml_header));
     char line[1024];
@@ -2123,6 +2152,9 @@ static bool layout_xml_load(LayoutEditorState *st, const char *filepath) {
                         } else if (_strnicmp(tag_name, "Adventure", 9) == 0) {
                             st->adventure_space_w = sw;
                             st->adventure_space_h = sh;
+                        } else if (_strnicmp(tag_name, "Gauntlet", 8) == 0) {
+                            st->gauntlet_space_w = sw;
+                            st->gauntlet_space_h = sh;
                         }
                     }
                 }
@@ -2637,7 +2669,6 @@ static bool is_text_element(const LayoutElement *el) {
         _stricmp(tag, "ClickToPlay") == 0 ||
         _stricmp(tag, "HighscoreScores") == 0 ||
         _stricmp(tag, "HighscoreNames") == 0 ||
-        _stricmp(tag, "HighscoreDate") == 0 ||
         _stricmp(tag, "StageNum") == 0 ||
         _stricmp(tag, "Subtitle") == 0 ||
         _stricmp(tag, "Stage13Num") == 0 ||
@@ -2645,6 +2676,8 @@ static bool is_text_element(const LayoutElement *el) {
         _stricmp(tag, "Stage13Subtitle") == 0 ||
         _stricmp(tag, "DoorName") == 0 ||
         _stricmp(tag, "PracticeText") == 0 ||
+        _stricmp(tag, "ScoreText") == 0 ||
+        _stricmp(tag, "StageName") == 0 ||
         _stricmp(tag, "CustomMapTag") == 0 ||
         _stricmp(tag, "CreditsText") == 0 ||
         _stricmp(tag, "HeaderTitle") == 0 ||
@@ -2662,7 +2695,8 @@ static bool is_text_element(const LayoutElement *el) {
         _stricmp(tag, "SwapClick") == 0 ||
         _stricmp(tag, "BallTarget") == 0 ||
         _stricmp(tag, "WelcomeText") == 0 ||
-        _stricmp(tag, "UserSwitchText") == 0) {
+        _stricmp(tag, "UserSwitchText") == 0 ||
+        _stricmp(tag, "InfoBox") == 0) {
         return true;
     }
     return false;
@@ -2673,7 +2707,7 @@ static bool is_region_element(const LayoutElement *el) {
     const char *tag = el->tag ? el->tag : "";
     if (_stricmp(tag, "MenubarMargins") == 0 ||
         _stricmp(tag, "HighscoreClip") == 0 ||
-        _stricmp(tag, "InfoBox") == 0 ||
+        _stricmp(tag, "HighscoreDate") == 0 ||
         _strnicmp(tag, "Thumb", 5) == 0 ||
         _stricmp(tag, "ScrollArea") == 0 ||
         _stricmp(tag, "Dialog") == 0 ||
@@ -2702,6 +2736,7 @@ static int get_element_z_order(const LayoutElement *el, int screen_idx) {
 
     /* Adventure Screen */
     if (_stricmp(sec, "AdventureTemples") == 0) {
+        if (_stricmp(tag, "AdvBack") == 0) return 5;
         if (_stricmp(tag, "Temple4") == 0) return 10;
         if (_stricmp(tag, "Middle") == 0)  return 20;
         if (_stricmp(tag, "Temple5") == 0) return 30;
@@ -2722,6 +2757,7 @@ static int get_element_z_order(const LayoutElement *el, int screen_idx) {
     if (_stricmp(sec, "AdventureButtons") == 0) return 110;
     if (_stricmp(sec, "AdventureLabels") == 0) {
         if (_stricmp(tag, "BottomBox") == 0 || _stricmp(tag, "Stage13Badge") == 0) return 70;
+        if (_stricmp(tag, "AdventureTitle") == 0) return 90;
         if (_stricmp(tag, "HighscoreTitle") == 0) return 95;
         return 100;
     }
@@ -2729,6 +2765,7 @@ static int get_element_z_order(const LayoutElement *el, int screen_idx) {
     /* Gauntlet Screen */
     if (_stricmp(sec, "GauntletDoors") == 0) return 30;
     if (_stricmp(sec, "GauntletLabels") == 0) {
+        if (_stricmp(tag, "HighscoreClip") == 0) return 5;
         if (_stricmp(tag, "DoorFrame") == 0) return 20;
         if (_stricmp(tag, "Gem") == 0) return 40;
         return 90;
@@ -2882,7 +2919,7 @@ static void update_all_elements_canvas_rects(LayoutEditorState *st, int cv_w, in
 
         if (el->flags & ATTR_IS_DOOR_PAIR) {
             int target_dx, target_dy, target_fx, target_fy;
-            if (is_element_space_1to1(el, st) || scr == 4 || scr == 5 || scr == 6 || (scr == 2 && st && st->adventure_space_w == st->target_w && st->adventure_space_h == st->target_h)) {
+            if (is_element_space_1to1(el, st) || scr == 4 || scr == 5 || scr == 6 || (scr == 2 && st && st->adventure_space_w == st->target_w && st->adventure_space_h == st->target_h) || (scr == 3 && st && st->gauntlet_space_w == st->target_w && st->gauntlet_space_h == st->target_h)) {
                 target_dx = el->doorX; target_dy = el->doorY;
                 target_fx = el->frogX; target_fy = el->frogY;
             } else {
@@ -2912,11 +2949,13 @@ static void update_all_elements_canvas_rects(LayoutEditorState *st, int cv_w, in
                 /* Mode C: TempleCleared */
                 int delta_x = (st->target_w - 640) / 2;
                 int delta_y = (st->target_h - 480) / 2;
+                if (_stricmp(el->tag, "Title") == 0) in_y -= 80;
                 target_x = delta_x + in_x;
                 target_y = delta_y + in_y;
             } else if (scr == 5) {
                 /* Mode C: StageComplete */
                 int delta_y = (st->target_h - 480) / 2;
+                if (_stricmp(el->tag, "StageText") == 0 || _stricmp(el->tag, "CompleteText") == 0) in_y -= 80;
                 target_x = (in_x == 320 || in_x == st->target_w / 2) ? (st->target_w / 2) : (int)roundf((float)in_x * zscale);
                 target_y = delta_y + in_y;
             } else if (scr == 4) {
@@ -2929,7 +2968,10 @@ static void update_all_elements_canvas_rects(LayoutEditorState *st, int cv_w, in
                     target_y = st->target_h - off_y - target_eh;
                 } else if (_stricmp(el->tag, "ScoreText") == 0) {
                     target_x = hud_space_ok ? (in_x - target_ew) : ((int)roundf((float)in_x * zscale) - target_ew);
-                    target_y = hud_space_ok ? in_y : (int)roundf((float)in_y * zscale);
+                    target_y = 4;
+                } else if (_stricmp(el->tag, "StageName") == 0) {
+                    target_x = hud_space_ok ? in_x : (int)roundf((float)in_x * zscale);
+                    target_y = 5;
                 } else if (hud_space_ok) {
                     target_x = in_x;
                     target_y = in_y;
@@ -2952,28 +2994,26 @@ static void update_all_elements_canvas_rects(LayoutEditorState *st, int cv_w, in
                     }
                 }
                 if (scr == 2 && el->section && _stricmp(el->section, "AdventureLabels") == 0) {
-                    if (st && st->adventure_space_w == st->target_w && st->adventure_space_h == st->target_h) {
-                        if (_stricmp(el->tag, "StageText") == 0 || _stricmp(el->tag, "Stage13Title") == 0) {
-                            in_y -= (int)roundf(26.0f * 1.40625f);
-                        } else if (_stricmp(el->tag, "StageNum") == 0) {
-                            in_y -= (int)roundf(16.0f * 1.40625f);
-                        } else if (_stricmp(el->tag, "Subtitle") == 0 || _stricmp(el->tag, "Stage13Subtitle") == 0) {
-                            in_y -= (int)roundf(10.0f * 1.40625f);
-                        }
-                    } else {
-                        if (_stricmp(el->tag, "StageText") == 0 || _stricmp(el->tag, "Stage13Title") == 0) {
-                            in_y -= 26; /* PopCap DrawString baseline 422 to top box 396 */
-                        } else if (_stricmp(el->tag, "StageNum") == 0) {
-                            in_y -= 16; /* PopCap DrawString baseline 396 to top box 380, aligning with advstage */
-                        } else if (_stricmp(el->tag, "Subtitle") == 0 || _stricmp(el->tag, "Stage13Subtitle") == 0) {
-                            in_y -= 10; /* PopCap DrawString baseline 456 to top box 446 */
-                        }
+                    if (_stricmp(el->tag, "HighscoreNames") == 0 || _stricmp(el->tag, "HighscoreScores") == 0) {
+                        in_y -= 8;
+                    } else if (_stricmp(el->tag, "StageText") == 0 || _stricmp(el->tag, "Stage13Title") == 0) {
+                        in_y -= 26;
+                    } else if (_stricmp(el->tag, "StageNum") == 0 || _stricmp(el->tag, "Stage13Num") == 0) {
+                        in_y -= 10;
+                    } else if (_stricmp(el->tag, "Subtitle") == 0 || _stricmp(el->tag, "Stage13Subtitle") == 0) {
+                        in_y -= 10;
+                    }
+                }
+                if (scr == 3 && el->section && _stricmp(el->section, "GauntletLabels") == 0) {
+                    if (_stricmp(el->tag, "PracticeText") == 0 || _stricmp(el->tag, "CustomMapTag") == 0) {
+                        in_y -= 10;
                     }
                 }
                 bool is_space_1to1 = is_element_space_1to1(el, st);
                 if (scr == 1 && st && st->main_menu_space_w == st->target_w && st->main_menu_space_h == st->target_h) is_space_1to1 = true;
                 if (scr == 0 && st && st->loading_space_w == st->target_w && st->loading_space_h == st->target_h) is_space_1to1 = true;
                 if (scr == 2 && st && st->adventure_space_w == st->target_w && st->adventure_space_h == st->target_h) is_space_1to1 = true;
+                if (scr == 3 && st && st->gauntlet_space_w == st->target_w && st->gauntlet_space_h == st->target_h) is_space_1to1 = true;
 
                 if (is_space_1to1) {
                     target_x = in_x;
@@ -3078,8 +3118,14 @@ static void render_layout_door_pair(
     if (sp && sp->loaded && sp->img.hbm) {
         int frame_w = sp->img.width / cols;
         int frame_h = sp->img.height / rows;
-        int src_x = (cell % cols) * frame_w;
-        int src_y = (cell / cols) * frame_h;
+        int frame_idx = cell;
+        if (cols >= 3) {
+            if (is_held && held_handle == 0) frame_idx = (cols >= 4) ? 3 : 2;
+            else if (is_hovered || is_selected) frame_idx = 2;
+            else frame_idx = cell;
+        }
+        int src_x = (frame_idx % cols) * frame_w;
+        int src_y = (frame_idx / cols) * frame_h;
 
         BLENDFUNCTION bf = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
         BOOL ok = AlphaBlend(mem_dc, dst_x, dst_y, dst_w, dst_h,
@@ -3172,7 +3218,7 @@ static void render_layout_sprite_element(
     int frame_h = sp->img.height / rows;
     int frame_idx = cell;
     if (frame_idx == 0 && sp && sp->default_cell > 0) frame_idx = sp->default_cell;
-    if (cols == 3 && cell == 0) {
+    if ((cols == 3 || cols == 4) && cell == 0) {
         if (is_held) frame_idx = 2;
         else if (is_hovered) frame_idx = 1;
         else frame_idx = 0;
@@ -3294,7 +3340,34 @@ static PopCapFont g_popcap_cancun_12 = {0};
 static PopCapFont g_popcap_cancun_13 = {0};
 static PopCapFont g_popcap_cancun_10 = {0};
 static PopCapFont g_popcap_cancun_outline_10 = {0};
+static PopCapFont g_popcap_cancun_outline_8 = {0};
 static PopCapFont g_popcap_arial_12 = {0};
+
+/* Universal Font Baseline Offset (Ascent - AscentPadding) Helper.
+   Computes exact pixel offset between DrawString baseline Y and visual glyph top. */
+static inline int le_font_baseline_offset(const PopCapFont *font) {
+    if (!font) return 0;
+    int off = 0;
+    if (font->has_outline && font->outline_ascent > 0) {
+        off = font->outline_ascent - font->outline_ascent_padding;
+    } else if (font->ascent > 0) {
+        off = font->ascent - font->ascent_padding;
+    }
+    if (off > 0) return off;
+
+    /* Fallback constants matching verified font descriptors */
+    if (font == &g_popcap_native_alien_48) return 80;
+    if (font == &g_popcap_native_alien_18) return 30;
+    if (font == &g_popcap_native_alien_16) return 26;
+    if (font == &g_popcap_cancun_outline_8) return 8;
+    if (font == &g_popcap_cancun_outline_10) return 10;
+    if (font == &g_popcap_cancun_10) return 10;
+    if (font == &g_popcap_cancun_12) return 12;
+    if (font == &g_popcap_cancun_13) return 13;
+    if (font == &g_popcap_cancun_14) return 15;
+    if (font == &g_popcap_arial_12) return 14;
+    return 0;
+}
 
 static char* font_skip_ws(char *p) {
     while (*p && (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n')) p++;
@@ -3757,6 +3830,7 @@ static void ensure_popcap_fonts(void) {
     popcap_font_load(&g_popcap_cancun_13, "Cancun13", NULL, "_Cancun13", NULL);
     popcap_font_load(&g_popcap_cancun_10, "Cancun10", NULL, "_Cancun10", NULL);
     popcap_font_load(&g_popcap_cancun_outline_10, "Cancun10", NULL, "_Cancun10", "_CancunOUTLINE10");
+    popcap_font_load(&g_popcap_cancun_outline_8, "Cancun8", NULL, "_Cancun8", "_CancunFAT8");
     popcap_font_load(&g_popcap_arial_12, "Arial12Bold", NULL, "_Arial12Bold", NULL);
 }
 
@@ -3902,13 +3976,13 @@ static void draw_sandy_glow_text(HDC mem_dc, PopCapFont *font, const char *text,
     popcap_font_draw_text(mem_dc, font, text, rc, RGB(0, 229, 255), vscale, DT_CENTER | DT_VCENTER);
 }
 
-static void popcap_font_draw_text(
+static void popcap_font_draw_text_ex(
     HDC mem_dc, PopCapFont *font, const char *text,
-    const RECT *rc, COLORREF color, float vscale, UINT draw_flags
+    const RECT *rc, COLORREF color, float vscale, UINT draw_flags, int custom_line_spacing
 ) {
     if (!font || !font->loaded || !text || !rc) return;
 
-    int line_spacing = font->ascent + font->line_spacing_offset;
+    int line_spacing = (custom_line_spacing > 0) ? custom_line_spacing : (font->ascent + font->line_spacing_offset);
     if (line_spacing <= 0) line_spacing = 14;
     int line_h = (int)roundf((float)line_spacing * vscale);
     if (line_h <= 0) line_h = 16;
@@ -3954,9 +4028,80 @@ static void popcap_font_draw_text(
     }
 }
 
+static void popcap_font_draw_text(
+    HDC mem_dc, PopCapFont *font, const char *text,
+    const RECT *rc, COLORREF color, float vscale, UINT draw_flags
+) {
+    popcap_font_draw_text_ex(mem_dc, font, text, rc, color, vscale, draw_flags, 0);
+}
+
+/* Word-wrap text renderer replicating Zuma.exe Widget::DrawStringWordWrap (0x0047A770) */
+static void popcap_font_draw_word_wrap(
+    HDC mem_dc, PopCapFont *font, const char *text,
+    const RECT *rc, COLORREF color, float vscale, int line_spacing
+) {
+    if (!font || !font->loaded || !text || !rc) return;
+    int max_w = rc->right - rc->left;
+    if (max_w <= 0) return;
+
+    if (line_spacing <= 0) line_spacing = 14;
+    int step_y = (int)roundf((float)line_spacing * vscale);
+    if (step_y <= 0) step_y = 12;
+
+    int base_offset = le_font_baseline_offset(font);
+    int baseline_y = rc->top + (int)roundf((float)base_offset * vscale);
+
+    const char *p = text;
+    while (*p) {
+        while (*p == ' ') p++;
+        if (!*p) break;
+
+        const char *line_start = p;
+        const char *last_space_end = NULL;
+        const char *cur = p;
+        int cur_w = 0;
+
+        while (*cur && *cur != '\n') {
+            const char *word_start = cur;
+            while (*cur && *cur != ' ' && *cur != '\n') cur++;
+            int word_len = (int)(cur - word_start);
+            int word_w = (int)roundf((float)popcap_font_get_line_width(font, word_start, word_len) * vscale);
+
+            int space_w = 0;
+            if (*cur == ' ') {
+                space_w = (int)roundf((float)font->space_width * vscale);
+            }
+
+            if (cur_w > 0 && cur_w + word_w > max_w) {
+                break;
+            }
+
+            cur_w += word_w + space_w;
+            last_space_end = cur;
+            if (*cur == ' ') cur++;
+        }
+
+        int line_len = 0;
+        if (last_space_end && last_space_end > line_start) {
+            line_len = (int)(last_space_end - line_start);
+            p = (*last_space_end == ' ') ? last_space_end + 1 : last_space_end;
+        } else {
+            line_len = (cur > line_start) ? (int)(cur - line_start) : 1;
+            p = line_start + line_len;
+            if (*p == ' ') p++;
+        }
+
+        if (baseline_y <= rc->bottom + step_y) {
+            popcap_font_draw_line(mem_dc, font, line_start, line_len, rc->left, baseline_y, color, vscale);
+        }
+        baseline_y += step_y;
+        if (*p == '\n') p++;
+    }
+}
+
 /* Render Authentic Text Element */
 static void render_layout_text_element(
-    HDC mem_dc, LayoutElement *el,
+    HDC mem_dc, LayoutElement *el, const LayoutEditorState *st,
     HFONT font_bold, HFONT font_ui,
     bool is_dark, bool is_selected, bool is_hovered,
     float vscale
@@ -4073,20 +4218,22 @@ static void render_layout_text_element(
     } else if (_stricmp(tag, "HighscoreScores") == 0) {
         if (_stricmp(el->section, "GauntletLabels") == 0) {
             disp_text = "10000\n5000\n1000";
+            text_color = RGB(91, 1, 10);
         } else {
             disp_text = "686500\n194100\n194100";
+            text_color = RGB(40, 83, 76);
         }
-        text_color = RGB(255, 234, 1);
-        pfont = &g_popcap_arial_12;
-        draw_flags = DT_RIGHT | DT_TOP;
+        pfont = &g_popcap_cancun_outline_8;
+        draw_flags = DT_LEFT | DT_TOP;
     } else if (_stricmp(tag, "HighscoreNames") == 0) {
         if (_stricmp(el->section, "GauntletLabels") == 0) {
             disp_text = "SUKHBIR\nTYSEN\nSHAWN";
+            text_color = RGB(91, 1, 10);
         } else {
             disp_text = "DEVTESTER\nDEVTESTER\nDEVTESTER";
+            text_color = RGB(40, 83, 76);
         }
-        text_color = RGB(255, 255, 255);
-        pfont = &g_popcap_arial_12;
+        pfont = &g_popcap_cancun_outline_8;
         draw_flags = DT_LEFT | DT_TOP;
     } else if (_stricmp(tag, "HighscoreDate") == 0) {
         if (el->section && _stricmp(el->section, "AdventureLabels") == 0) return; /* Clipping width, not date */
@@ -4134,6 +4281,16 @@ static void render_layout_text_element(
         text_color = RGB(255, 234, 1);
         pfont = &g_popcap_cancun_outline_10;
         draw_flags = DT_RIGHT | DT_VCENTER;
+    } else if (_stricmp(tag, "InfoBox") == 0) {
+        if (_stricmp(el->section, "GauntletLabels") == 0) {
+            disp_text = "PLAY THROUGH ALL THE LEVELS YOU HAVE UNLOCKED IN ADVENTURE MODE IN RANDOM ORDER!";
+            text_color = RGB(91, 1, 10);
+        } else {
+            disp_text = "UNCOVER THE SECRET TEMPLES OF ZUMA!";
+            text_color = RGB(40, 83, 76);
+        }
+        pfont = &g_popcap_cancun_outline_8;
+        draw_flags = DT_LEFT | DT_TOP;
     } else if (_stricmp(tag, "CustomMapTag") == 0) {
         disp_text = "ORIGINAL MAPS";
         text_color = RGB(160, 255, 128);
@@ -4227,7 +4384,26 @@ static void render_layout_text_element(
                 FillRect(mem_dc, &rc_ul, br);
                 DeleteObject(br);
             } else {
-                popcap_font_draw_text(mem_dc, pfont, disp_text, &rc_txt, text_color, vscale, draw_flags);
+                if (_stricmp(tag, "InfoBox") == 0) {
+                    int l_spacing = (el->flags & ATTR_HAS_LINESPACING && el->lineSpacing > 0) ? el->lineSpacing : 20;
+                    popcap_font_draw_word_wrap(mem_dc, pfont, disp_text, &rc_txt, text_color, vscale, l_spacing);
+                } else if (_stricmp(tag, "HighscoreScores") == 0 || _stricmp(tag, "HighscoreNames") == 0) {
+                    int row_sp = 21; /* PopCap authentic HighscoreRow spacing */
+                    if (st) {
+                        for (int k = 0; k < st->element_count; ++k) {
+                            if (_stricmp(st->elements[k].section, el->section) == 0 &&
+                                _stricmp(st->elements[k].tag, "HighscoreRow") == 0) {
+                                if (st->elements[k].flags & ATTR_HAS_SPACING && st->elements[k].spacing > 0) {
+                                    row_sp = st->elements[k].spacing;
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    popcap_font_draw_text_ex(mem_dc, pfont, disp_text, &rc_txt, text_color, vscale, draw_flags, row_sp);
+                } else {
+                    popcap_font_draw_text(mem_dc, pfont, disp_text, &rc_txt, text_color, vscale, draw_flags);
+                }
             }
         } else {
             SetBkMode(mem_dc, TRANSPARENT);
@@ -4769,34 +4945,7 @@ static void layout_canvas_paint(LayoutEditorState *st, HWND hwnd) {
                 }
             }
         }
-        /* Waterfall background (advback.jpg) - BEHIND all temples */
-        LayoutSprite *sp_back = layout_get_cached_sprite("advback", 1);
-        if (sp_back && sp_back->loaded && sp_back->img.hbm) {
-            float ab_s = vscale;
-            int ab_h = (int)roundf((float)sp_back->img.height * ab_s);
-            int ab_y = cy + rh - ab_h;
-            BLENDFUNCTION bf = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
-            AlphaBlend(mem_dc, cx, ab_y, rw, ab_h,
-                       sp_back->img.hdc_mem, 0, 0, sp_back->img.width, sp_back->img.height, bf);
-        }
-        /* advtitle header at top-left */
-        LayoutSprite *sp_title = layout_get_cached_sprite("advtitle", 1);
-        if (sp_title && sp_title->loaded && sp_title->img.hbm) {
-            float tw_s = vscale;
-            int tw_px = (int)roundf((float)sp_title->img.width * tw_s);
-            int th_px = (int)roundf((float)sp_title->img.height * tw_s);
-            BLENDFUNCTION bf = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
-            AlphaBlend(mem_dc, cx, cy, tw_px, th_px,
-                       sp_title->img.hdc_mem, 0, 0, sp_title->img.width, sp_title->img.height, bf);
-
-            /* Subtitle under ADVENTURE */
-            RECT rc_adsub = { cx + (int)roundf(28.0f * vscale), cy + (int)roundf(80.0f * vscale),
-                              cx + (int)roundf(280.0f * vscale), cy + (int)roundf(110.0f * vscale) };
-            if (g_popcap_cancun_10.loaded) {
-                popcap_font_draw_text(mem_dc, &g_popcap_cancun_10, "UNCOVER THE SECRET TEMPLES OF ZUMA!",
-                                      &rc_adsub, RGB(254, 209, 127), vscale, DT_LEFT | DT_TOP);
-            }
-        }
+        /* Note: advback, advtitle, and infobox are dynamically drawn from st->elements in Step 3 */
     } else if (st->cur_screen_idx == 3) {
         /* Screen 3: Gauntlet Screen Composite */
         /* Top sky band */
@@ -4864,29 +5013,6 @@ static void layout_canvas_paint(LayoutEditorState *st, HWND hwnd) {
                        st->bg_image.hdc_mem, 0, 0, st->bg_image.width, st->bg_image.height, SRCCOPY);
         }
 
-        /* gaunttitle.gif at top-left */
-        LayoutSprite *sp_gt = layout_get_cached_sprite("gaunttitle", 1);
-        if (sp_gt && sp_gt->loaded && sp_gt->img.hbm) {
-            float gt_s = vscale;
-            int gtx = cx + (int)roundf(14.0f * zscale * vscale);
-            int gty = cy + (int)roundf(14.0f * zscale * vscale);
-            int gtw = (int)roundf((float)sp_gt->img.width * gt_s);
-            int gth = (int)roundf((float)sp_gt->img.height * gt_s);
-            BLENDFUNCTION bf = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
-            AlphaBlend(mem_dc, gtx, gty, gtw, gth,
-                       sp_gt->img.hdc_mem, 0, 0, sp_gt->img.width, sp_gt->img.height, bf);
-
-            RECT rc_gdesc = {
-                gtx, gty + gth + (int)roundf(10.0f * vscale),
-                gtx + (int)roundf(240.0f * vscale),
-                gty + gth + (int)roundf(120.0f * vscale)
-            };
-            if (g_popcap_cancun_10.loaded) {
-                popcap_font_draw_text(mem_dc, &g_popcap_cancun_10,
-                    "PLAY THROUGH ALL THE LEVELS\nYOU HAVE UNLOCKED IN\nADVENTURE MODE IN RANDOM\nORDER!",
-                    &rc_gdesc, RGB(255, 185, 45), vscale, DT_LEFT | DT_TOP);
-            }
-        }
 
         /* Difficulty Gem is rendered dynamically in Step 3 from st->elements */
 
@@ -5405,7 +5531,7 @@ static void layout_canvas_paint(LayoutEditorState *st, HWND hwnd) {
         } else if (sp && sp->loaded && sp->img.hbm) {
             render_layout_sprite_element(mem_dc, el, sp, cols, rows, cell, is_selected, is_hovered, is_held, font_bold);
         } else if (is_text_element(el)) {
-            render_layout_text_element(mem_dc, el, font_bold, font_ui, is_dark, is_selected, is_hovered, effective_scale);
+            render_layout_text_element(mem_dc, el, st, font_bold, font_ui, is_dark, is_selected, is_hovered, effective_scale);
         } else if (is_region_element(el)) {
             render_layout_region_element(mem_dc, el, font_bold, font_ui, is_dark, is_selected, is_hovered);
         } else {

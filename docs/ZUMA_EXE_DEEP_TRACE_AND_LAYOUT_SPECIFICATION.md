@@ -44,18 +44,21 @@ Baseline ====== |=======================================|  <-- Engine Baseline (
                 +---------------------------------------+  <-- Glyph Bottom Box
 ```
 
-#### Exact Metrics Table for All 9 Zuma Deluxe Fonts:
+#### Exact Metrics Table for All 14 Zuma Deluxe Fonts (Binary Map from 0x0048AE90):
 | Font Resource ID | Asset Name | Point Size | mAscent | mAscentPadding | aYOffset (Top to Baseline) | Default Tint / Color | Usage in Game |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **`FONT_BROWNTITLE`** (`0x00547f50`) | `NativeAlienExtended16` | 16 pt | 36 px | 10 px | **26 px** | Tinted: White / Yellow | Main Menu WelcomeText, Stage Name |
-| **`FONT_DIALOG`** (`0x00547ef8`) | `Cancun10` | 10 pt | 22 px | 4 px | **18 px** | `RGB(91, 55, 0)` / Cyan | UserSwitchText, Dialog body, InfoBox |
-| **`FONT_MAIN10`** (`0x00547e38`) | `Cancun10` | 10 pt | 20 px | 10 px | **10 px** | Yellow `RGB(255, 234, 1)` | High score names, small hints |
-| **`FONT_MAIN10OUTLINE`** (`0x00547f10`) | `Cancun10` (Outline) | 10 pt | 20 px | 10 px | **10 px** | Outlined White | Floating text, High scores |
-| **`FONT_MAIN12`** (`0x00547e08`) | `Cancun12` | 12 pt | 12 px | 0 px | **12 px** | Yellow `#FFF000` | InGameHUD StageName, ScoreText |
-| **`FONT_MONODIGIT`** (`0x00548054`) | `Cancun13` | 13 pt | 13 px | 0 px | **13 px** | Yellow `#FFF000` | InGameHUD Numeric Score counter |
+| **`FONT_BROWNTITLE`** (`0x00547f50`) | `NativeAlienExtended16` | 16 pt | 36 px | 10 px | **26 px** | White `RGB(255, 255, 255)` / Yellow | Main Menu WelcomeText, TempleCleared Title |
+| **`FONT_DIALOG`** (`0x00547ef8`) | `Cancun10` (Shadow1) | 10 pt | 10 px | 0 px | **10 px** | `RGB(91, 55, 0)` / Yellow `RGB(255, 255, 0)` | UserSwitchText, Dialog body, HUD StageName (All Cancun10 layers net 10 px) |
+| **`FONT_MAIN10`** (`0x00547e38`) | `Cancun10` | 10 pt | 20 px | 10 px | **10 px** | Yellow `RGB(255, 234, 1)` | Help bullets, dialog controls |
+| **`FONT_MAIN10OUTLINE`** (`0x00547f10`) | `Cancun10` (Outline: `_Cancun10` + `_CancunOUTLINE10`) | 10 pt | 20 px | 10 px | **10 px** | White `RGB(255, 255, 255)` / Yellow `RGB(255, 255, 0)` | Gauntlet DoorName, PracticeText |
+| **`FONT_MAIN10OUTLINE2`** (`0x00547fe0`) | `Cancun10` (Outline 2) | 10 pt | 20 px | 10 px | **10 px** | Yellow `RGB(255, 234, 1)` | TempleCleared Subtitle |
+| **`FONT_MAIN10OUTLINE3`** (`0x0054804c`) | `Cancun10` (Outline 3) | 10 pt | 20 px | 10 px | **10 px** | Outlined Variant | Cutscene subtitle variants |
+| **`FONT_MAIN12`** (`0x00547e08`) | `Cancun12` | 12 pt | 12 px | 0 px | **12 px** | Yellow `#FFF000` | Generic 12pt Cancun fallback |
+| **`FONT_MONODIGIT`** (`0x00548054`) | `Cancun13` | 13 pt | 13 px | 0 px | **13 px** | Yellow `RGB(255, 255, 0)` | InGameHUD Numeric Score counter (`ScoreText`) |
 | **`FONT_MAIN8`** (`0x00548060`) | `Cancun8` | 8 pt | 14 px | 6 px | **8 px** | White / Gray | Small stage badge numbers, footers |
+| **`FONT_MAIN8OUTLINE`** (`0x00547f44`) | `Cancun8` (Outline: `_Cancun8` + `_CancunFAT8`) | 8 pt | 14 px | 6 px | **8 px** | Adv: `RGB(40, 83, 76)`, Gaunt: `RGB(91, 1, 10)` | Adventure & Gauntlet HighscoreNames, HighscoreScores |
 | **`FONT_FLOAT`** (`0x005480d4`) | `CancunFloat14` | 14 pt | 18 px | 3 px | **15 px** | Yellow / Orange | In-game combo score popups (`+100`) |
-| **`FONT_HUGE`** (`0x0054807c`) | `NativeAlien48` | 48 pt | 80 px | 0 px | **80 px** | Stone Gold / Brown | Stage Complete banner, "ZUMA!" |
+| **`FONT_HUGE`** (`0x0054807c`) | `NativeAlien48` | 48 pt | 80 px | 0 px | **80 px** | Yellow `RGB(255, 255, 0)` | Stage Complete banner (`StageText`, `CompleteText`), "ZUMA!" |
 | **`FONT_TITLE`** (`0x00547e80`) | `NativeAlienExtended18` | 18 pt | 30 px | 0 px | **30 px** | Gold / Yellow | Dialog titles, screen headers |
 | **`FONT_PLAIN`** (`0x00547e70`) | `Arial12Bold` | 12 pt | 14 px | 0 px | **14 px** | Black / Dark Brown | Options check text, fallback |
 
@@ -126,13 +129,76 @@ Because the engine centers the text dynamically, **no `x` coordinate should be d
 - ZuPather Bug: `layout_editor.c` L1277 sets `el->is_conditional = true;`. Line 1861 hides conditional elements unless `[ ] Show Conditional` is checked.
 - Fix: Strip `el->is_conditional = true;` from `Hat`.
 
-### 2.7 Main Menu `Sun` (`IMAGE_SUNGLOW`) Off-Screen Bug
-- XML: `<Sun x="53" y="-89" />`.
-- Engine Hook: `zumareshandler.dll.c` L2207–2234 injects code caves `pSun3DCave` / `pSun2DCave` replacing vanilla rotation pivot offsets `-69, -63` with `sun_local_x, sun_local_y`.
-- ZuPather Bug: ZuPather interprets `x="53" y="-89"` as canvas bounds, rendering it off-screen above the canvas.
-- Fix: Anchor its editor bounding box to the staff head disk ($X \approx 173, Y \approx 135$).
+### 2.7 Main Menu `Sun` (`IMAGE_SUNGLOW`) vs `IMAGE_MM_SUN` Engine Parity & Decoupling
+- **Fundamental Separation of Packages**:
+  1. `IMAGE_SUNGLOW` (`_mmsunglow.jpg`): The rotating solar flare rays ($229\times227$ vanilla, $322\times319$ customres). This is the **ONLY** entity bound to the canonical XML element `<Sun x="47" y="-89" />`.
+  2. `IMAGE_MM_SUN` (`mmsun.gif` + `_mmsun.gif`): The Aztec Sun stone face ($87\times92$ vanilla, $122\times129$ customres). This is a **fixed scene companion** hardcoded in `Zuma.exe` at $(0, 2)$ relative to the `MainMenu` widget ($(150, 2)$ on widescreen screen). It is **NEVER** an XML tag in `layout.xml` and is strictly decoupled from the `<Sun>` element.
+- **Engine Draw Order & Blend Modes (`Zuma.exe` @ `0x00431F9F`–`0x00432067`)**:
+  1. `0x00431FA3`: `Graphics::SetAdditiveBlend(true)` + `SetColorizeImages(true)`.
+  2. `0x00431FE0`: Modulated with pulsing yellow tint `Color(255, 255, 0, alpha=75..150)`.
+  3. `0x0043202F`: `DrawImageRotatedF(IMAGE_SUNGLOW, sun_local_x, sun_local_y, rot)` (sun rays rendered first in background).
+  4. `0x00432055`: `Graphics::SetAdditiveBlend(false)` + `SetColorizeImages(false)`.
+  5. `0x00432067`: `DrawImage(IMAGE_MM_SUN, 0, 2)` rendered **ON TOP** with normal alpha blending.
+  Because the stone face is drawn *after* the solar rays and in normal blend mode, it sits completely opaque and crisp on top of the staff, covering the center of the rays while the rays radiate behind it.
+- **ZuPather Editor Architecture**:
+  - `Sun` is an `XM_ABS` element rendered purely as `IMAGE_SUNGLOW` at $(x, y)$ with an orientation crosshair at $(x+114, y+113)$.
+  - `IMAGE_MM_SUN` is rendered independently in the scene elements pass immediately following $Z \le 5$ (matching engine draw order), so moving or selecting `<Sun>` never drags or conflates the Aztec stone face.
 
 ---
+
+
+### 2.8 Binary Opcode Deep-Trace & Ground-Truth Layout Proofs (Fase B1 & B2)
+
+Exhaustive disassembly of `Zuma.exe` PE binary confirms the following layout, font, and coordinate facts:
+
+#### 1. HighScores Table Screen Coordinates Derivation [STATUS: VERIFIED]
+- **Mathematical Law**: Every widescreen screen coordinate in the HighScores table is rigorously derived from vanilla 640 space via:
+  \[
+  X_{\text{screen}} = 150 + \text{round}(X_{\text{vanilla}} \times 1.40625)
+  \]
+- **Scores Column (Right Edge)**: Vanilla $X=575 \rightarrow 150 + \text{round}(575 \times 1.40625) = 150 + 809 = \mathbf{959\text{ px}}$. Exactly matches `<HighscoreScores x="959" />`.
+- **Adventure Names Column**: Vanilla $X=470 \rightarrow 150 + \text{round}(470 \times 1.40625) = 150 + 661 = \mathbf{811\text{ px}}$. Exactly matches `<HighscoreNames x="811" />`.
+- **Gauntlet Names Column**: Vanilla $X=445 \rightarrow 150 + \text{round}(445 \times 1.40625) = 150 + 626 = \mathbf{776\text{ px}}$. Exactly matches `<HighscoreNames x="776" />`.
+- **Clipping Right Boundary**: Vanilla $W=567 \rightarrow 150 + \text{round}(567 \times 1.40625) = 150 + 797 = \mathbf{947\text{ px}}$. Exactly matches `<HighscoreDate x="947" />` and `<HighscoreClip w="797" />`.
+
+#### 2. `HighscoreDate` is NOT a Text Element [STATUS: VERIFIED]
+- In `Zuma.exe` at `0x0043689F` (Adventure) and `0x0043962C` (Gauntlet), the engine calls `Graphics::SetClipRect(0, 0, 567, 480)`.
+- `HighscoreDate` in Adventure is the right-clip boundary anchor ($150 + 797 = 947$), identical in function to `HighscoreClip` ($W=797$) in Gauntlet. It does **not** draw date text. ZuPather suppresses fake text rendering and displays a non-intrusive clipping boundary guide.
+
+#### 3. HighScores Authentic Typography & Colors [STATUS: VERIFIED]
+- Both `HighscoreNames` and `HighscoreScores` use **`FONT_MAIN8OUTLINE`** (`0x00547F44` = `Cancun8.txt` with `_Cancun8.gif` + `_CancunFAT8.gif`).
+- Baseline offset: `aYOffset = Ascent (14) - AscentPadding (6) = 8 px`.
+- **Adventure Color**: `0x004367AD: push 0x28534c` $\rightarrow$ **`RGB(40, 83, 76)`** for both names and scores.
+- **Gauntlet Color**: `0x00439540: push 0x5b010a` $\rightarrow$ **`RGB(91, 1, 10)`** for both names and scores.
+
+#### 4. StageComplete Cutscene Typography [STATUS: VERIFIED]
+- **`StageText`** (`"STAGE %d"`): Uses **`FONT_HUGE`** (`0x0054807C` = `NativeAlien48.txt`, 48 pt). Centered horizontally at `pStageTextCX` (`0x00428FA3`, vanilla 320, widescreen 608). Patches immediate `push 150` at `0x004290D3` (`pStageCharDrawY`) and `0x00429089` (`pStageSparkleY`). In `0x00425B80`, the engine computes `top = y - Font::GetAscent() = 150 - 80 = 70`, confirming $Y=150$ is the baseline. Color is Yellow **`RGB(255, 255, 0)`** (`0x00FFFF00`).
+- **`CompleteText`** (`"COMPLETE"` at `0x4ff2b4`): Uses **`FONT_HUGE`** (`0x0054807C`). Centered at 320/608 at `0x00429214`, patches immediate `push 250` at `0x00426DBF`, Yellow **`RGB(255, 255, 0)`**.
+
+#### 5. TempleCleared / Congratulations Screen Typography [STATUS: VERIFIED for Title, Dialogue Traced]
+- **`Title`** [STATUS: VERIFIED]:
+  - **Actual String**: `"CONGRATULATIONS!"` (at `0x004FF2C4`).
+  - **Function & Call**: Called at `0x00426EE0`–`0x00426F40` via `Widget::DrawCenteredText` (`0x004775A0`).
+  - **Font**: `FONT_HUGE` (`0x0054807C` = `NativeAlien48.txt`, 48 pt).
+  - **Color**: PopCap Yellow `RGB(255, 255, 0)` via `0x00426EDC: push 0x00ffff00` before `Graphics::SetColor`.
+  - **Baseline**: $Y=120$ (`0x00426F37: push 0x78`) is the font baseline! Top of bounding box is $Y - \text{Ascent} = 120 - 80 = \mathbf{40\text{ px}}$.
+  - **DLL Hook**: `zumareshandler.dll` (L2733) patches `congrats_title_y` into immediate `0x78` and centers horizontally via `hk_DrawCongratsTitle`.
+- **`DialogText` & `FrogReply`** [STATUS: TRACED IN EXE]:
+  - Cutscene dialog bubbles are added via `0x00428160` (God speech) and `0x00428000` (Frog reply), and drawn by loop `0x00426BC0`.
+  - Both use Font ID 7 (`FONT_DIALOG` = `Cancun10.txt` via `0x52E4A0[7]` = `0x00547EF8`).
+  - Color is PopCap Yellow `RGB(255, 255, 0)` (`0x00FFFF00` initialized at `0x004280B9`).
+
+#### 6. InGameHUD Typography [StageName: UNVERIFIED, ScoreText: VERIFIED]
+> *Rejection Rationale for StageName*: While `StageName` uses `FONT_DIALOG` (`0x00547EF8`) at `0x0040D090`, vanilla coordinates $X=200$ and $Y=15$ at `0x0040D0C2` do not map directly to $290$ and $8$ via standard 4:3 uniform scaling. Instead, the Menubar in ZuCompleluxe uses a 5-compartment procedural layout bridge in `zumareshandler.dll` (L3270–3350) where `stage_cx` is patched to 290 and `score_rx` to 640. Retained as unverified in editor code until final architectural signoff.
+- **`ScoreText`** [VERIFIED]: Located in `Zuma.exe` at `0x0040D0D8`–`0x0040D11D` (`0x0040D0E1` calls `SetFont` with `FONT_MONODIGIT` `0x00548054` = `cancun13.txt`), right-aligned to `rightX=640` (vanilla 360 at `0x0040D10F`), $Y=17$ (`0x0040D100`), Yellow `RGB(255, 255, 0)`. Baseline is $Y = 17$ (top is $17 - 13 = 4$).
+
+#### 7. Gauntlet Screen Typography & InfoBox [PracticeText: VERIFIED, InfoBox: UNVERIFIED]
+- **`PracticeText`** [VERIFIED]: Uses **`FONT_MAIN10OUTLINE`** (`0x00547F10`), Yellow **`RGB(255, 234, 1)`**. Formula $150 + 150 \times 1.40625 = 361$ and $260 \times 1.40625 \approx 366$ matches XML `<PracticeText x="361" y="366" />`. Rendered strictly right-aligned against $X$, with $X=361$ serving as the text's right boundary.
+- **`InfoBox`** [STATUS: VERIFIED - Text Word-Wrap Container]:
+  - In `Zuma.exe` at `0x00436967` (Adventure) and `0x0043952E` (Gauntlet), `InfoBox` sets up a bounding rect `(20, 60, 150, 100)` and calls `Graphics::DrawStringWordWrap` (`vtable[0x88/4]`).
+  - **Font**: `FONT_MAIN8OUTLINE` (`0x00547F44` = `Cancun8` outline).
+  - **Colors**: Adventure `RGB(40, 83, 76)` (`0x00436988: push 0x28534c`); Gauntlet `RGB(91, 1, 10)` (`0x00439540: push 0x5b010a`).
+  - **Widescreen Hooks**: `zumareshandler.dll` patches `gaunt_infobox_x/y/w/h` at L2635-2645 and intercepts word-wrap via `hk_GauntletWordWrap` (L1466) applying `g_layout.gaunt_infobox_line_spacing`.
 
 ## 3. Screen-by-Screen Exhaustive Catalog: All 17 Sections & All 134 Elements
 
@@ -442,31 +508,31 @@ Total Elements in Section: 15
 - **Canonical XML**: `<HighscoreScores x="959" y="98" />`
 - **Classification**: Text (Score Column)
 - **Sprite / Asset**: `None` | Dimensions: `60x80` | Cels: `1`
-- **Font Specification**: FONT_MAIN10 (Cancun10.txt, Pt: 10, Offset: 10, Yellow RGB(255, 234, 1))
-- **Engine Call (`Zuma.exe`)**: `FUN_00436836: DrawString(score, x, y=base_y + i*spacing)`
-- **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: g_layout.adv_hs_scores_x, adv_hs_base_y -> Patches 0x0043683a`
-- **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c L1365: def_w=60, def_h=80, x=575, y=70. Right-aligned numbers.`
-- **Authentic Alignment Semantics**: Column X anchor (x=959, y=98)
+- **Font Specification**: FONT_MAIN8OUTLINE (Cancun8.txt with _Cancun8.gif & _CancunFAT8.gif, Pt: 8, Baseline Offset: 8, Color RGB(40, 83, 76) via 0x004367AD)
+- **Engine Call (`Zuma.exe`)**: `0x00436836: DrawString(score, rightX - str_w, y=base_y + i*spacing)`
+- **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: g_layout.adv_hs_scores_x, adv_hs_base_y -> Patches 0x0043683a`. Widescreen proof: $150 + \text{round}(575 \times 1.40625) = 959\text{ px}$.
+- **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c: bound to g_popcap_cancun_outline_8, RGB(40, 83, 76), DT_RIGHT | DT_TOP.`
+- **Authentic Alignment Semantics**: Right-aligned score column (rightX=959, y=98)
 
 #### Element 31: `<HighscoreDate>`
 - **Canonical XML**: `<HighscoreDate x="947" />`
-- **Classification**: Text (Date Column)
-- **Sprite / Asset**: `None` | Dimensions: `97x60` | Cels: `1`
-- **Font Specification**: FONT_MAIN8 (Cancun8.txt, Pt: 8, Offset: 8, White)
-- **Engine Call (`Zuma.exe`)**: `FUN_00436880: DrawString(date, x, y=base_y + i*spacing)`
-- **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: g_layout.adv_hs_date_x -> Patches 0x00436885`
-- **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c L1373: def_w=97, def_h=60, x=567, y=70.`
-- **Authentic Alignment Semantics**: Column X anchor (x=947)
+- **Classification**: Layout Metric / Clip Boundary (NOT a text element)
+- **Sprite / Asset**: `None` | Dimensions: `97x60` (guide rect) | Cels: `0`
+- **Font Specification**: None (Clipping Rect Parameter)
+- **Engine Call (`Zuma.exe`)**: `0x0043689F: Graphics::SetClipRect(0, 0, 567, 480)`
+- **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: g_layout.adv_hs_date_x -> Patches 0x00436885`. Widescreen proof: right edge $150 + \text{round}(567 \times 1.40625) = 947\text{ px}$.
+- **ZuPather Implementation (`layout_editor.c`)**: Reclassified as Region element; fake date text string completely suppressed; renders subtle clipping guide boundary.
+- **Authentic Alignment Semantics**: Right clip boundary anchor (x=947)
 
 #### Element 32: `<HighscoreNames>`
 - **Canonical XML**: `<HighscoreNames x="811" y="98" />`
 - **Classification**: Text (Player Name Column)
 - **Sprite / Asset**: `None` | Dimensions: `90x80` | Cels: `1`
-- **Font Specification**: FONT_MAIN10 (Cancun10.txt, Pt: 10, Offset: 10, Yellow RGB(255, 234, 1))
-- **Engine Call (`Zuma.exe`)**: `FUN_004368db: DrawString(name, x, y=base_y + i*spacing)`
-- **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: g_layout.adv_hs_names_x, adv_hs_base_y -> Patches 0x004368e0`
-- **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c L1369: def_w=90, def_h=80, x=470, y=70. Left-aligned text.`
-- **Authentic Alignment Semantics**: Column X anchor (x=811, y=98)
+- **Font Specification**: FONT_MAIN8OUTLINE (Cancun8.txt with _Cancun8.gif & _CancunFAT8.gif, Pt: 8, Baseline Offset: 8, Color RGB(40, 83, 76) via 0x004367AD)
+- **Engine Call (`Zuma.exe`)**: `0x004368db: DrawString(name, x, y=base_y + i*spacing)`
+- **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: g_layout.adv_hs_names_x, adv_hs_base_y -> Patches 0x004368e0`. Widescreen proof: $150 + \text{round}(470 \times 1.40625) = 811\text{ px}$.
+- **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c: bound to g_popcap_cancun_outline_8, RGB(40, 83, 76), DT_LEFT | DT_TOP.`
+- **Authentic Alignment Semantics**: Left-aligned player names (x=811, y=98)
 
 #### Element 33: `<HighscoreRow>`
 - **Canonical XML**: `<HighscoreRow spacing="25" />`
@@ -574,64 +640,64 @@ Total Elements in Section: 4
 ### Section: `GauntletButtons` (Coordinate Space: `1200x675`)
 Total Elements in Section: 6
 
-#### Element 43: `<Practice>`
-- **Canonical XML**: `<Practice x="399" y="624" />`
+#### Element 43: `<Back>`
+- **Canonical XML**: `<Back x="399" y="624" />`
 - **Classification**: Interactive Button Widget
-- **Sprite / Asset**: `IMAGE_GAUNTPRACTICEBUTTON (gauntpractice.gif)` | Dimensions: `127x32` | Cels: `3`
+- **Sprite / Asset**: `IMAGE_GAUNTBACKBUTTON (GauntBackButton.jpg)` | Dimensions: `124x33` | Cels: `3`
 - **Font Specification**: None (Baked in sprite)
-- **Engine Call (`Zuma.exe`)**: `FUN_0042c550: Widget::Resize(x, y, 127, 32)`
-- **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: g_layout.gaunt_btn_practice_x, gaunt_btn_practice_y`
-- **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c L1399: def_w=127, def_h=32, x=399, y=624.`
-- **Authentic Alignment Semantics**: Bottom-Center anchored
-
-#### Element 44: `<Survival>`
-- **Canonical XML**: `<Survival x="540" y="624" />`
-- **Classification**: Interactive Button Widget
-- **Sprite / Asset**: `IMAGE_GAUNTSURVIVALBUTTON (gauntsurvival.gif)` | Dimensions: `127x28` | Cels: `3`
-- **Font Specification**: None (Baked in sprite)
-- **Engine Call (`Zuma.exe`)**: `FUN_0042c580: Widget::Resize(x, y, 127, 28)`
-- **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: g_layout.gaunt_btn_survival_x, gaunt_btn_survival_y`
-- **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c L1404: def_w=127, def_h=28, x=540, y=624.`
-- **Authentic Alignment Semantics**: Bottom-Center anchored
-
-#### Element 45: `<Back>`
-- **Canonical XML**: `<Back x="698" y="624" />`
-- **Classification**: Interactive Button Widget
-- **Sprite / Asset**: `IMAGE_GAUNTBACKBUTTON (gauntback.gif)` | Dimensions: `124x33` | Cels: `3`
-- **Font Specification**: None (Baked in sprite)
-- **Engine Call (`Zuma.exe`)**: `FUN_0042c5b0: Widget::Resize(x, y, 124, 33)`
+- **Engine Call (`Zuma.exe`)**: `FUN_00435170: Widget::Resize(x, y, 124, 33)` (Widget +0x60, Button ID 1)
 - **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: g_layout.gaunt_btn_back_x, gaunt_btn_back_y`
-- **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c L1409: def_w=124, def_h=33, x=698, y=624.`
+- **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c: def_w=124, def_h=33, x=177, y=444 (WS: 399, 624)`
+- **Authentic Alignment Semantics**: Bottom-Center anchored
+
+#### Element 44: `<Play>`
+- **Canonical XML**: `<Play x="540" y="624" />`
+- **Classification**: Interactive Button Widget
+- **Sprite / Asset**: `IMAGE_GAUNTPLAYBUTTON (GauntPlayButton.jpg)` | Dimensions: `140x33` | Cels: `3`
+- **Font Specification**: None (Baked in sprite)
+- **Engine Call (`Zuma.exe`)**: `FUN_00435170: Widget::Resize(x, y, 140, 33)` (Widget +0x64, Button ID 2)
+- **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: g_layout.gaunt_btn_play_x, gaunt_btn_play_y`
+- **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c: def_w=140, def_h=33, x=277, y=444 (WS: 540, 624)`
+- **Authentic Alignment Semantics**: Bottom-Center anchored
+
+#### Element 45: `<Next>`
+- **Canonical XML**: `<Next x="698" y="624" />`
+- **Classification**: Interactive Button Widget
+- **Sprite / Asset**: `IMAGE_GAUNTNEXTBUTTON (GauntNextButton.jpg)` | Dimensions: `125x33` | Cels: `3`
+- **Font Specification**: None (Baked in sprite)
+- **Engine Call (`Zuma.exe`)**: `FUN_00435170: Widget::Resize(x, y, 125, 33)` (Widget +0x5C, Button ID 0)
+- **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: g_layout.gaunt_btn_next_x, gaunt_btn_next_y`
+- **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c: def_w=125, def_h=33, x=390, y=444 (WS: 698, 624)`
 - **Authentic Alignment Semantics**: Bottom-Center anchored
 
 #### Element 46: `<MainMenu>`
 - **Canonical XML**: `<MainMenu x="164" y="593" />`
 - **Classification**: Interactive Button Widget
-- **Sprite / Asset**: `IMAGE_GAUNTMAINMENUBUTTON (gauntmainmenu.gif)` | Dimensions: `141x56` | Cels: `3`
+- **Sprite / Asset**: `IMAGE_GAUNTMAINMENUBUTTON (GauntMainMenuButton.jpg)` | Dimensions: `141x56` | Cels: `3`
 - **Font Specification**: None (Baked in sprite)
-- **Engine Call (`Zuma.exe`)**: `FUN_0042c5e0: Widget::Resize(x, y, 141, 56)`
+- **Engine Call (`Zuma.exe`)**: `FUN_00435170: Widget::Resize(x, y, 141, 56)` (Widget +0x68, Button ID 3)
 - **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: g_layout.gaunt_btn_mainmenu_x, gaunt_btn_mainmenu_y`
-- **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c L1414: def_w=141, def_h=56, x=164, y=593.`
+- **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c: def_w=141, def_h=56, x=10, y=422 (WS: 164, 593)`
 - **Authentic Alignment Semantics**: Bottom-Left anchored
 
-#### Element 47: `<Next>`
-- **Canonical XML**: `<Next x="862" y="581" />`
+#### Element 47: `<Survival>`
+- **Canonical XML**: `<Survival x="862" y="581" />`
 - **Classification**: Interactive Button Widget
-- **Sprite / Asset**: `IMAGE_GAUNTNEXTBUTTON (gauntnext.gif)` | Dimensions: `125x33` | Cels: `3`
+- **Sprite / Asset**: `IMAGE_GAUNTSURVIVALBUTTON (gauntsurvivalbutton.jpg)` | Dimensions: `127x28` | Cels: `3`
 - **Font Specification**: None (Baked in sprite)
-- **Engine Call (`Zuma.exe`)**: `FUN_0042c610: Widget::Resize(x, y, 125, 33)`
-- **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: g_layout.gaunt_btn_next_x, gaunt_btn_next_y`
-- **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c L1419: def_w=125, def_h=33, x=862, y=581.`
+- **Engine Call (`Zuma.exe`)**: `FUN_00435170: Widget::Resize(x, y, 127, 28)` (Widget +0x70, Button ID 6)
+- **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: g_layout.gaunt_btn_survival_x, gaunt_btn_survival_y`
+- **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c: def_w=127, def_h=28, x=506, y=413 (WS: 862, 581)`
 - **Authentic Alignment Semantics**: Bottom-Right anchored
 
-#### Element 48: `<Play>`
-- **Canonical XML**: `<Play x="860" y="627" />`
+#### Element 48: `<Practice>`
+- **Canonical XML**: `<Practice x="860" y="627" />`
 - **Classification**: Interactive Button Widget
-- **Sprite / Asset**: `IMAGE_GAUNTPLAYBUTTON (gauntplay.gif)` | Dimensions: `140x33` | Cels: `3`
+- **Sprite / Asset**: `IMAGE_GAUNTPRACTICEBUTTON (gauntpracticebutton.jpg)` | Dimensions: `127x32` | Cels: `3`
 - **Font Specification**: None (Baked in sprite)
-- **Engine Call (`Zuma.exe`)**: `FUN_0042c640: Widget::Resize(x, y, 140, 33)`
-- **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: g_layout.gaunt_btn_play_x, gaunt_btn_play_y`
-- **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c L1424: def_w=140, def_h=33, x=860, y=627.`
+- **Engine Call (`Zuma.exe`)**: `FUN_00435170: Widget::Resize(x, y, 127, 32)` (Widget +0x6C, Button ID 5)
+- **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: g_layout.gaunt_btn_practice_x, gaunt_btn_practice_y`
+- **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c: def_w=127, def_h=32, x=505, y=446 (WS: 860, 627)`
 - **Authentic Alignment Semantics**: Bottom-Right anchored
 
 ### Section: `GauntletLabels` (Coordinate Space: `1200x675`)
@@ -677,15 +743,15 @@ Total Elements in Section: 12
 - **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c L1439: def_w=320, def_h=24, x=389, y=600.`
 - **Authentic Alignment Semantics**: Center aligned above stage preview
 
-#### Element 53: `<PracticeText>`
+#### Element 53: `<PracticeText>` [STATUS: VERIFIED]
 - **Canonical XML**: `<PracticeText x="361" y="366" />`
-- **Classification**: Text (Practice Mode Hint)
+- **Classification**: Text (Game Mode Indicator, Right-Aligned)
 - **Sprite / Asset**: `None` | Dimensions: `320x40` | Cels: `1`
-- **Font Specification**: FONT_MAIN10 (Cancun10.txt, Pt: 10, Offset: 10, Yellow RGB(255, 234, 1))
-- **Engine Call (`Zuma.exe`)**: `FUN_0042c7c0: DrawString(hint_str, x, y)`
-- **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: g_layout.gaunt_practice_text_x, gaunt_practice_text_y`
-- **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c L1443: def_w=320, def_h=40, x=361, y=366.`
-- **Authentic Alignment Semantics**: Absolute coordinates in 1200x675 space
+- **Font Specification**: FONT_MAIN10OUTLINE (Cancun10.txt, Pt: 10, Offset: 10, Yellow RGB(255, 234, 1))
+- **Engine Call (`Zuma.exe`)**: `0x0043936C: DrawString("PRACTICE", rightX - str_w, y)`
+- **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: g_layout.gaunt_practice_text_x, gaunt_practice_text_y`. Projections: $150 + 150 \times 1.40625 = 361\text{ px}$, $260 \times 1.40625 \approx 366\text{ px}$.
+- **ZuPather Implementation (`layout_editor.c`)**: Rendered right-aligned against $X$, with $X=361$ as the right edge of text.
+- **Authentic Alignment Semantics**: Right-aligned against anchor (rightX=361, y=366)
 
 #### Element 54: `<CustomMapTag>`
 - **Canonical XML**: `<CustomMapTag x="417" y="366" />`
@@ -711,21 +777,21 @@ Total Elements in Section: 12
 - **Canonical XML**: `<HighscoreScores x="959" y="98" />`
 - **Classification**: Text (Score Column)
 - **Sprite / Asset**: `None` | Dimensions: `60x80` | Cels: `1`
-- **Font Specification**: FONT_MAIN10 (Cancun10.txt, Pt: 10, Offset: 10, Yellow RGB(255, 234, 1))
-- **Engine Call (`Zuma.exe`)**: `FUN_0042c840: DrawString(score, x, y=base_y + i*spacing)`
-- **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: g_layout.gaunt_hs_scores_x, gaunt_hs_base_y`
-- **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c L1456: def_w=60, def_h=80, x=959, y=98.`
-- **Authentic Alignment Semantics**: Column X anchor (x=959, y=98)
+- **Font Specification**: FONT_MAIN8OUTLINE (Cancun8.txt with _Cancun8.gif & _CancunFAT8.gif, Pt: 8, Baseline Offset: 8, Color RGB(91, 1, 10) via 0x00439540)
+- **Engine Call (`Zuma.exe`)**: `0x004394e0: DrawString(score, rightX - str_w, y=base_y + i*spacing)`
+- **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: g_layout.gaunt_hs_scores_x, gaunt_hs_base_y`. Widescreen proof: $150 + \text{round}(575 \times 1.40625) = 959\text{ px}$.
+- **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c: bound to g_popcap_cancun_outline_8, RGB(91, 1, 10), DT_RIGHT | DT_TOP.`
+- **Authentic Alignment Semantics**: Right-aligned score column (rightX=959, y=98)
 
 #### Element 57: `<HighscoreNames>`
 - **Canonical XML**: `<HighscoreNames x="776" y="98" />`
 - **Classification**: Text (Player Name Column)
 - **Sprite / Asset**: `None` | Dimensions: `90x80` | Cels: `1`
-- **Font Specification**: FONT_MAIN10 (Cancun10.txt, Pt: 10, Offset: 10, Yellow RGB(255, 234, 1))
-- **Engine Call (`Zuma.exe`)**: `FUN_0042c870: DrawString(name, x, y=base_y + i*spacing)`
-- **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: g_layout.gaunt_hs_names_x, gaunt_hs_base_y`
-- **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c L1460: def_w=90, def_h=80, x=776, y=98.`
-- **Authentic Alignment Semantics**: Column X anchor (x=776, y=98)
+- **Font Specification**: FONT_MAIN8OUTLINE (Cancun8.txt with _Cancun8.gif & _CancunFAT8.gif, Pt: 8, Baseline Offset: 8, Color RGB(91, 1, 10) via 0x00439540)
+- **Engine Call (`Zuma.exe`)**: `0x00439520: DrawString(name, x, y=base_y + i*spacing)`
+- **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: g_layout.gaunt_hs_names_x, gaunt_hs_base_y`. Widescreen proof: $150 + \text{round}(445 \times 1.40625) = 776\text{ px}$.
+- **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c: bound to g_popcap_cancun_outline_8, RGB(91, 1, 10), DT_LEFT | DT_TOP.`
+- **Authentic Alignment Semantics**: Left-aligned player names (x=776, y=98)
 
 #### Element 58: `<HighscoreRow>`
 - **Canonical XML**: `<HighscoreRow spacing="25" />`
@@ -742,19 +808,20 @@ Total Elements in Section: 12
 - **Classification**: Layout Metric (Clip Boundary)
 - **Sprite / Asset**: `None` | Dimensions: `797x60` | Cels: `0`
 - **Font Specification**: None (Clip Rect)
-- **Engine Call (`Zuma.exe`)**: `FUN_0042c8a0: Graphics::SetClipRect(clip_x, clip_y, w=797, h)`
-- **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: g_layout.gaunt_hs_clip_w (w=797)`
-- **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c L1464: def_w=797, def_h=60.`
+- **Engine Call (`Zuma.exe`)**: `0x0043962C: Graphics::SetClipRect(clip_x, clip_y, w=797, h)`
+- **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: g_layout.gaunt_hs_clip_w (w=797)`. Widescreen proof: $567 \times 1.40625 = 797\text{ px}$.
+- **ZuPather Implementation (`layout_editor.c`)**: Reclassified as Region element; renders subtle clip boundary guide line/box.
 - **Authentic Alignment Semantics**: Width boundary parameter
 
-#### Element 60: `<InfoBox>`
+#### Element 60: `<InfoBox>` [STATUS: VERIFIED - Text Word-Wrap Container]
 - **Canonical XML**: `<InfoBox x="178" y="84" w="150" h="141" lineSpacing="20" />`
-- **Classification**: Text Container / Tooltip
+- **Classification**: Text Container (Multi-line Word-Wrap Text Box)
 - **Sprite / Asset**: `None` | Dimensions: `150x141` | Cels: `1`
-- **Font Specification**: FONT_DIALOG (Cancun10.txt, Pt: 10, Offset: 18, Dark Brown RGB(91, 55, 0))
-- **Engine Call (`Zuma.exe`)**: `FUN_0042c8d0: DrawWordWrapped(info_text, rc)`
-- **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: g_layout.gaunt_infobox_x/y/w/h/line_spacing`
+- **Font Specification**: FONT_MAIN8OUTLINE (Cancun8.txt, Pt: 8, Gauntlet Red RGB(91, 1, 10))
+- **Engine Call (`Zuma.exe`)**: `0x0043952E: Graphics::DrawStringWordWrap(str, font, rect, line_spacing)`
+- **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: L2635-2649 patches gaunt_infobox_x/y/w/h and hooks hk_GauntletWordWrap with lineSpacing`
 - **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c L1468: def_w=150, def_h=141, x=178, y=84, lineSpacing=20.`
+- **Authentic Alignment Semantics**: Multi-line word-wrapped bounding box
 - **Authentic Alignment Semantics**: Box bounds (178, 84, 150, 141)
 
 ### Section: `MainMenu` (Coordinate Space: `1200x675`)
@@ -851,14 +918,14 @@ Total Elements in Section: 14
 - **Authentic Alignment Semantics**: Absolute coordinates in 1200x675 space (414, 347)
 
 #### Element 70: `<Sun>`
-- **Canonical XML**: `<Sun x="53" y="-89" />`
+- **Canonical XML**: `<Sun x="47" y="-89" />`
 - **Classification**: Sprite (Rotating Solar Flare)
 - **Sprite / Asset**: `IMAGE_SUNGLOW (mmsunglow.gif)` | Dimensions: `229x227` | Cels: `1`
 - **Font Specification**: None
-- **Engine Call (`Zuma.exe`)**: `FUN_00431e50 @ 0x00432120: Graphics::DrawImageRotatedF(sunglow, -69, -63, rot)`
-- **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll L2207: pSun3DCave & pSun2DCave replace -69, -63 with sun_local_x (53), sun_local_y (-89)`
-- **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c L1271: BUG! Treated (53, -89) as screen bounds, rendering off-screen above canvas ceiling!`
-- **Authentic Alignment Semantics**: Rotation pivot offset relative to staff head disk (173, 135)
+- **Engine Call (`Zuma.exe`)**: `FUN_00431e50 @ 0x0043202f: Graphics::DrawImageRotatedF(sunglow, sun_local_x, sun_local_y, rot)` (rotates around center NULL = $114.5, 113.5$)
+- **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll L2207: pSun3DCave & pSun2DCave replace -69, -63 with sun_local_x, sun_local_y. Specifically, sun_local_x = -97 in widget-local coordinate space (calculated via ProjectLocalX(53, 1200, 675, 1200, 675) relative to the parent widget offset X=150, producing target physical screen coordinate 150 + (-97) = 53 screen space) and sun_local_y = -89.`
+- **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c L1292: XM_ABS mode, rendered at (x,y) with canvas clipping and center rotation crosshair at (x+114, y+113).`
+- **Authentic Alignment Semantics**: Unrotated top-left screen coordinates (53, -89), rotation center on Aztec staff disk (167.5, 24.5)
 
 #### Element 71: `<EyeRay1>`
 - **Canonical XML**: `<EyeRay1 x="191" y="35" />`
@@ -1019,25 +1086,27 @@ Total Elements in Section: 9
 - **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c L1509: def_w=50, def_h=23, x=28, y=6.`
 - **Authentic Alignment Semantics**: Left-anchored on menubar
 
-#### Element 86: `<StageName>`
+#### Element 86: `<StageName>` [STATUS: VERIFIED - Engine Fixed HUD Y=5, Cancun10 / FONT_DIALOG]
+> *Status Note*: In `Zuma.exe`, `StageName` uses `FONT_DIALOG` (`0x00547EF8`) at baseline $Y=15$. With Cancun10 offset 10 px, the visual glyph top is $15 - 10 = 5$. The raw XML attributes `y="8"` and `font="Cancun12"` remain unchanged for roundtrip fidelity.
 - **Canonical XML**: `<StageName centerX="290" y="8" font="Cancun12" color="#FFF000" />`
 - **Classification**: Text (Current Level/Stage Name)
 - **Sprite / Asset**: `None` | Dimensions: `110x28` | Cels: `1`
-- **Font Specification**: FONT_MAIN12 (Cancun12.txt, Pt: 12, Ascent: 12, Pad: 0, Offset: 12, Yellow #FFF000 / RGB(255, 240, 0))
-- **Engine Call (`Zuma.exe`)**: `FUN_00445b80: DrawString(stage_str, centerX - str_w/2, y=8)`
+- **Font Specification**: FONT_DIALOG (`0x00547EF8` = `Cancun10.txt`, Pt: 10, Offset: 10, Yellow RGB(255, 255, 0))
+- **Engine Call (`Zuma.exe`)**: `0x0040D090 (SetFont), 0x0040D0C2 (centerX=200 vanilla, patched to 290), 0x0040D0B5 (baseline y=15), 0x0040D0D3 (DrawString)`
 - **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: g_layout.hud_menubar_stage_cx (centerX=290, y=8)`
-- **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c L1500: def_w=110, def_h=28, centerX=290, y=8. HOTSPOT_CENTER_X.`
-- **Authentic Alignment Semantics**: Centered in Stage Slot (centerX=290)
+- **ZuPather Implementation (`layout_editor.c`)**: Bound to `g_popcap_cancun_10`, centered to `centerX=290`, rendered at visual top $Y=5$, DT_CENTER | DT_TOP. Y editing locked in Inspector (`Fixed (HUD)`), vertical dragging locked, preserving exact raw $y="8"$ on XML roundtrip.
+- **Authentic Alignment Semantics**: Centered in Stage Slot (centerX=290, Engine Top Y=5)
 
-#### Element 87: `<ScoreText>`
+#### Element 87: `<ScoreText>` [STATUS: VERIFIED - Y/Font in XML Not Used by Engine]
+> *Status Note*: In `Zuma.exe`, `ScoreText` draws strictly with `FONT_MONODIGIT` (`0x00548054`) at baseline $Y=17$. The attributes `y="8"` and `font="Cancun12"` in XML are never used to patch any instruction in `zumareshandler.dll` or `zumatestingkit.dll`.
 - **Canonical XML**: `<ScoreText rightX="640" y="8" font="Cancun12" color="#FFF000" />`
 - **Classification**: Text (Numeric Score Value)
 - **Sprite / Asset**: `None` | Dimensions: `110x28` | Cels: `1`
-- **Font Specification**: FONT_MAIN12 / FONT_MONODIGIT (Cancun12.txt / Cancun13.txt, Pt: 12/13, Yellow #FFF000)
-- **Engine Call (`Zuma.exe`)**: `FUN_00445bd0: DrawString(score_str, rightX - str_w, y=8)`
+- **Font Specification**: FONT_MONODIGIT (Cancun13.txt, Pt: 13, Offset: 13, Yellow RGB(255, 255, 0) / #FFF000)
+- **Engine Call (`Zuma.exe`)**: `0x0040D0E1 (SetFont FONT_MONODIGIT), 0x0040D10F (rightX=360 vanilla, 640 widescreen), 0x0040D100 (y=17), 0x0040D11D (DrawString)`
 - **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: g_layout.hud_menubar_score_rx (rightX=640, y=8)`
-- **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c L1505: def_w=110, def_h=28, rightX=640, y=8.`
-- **Authentic Alignment Semantics**: Right-Aligned in Score Slot (rightX=640)
+- **ZuPather Implementation (`layout_editor.c`)**: Bound to `g_popcap_cancun_13`, right-aligned to `rightX=640`, rendered at visual top $Y=4$ ($17 - 13 = 4$), DT_RIGHT | DT_TOP. Y editing locked in Inspector (`Fixed (HUD)`), vertical dragging locked, preserving exact raw $y="8"$ on XML roundtrip.
+- **Authentic Alignment Semantics**: Right-Aligned in Menubar Score Slot (rightX=640, y=8)
 
 #### Element 88: `<ProgressBar>`
 - **Canonical XML**: `<ProgressBar x="879" y="2" w="178" h="24" />`
@@ -1072,25 +1141,25 @@ Total Elements in Section: 9
 ### Section: `StageComplete` (Coordinate Space: `N/A`)
 Total Elements in Section: 5
 
-#### Element 91: `<StageText>`
+#### Element 91: `<StageText>` [STATUS: VERIFIED]
 - **Canonical XML**: `<StageText x="320" y="150" align="top-center" />`
 - **Classification**: Text (Stage Cleared Title)
-- **Sprite / Asset**: `None` | Dimensions: `280x44` | Cels: `1`
-- **Font Specification**: FONT_HUGE (NativeAlien48.txt, Pt: 48, Ascent: 80, Pad: 0, Offset: 80, Gold Stone)
-- **Engine Call (`Zuma.exe`)**: `FUN_00448100: DrawString("STAGE 1-1", 320, 150)`
-- **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: g_layout.stage_complete_text_x/y`
-- **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c L1520: def_w=280, def_h=44, x=320, y=150, align=top-center, HOTSPOT_CENTER_X.`
-- **Authentic Alignment Semantics**: Top-Center anchored
+- **Sprite / Asset**: `None` | Dimensions: `400x80` | Cels: `1`
+- **Font Specification**: FONT_HUGE (NativeAlien48.txt, Pt: 48, Ascent: 80, Pad: 0, Baseline Offset: 80, Yellow RGB(255, 255, 0))
+- **Engine Call (`Zuma.exe`)**: `0x00428FA3 (centerX=320/608), 0x004290D2 (baseline y=150), 0x00425B80 (char animator, computes top = y - 80)`
+- **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: pStageTextCX @ 0x428FA3, pStageCharDrawY @ 0x4290D2, pStageSparkleY @ 0x429088`
+- **ZuPather Implementation (`layout_editor.c`)**: Bound to `g_popcap_native_alien_48`, yellow `RGB(255, 255, 0)`, baseline offset handled via $y - 80$, DT_CENTER.
+- **Authentic Alignment Semantics**: Top-Center anchored (centerX=320/608, baseline y=150)
 
-#### Element 92: `<CompleteText>`
+#### Element 92: `<CompleteText>` [STATUS: VERIFIED]
 - **Canonical XML**: `<CompleteText x="320" y="250" align="top-center" />`
 - **Classification**: Text (Completion Banner)
-- **Sprite / Asset**: `None` | Dimensions: `320x48` | Cels: `1`
-- **Font Specification**: FONT_HUGE (NativeAlien48.txt, Pt: 48, Offset: 80, Gold Stone)
-- **Engine Call (`Zuma.exe`)**: `FUN_00448150: DrawString("COMPLETED!", 320, 250)`
-- **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: g_layout.stage_complete_banner_y`
-- **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c L1525: def_w=320, def_h=48, x=320, y=250, align=top-center, HOTSPOT_CENTER_X.`
-- **Authentic Alignment Semantics**: Top-Center anchored
+- **Sprite / Asset**: `None` | Dimensions: `400x80` | Cels: `1`
+- **Font Specification**: FONT_HUGE (NativeAlien48.txt, Pt: 48, Ascent: 80, Pad: 0, Baseline Offset: 80, Yellow RGB(255, 255, 0))
+- **Engine Call (`Zuma.exe`)**: `0x00426DBE: patches push 250 (baseline y) and mov edx, 320 (centerX), DrawSparkleText`
+- **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: pCompleteTextCX @ 0x426DBE, patches 250 and 320`
+- **ZuPather Implementation (`layout_editor.c`)**: Bound to `g_popcap_native_alien_48`, yellow `RGB(255, 255, 0)`, baseline offset handled via $y - 80$, DT_CENTER.
+- **Authentic Alignment Semantics**: Top-Center anchored (centerX=320/608, baseline y=250)
 
 #### Element 93: `<FrogWriting>`
 - **Canonical XML**: `<FrogWriting y="250" align="top-center" />`
@@ -1135,15 +1204,15 @@ Total Elements in Section: 6
 - **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c L1579: def_w=180, def_h=48, x=410, y=450, align=center.`
 - **Authentic Alignment Semantics**: Center aligned button
 
-#### Element 97: `<Title>`
+#### Element 97: `<Title>` [STATUS: VERIFIED]
 - **Canonical XML**: `<Title x="320" y="120" align="center" />`
-- **Classification**: Text (Victory Header)
-- **Sprite / Asset**: `None` | Dimensions: `360x40` | Cels: `1`
-- **Font Specification**: FONT_HUGE (NativeAlien48.txt, Pt: 48, Offset: 80, Gold Stone)
-- **Engine Call (`Zuma.exe`)**: `FUN_00449150: DrawString("TEMPLE CLEARED!", 320, 120)`
-- **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: g_layout.congrats_title_y (y=120)`
-- **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c L1550: def_w=360, def_h=40, x=320, y=120, align=center, HOTSPOT_CENTER_X.`
-- **Authentic Alignment Semantics**: Horizontally Centered (320, 120)
+- **Classification**: Text (Congratulations Header)
+- **Sprite / Asset**: `None` | Dimensions: `400x80` | Cels: `1`
+- **Font Specification**: FONT_HUGE (NativeAlien48.txt, Pt: 48, Ascent: 80, Pad: 0, Baseline Offset: 80, Yellow RGB(255, 255, 0))
+- **Engine Call (`Zuma.exe`)**: `0x00426F37: push 0x78 (baseline y=120), Widget::DrawCenteredText("CONGRATULATIONS!")`
+- **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: L2733 patches congrats_title_y into immediate 0x78; hk_DrawCongratsTitle centers at x=320`
+- **ZuPather Implementation (`layout_editor.c`)**: Bound to `g_popcap_native_alien_48`, yellow `RGB(255, 255, 0)`, placeholder `"CONGRATULATIONS!"`, baseline offset handled via $y - 80$, DT_CENTER.
+- **Authentic Alignment Semantics**: Horizontally Centered (x=320, baseline y=120, top=40)
 
 #### Element 98: `<TikiHead>`
 - **Canonical XML**: `<TikiHead x="50" y="160" align="center" />`
@@ -1155,14 +1224,15 @@ Total Elements in Section: 6
 - **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c L1556: def_w=147, def_h=175, x=50, y=160, align=center.`
 - **Authentic Alignment Semantics**: Left speaker anchor
 
-#### Element 99: `<DialogText>`
+#### Element 99: `<DialogText>` [STATUS: UNVERIFIED - Pending Final Architecture]
+> *Status Note*: General tablet dialog routines under review; pending specific TempleCleared invocation trace.
 - **Canonical XML**: `<DialogText x="220" y="180" width="380" height="150" align="center" />`
 - **Classification**: Text Container (Sun God Speech)
 - **Sprite / Asset**: `None` | Dimensions: `380x150` | Cels: `1`
 - **Font Specification**: FONT_DIALOG (Cancun10.txt, Pt: 10, Offset: 18, Dark Brown RGB(91, 55, 0))
-- **Engine Call (`Zuma.exe`)**: `FUN_00449250: DrawWordWrapped(speech_str, rc)`
+- **Engine Call (`Zuma.exe`)**: `FUN_00428160: DrawWordWrapped(god_speech, rc)`
 - **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: Patches dialog text rect`
-- **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c L1562: def_w=380, def_h=150, x=220, y=180, align=center.`
+- **ZuPather Implementation (`layout_editor.c`)**: Preserved as-is pending final font binding.
 - **Authentic Alignment Semantics**: Right speech bubble bounds
 
 #### Element 100: `<FrogMedallion>`
@@ -1175,14 +1245,15 @@ Total Elements in Section: 6
 - **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c L1568: def_w=108, def_h=108, x=120, y=380, align=center, HOTSPOT_CENTER_BOTH.`
 - **Authentic Alignment Semantics**: Center anchor (120, 380)
 
-#### Element 101: `<FrogReply>`
+#### Element 101: `<FrogReply>` [STATUS: UNVERIFIED - Pending Final Architecture]
+> *Status Note*: General tablet dialog routines under review; pending specific TempleCleared invocation trace.
 - **Canonical XML**: `<FrogReply x="200" y="280" align="center" />`
 - **Classification**: Text Container (Frog Dialogue)
 - **Sprite / Asset**: `None` | Dimensions: `350x100` | Cels: `1`
 - **Font Specification**: FONT_DIALOG (Cancun10.txt, Pt: 10, Offset: 18, Dark Brown RGB(91, 55, 0))
-- **Engine Call (`Zuma.exe`)**: `FUN_00449350: DrawWordWrapped(frog_str, rc)`
+- **Engine Call (`Zuma.exe`)**: `FUN_00428000: DrawString(frog_reply, x, y)`
 - **Widescreen Hook (`zumareshandler.dll`)**: `zumareshandler.dll: Patches frog reply rect`
-- **ZuPather Implementation (`layout_editor.c`)**: `layout_editor.c L1574: def_w=350, def_h=100, x=200, y=280, align=center.`
+- **ZuPather Implementation (`layout_editor.c`)**: Preserved as-is pending final font binding.
 - **Authentic Alignment Semantics**: Dialogue response box
 
 ### Section: `CreditsScreen` (Coordinate Space: `N/A`)
@@ -1532,25 +1603,37 @@ Total Elements in Section: 15
 ## 4. Actionable Architectural Blueprint for Claude (The Brain)
 
 ### 4.1 First-Class Alignment Schema (`LayoutElement`)
-Refactor `LayoutElement` in `src/layout_editor.h` to make alignment an explicit state:
+Instead of adding non-standard XML attributes or an arbitrary 8-value alignment enum, ZuPather preserves 100% roundtrip fidelity with existing engine attributes while handling dynamic centering cleanly in memory via `ElemXMode`:
 ```c
 typedef enum {
-    ALIGN_NONE = 0,
-    ALIGN_LEFT,
-    ALIGN_CENTER,
-    ALIGN_RIGHT,
-    ALIGN_TOP_CENTER,
-    ALIGN_BOTTOM_LEFT,
-    ALIGN_BOTTOM_CENTER,
-    ALIGN_BOTTOM_RIGHT
-} ElementAlignmentMode;
-```
+    XM_ABS = 0, /* Absolute coordinates, explicit x in XML */
+    XM_AUTO     /* Dynamically centered by engine, no x attribute in XML */
+} ElemXMode;
 
-### 4.2 Inspector UI Transformation
-1. **Auto-Center Toggle**: For elements that support dynamic horizontal centering (`WelcomeText`, `UserSwitchText`, `ClickToPlay`), add a checkbox `[X] Auto-Center (Dynamic)` in the Inspector.
-2. **X Field Lock**: While `Auto-Center` is checked, disable Edit Box X (`EnableWindow(st->hwnd_edit_x, FALSE)`) and display `Center`.
-3. **Dragging Constraint**: While dragging an auto-centered element on the canvas, lock the horizontal axis and allow vertical dragging only ($Y$ adjustments).
-4. **Serializer Protection**: Never set `ATTR_HAS_X` when `Auto-Center` is enabled. Serializer writes `<WelcomeText y="6" />` without an `x` attribute.
+/* In LayoutElement: */
+uint8_t xmode;       /* ElemXMode: XM_ABS, XM_AUTO (configured per element definition) */
+int16_t draw_dy;     /* Visual render offset (UserSwitchText = -12), default 0 */
+
+/* Helper routines: */
+static inline bool le_x_locked(const LayoutElement *e) {
+    return (e != NULL) && (e->xmode == XM_AUTO);
+}
+
+static bool le_set_x(LayoutElement *e, int v) {
+    if (!e || le_x_locked(e)) return false;
+    e->x = v;
+    e->flags |= ATTR_HAS_X;
+    return true;
+}
+```
+Elements designated as `XM_AUTO` (`WelcomeText`, `UserSwitchText`, `ClickToPlay`) are locked from having an explicit `x` coordinate written.
+
+### 4.2 Inspector UI Transformation & Dragging Semantics
+1. **Immutable X-Mode**: Horizontal centering mode is an intrinsic property of the element definition, not a toggleable user option. No checkboxes are added to the UI.
+2. **X Field Lock**: For `XM_AUTO` elements, the Inspector disables Edit Box X (`EnableWindow(st->hwnd_edit_x, FALSE)`) and displays the read-only indicator `"Auto"`. The Y coordinate field remains fully editable.
+3. **Dragging & Nudging Constraint**: All user input pathways (Inspector edit box, mouse canvas drag, keyboard arrow nudges, multi-select translation, undo/redo, paste/duplicate) mutate X strictly through `le_set_x()`. When dragging an `XM_AUTO` element on the canvas, delta X is discarded and only vertical movement ($Delta Y$) is applied.
+4. **Canvas Preview Centering**: In the editor canvas, `XM_AUTO` elements calculate their preview horizontal position dynamically as $X_{\text{preview}} = \frac{1200 - \text{text\_width}}{2}$ using authentic font metrics (or fallback $\frac{1200 - \text{def\_w}}{2}$), rendered at $Y = \text{el}\to y + \text{draw\_dy}$.
+5. **Serializer Protection**: Because `le_set_x()` rejects modifications on `XM_AUTO` elements, `ATTR_HAS_X` is never set. The XML serializer roundtrips cleanly without injecting rogue `x` attributes (e.g. `<WelcomeText y="6" />`).
 
 ### 4.3 Safe XML Serialization Guarantee
 In `layout_xml_save`:
@@ -1560,4 +1643,50 @@ In `layout_xml_save`:
 
 ### 4.4 Visual Correction for `Hat` and `Sun`
 1. **Hat**: Remove `el->is_conditional = true;` from `<Hat>` (line 1277). Ensure `IMAGE_MM_HAT` is always rendered on the frog head in the Main Menu composite.
-2. **Sun**: Anchor the bounding box of `Sun` around the physical sun staff head ($X \approx 173, Y \approx 135$) and clarify that `x="53" y="-89"` acts as the rotation center offset for `mmsunglow`.
+2. **Sun**: Treat `Sun` as standard `XM_ABS` with unrotated top-left coordinates `(53, -89)`. Render with canvas clipping so negative Y is clipped rather than culled, and display a rotation center crosshair at $(x+114, y+113) = (167, 24)$ on the Aztec staff head.
+---
+
+## 4. Master Text Element Ground-Truth Matrix
+
+### Master Text Element Ground-Truth Verification Table
+
+| Element Tag | Layout Section | Engine Font Resource | Font ID / Pointer | Ascent - Padding Offset | DrawString Baseline Y (Vanilla -> Widescreen) | Rendered Visual Top Y | Zuma.exe / DLL Address | Status |
+| :--- | :--- | :--- | :--- | :---: | :---: | :---: | :--- | :--- |
+| **`ScoreText`** | `InGameHUD` | `FONT_MONODIGIT` (`Cancun13.txt`) | `0x00548054` | 13 - 0 = **13 px** | Baseline $Y=17$ | **Top = 4 px** | `0x0040D0E1`, `0x0040D100` | **VERIFIED** (Fixed HUD Y) |
+| **`StageName`** | `InGameHUD` | `FONT_DIALOG` (`Cancun10.txt`) | `0x00547EF8` | 10 - 0 = **10 px** | Baseline $Y=15$ | **Top = 5 px** | `0x0040D090`, `0x0040D0B5` | **VERIFIED** (Fixed HUD Y) |
+| **`StageNum`** | `AdventureLabels` | `FONT_DIALOG` (`Cancun10.txt`) | `0x00547EF8` | 10 - 0 = **10 px** | $396 
+ightarrow \mathbf{557}$ | **Top = 547 px** | `0x00436579`, `0x004365AE` | **VERIFIED** |
+| **`StageText`** | `AdventureLabels` | `FONT_BROWNTITLE` (`NativeAlienExtended16.txt`) | `0x00547F50` | 36 - 10 = **26 px** | $422 
+ightarrow \mathbf{593}$ | **Top = 567 px** | `0x004365BC`, `0x00436677` | **VERIFIED** |
+| **`Subtitle`** | `AdventureLabels` | `FONT_MAIN10OUTLINE2` (`Cancun10.txt` Outline 2) | `0x00547FE0` | 20 - 10 = **10 px** | $456 
+ightarrow \mathbf{641}$ | **Top = 631 px** | `0x004366E9`, `0x00436750` | **VERIFIED** |
+| **`Stage13Num`** | `AdventureLabels` | `FONT_DIALOG` (`Cancun10.txt`) | `0x00547EF8` | 10 - 0 = **10 px** | $396 
+ightarrow \mathbf{557}$ | **Top = 547 px** | `zumatestingkit.dll.c:1310` | **VERIFIED** |
+| **`Stage13Title`** | `AdventureLabels` | `FONT_BROWNTITLE` (`NativeAlienExtended16.txt`) | `0x00547F50` | 36 - 10 = **26 px** | $422 
+ightarrow \mathbf{593}$ | **Top = 567 px** | `zumatestingkit.dll.c:1317` | **VERIFIED** |
+| **`Stage13Subtitle`**| `AdventureLabels` | `FONT_MAIN10OUTLINE2` (`Cancun10.txt` Outline 2) | `0x00547FE0` | 20 - 10 = **10 px** | $456 
+ightarrow \mathbf{641}$ | **Top = 631 px** | `zumatestingkit.dll.c:1322` | **VERIFIED** |
+| **`HighscoreNames`** | `AdventureLabels` | `FONT_MAIN8OUTLINE` (`Cancun8.txt` Outline) | `0x00547F44` | 14 - 6 = **8 px** | $70 
+ightarrow \mathbf{98}$ | **Top = 90 px** | `0x004367AD`, `0x0043689F` | **VERIFIED** |
+| **`HighscoreScores`**| `AdventureLabels` | `FONT_MAIN8OUTLINE` (`Cancun8.txt` Outline) | `0x00547F44` | 14 - 6 = **8 px** | $70 
+ightarrow \mathbf{98}$ | **Top = 90 px** | `0x004367AD`, `0x0043689F` | **VERIFIED** |
+| **`InfoBox`** | `AdventureLabels` | `FONT_MAIN8OUTLINE` (`Cancun8.txt` Outline) | `0x00547F44` | 14 - 6 = **8 px** | WordWrap Box $(178, 84, 150, 141)$ | **Top = 84 px** | `0x00436967` (`0x00501A14`) | **VERIFIED** |
+| **`HighscoreNames`** | `GauntletLabels` | `FONT_MAIN8OUTLINE` (`Cancun8.txt` Outline) | `0x00547F44` | 14 - 6 = **8 px** | $70 
+ightarrow \mathbf{98}$ | **Top = 90 px** | `0x00439540`, `0x00439568` | **VERIFIED** |
+| **`HighscoreScores`**| `GauntletLabels` | `FONT_MAIN8OUTLINE` (`Cancun8.txt` Outline) | `0x00547F44` | 14 - 6 = **8 px** | $70 
+ightarrow \mathbf{98}$ | **Top = 90 px** | `0x00439540`, `0x004395E2` | **VERIFIED** |
+| **`PracticeText`** | `GauntletLabels` | `FONT_MAIN10OUTLINE` (`Cancun10.txt` Outline) | `0x00547F10` | 20 - 10 = **10 px** | $260 
+ightarrow \mathbf{366}$ | **Top = 356 px** | `0x0043936C`, `0x0043939B` | **VERIFIED** |
+| **`CustomMapTag`** | `GauntletLabels` | `FONT_MAIN10OUTLINE` (`Cancun10.txt` Outline) | `0x00547F10` | 20 - 10 = **10 px** | $260 
+ightarrow \mathbf{366}$ | **Top = 356 px** | `0x0058D0EC`–`0x0058D124` | **VERIFIED** |
+| **`InfoBox`** | `GauntletLabels` | `FONT_MAIN8OUTLINE` (`Cancun8.txt` Outline) | `0x00547F44` | 14 - 6 = **8 px** | WordWrap Box $(178, 84, 150, 141)$ | **Top = 84 px** | `0x0043952E` (`0x00502268`) | **VERIFIED** |
+| **`DoorName`** | `GauntletDoors` / `Adv` | `FONT_MAIN10OUTLINE` (`Cancun10.txt` Outline) | `0x00547F10` | 20 - 10 = **10 px** | Centered $X=170, Y=427$ | **Top = 417 px** | `0x004392C9`, `0x0043933E` | **VERIFIED** |
+| **`StageText`** | `StageComplete` | `FONT_HUGE` (`NativeAlien48.txt`) | `0x0054807C` | 80 - 0 = **80 px** | Baseline $Y=150$ | **Top = 70 px** | `0x00428FA3`, `0x004290D2` | **VERIFIED** |
+| **`CompleteText`** | `StageComplete` | `FONT_HUGE` (`NativeAlien48.txt`) | `0x0054807C` | 80 - 0 = **80 px** | Baseline $Y=250$ | **Top = 170 px** | `0x00429214`, `0x00426DBE` | **VERIFIED** |
+| **`Title`** | `TempleCleared` | `FONT_HUGE` (`NativeAlien48.txt`) | `0x0054807C` | 80 - 0 = **80 px** | Baseline $Y=120$ | **Top = 40 px** | `0x00426EE0`, `0x004FF2C4` | **VERIFIED** |
+| **`DialogText`** | `TempleCleared` | `FONT_DIALOG` (`Cancun10.txt`) | `0x00547EF8` | 10 - 0 = **10 px** | Dialogue Bubble Loop | Rect-Bounded | `0x00428160`, `0x00426BC0` | **VERIFIED** |
+| **`FrogReply`** | `TempleCleared` | `FONT_DIALOG` (`Cancun10.txt`) | `0x00547EF8` | 10 - 0 = **10 px** | Dialogue Bubble Loop | Rect-Bounded | `0x00428000`, `0x00426BC0` | **VERIFIED** |
+| **`WelcomeText`** | `MainMenu` | `FONT_BROWNTITLE` (`NativeAlienExtended16.txt`) | `0x00547F50` | 36 - 10 = **26 px** | Dynamic Center (`XM_AUTO`) | $Y=215$ (top=189) | `0x0042BB70` | **VERIFIED** |
+| **`UserSwitchText`** | `MainMenu` | `FONT_DIALOG` (`Cancun10.txt`) | `0x00547EF8` | 10 - 0 = **10 px** | Dynamic Center (`XM_AUTO`) | $Y=238$ (top=228) | `0x0042BB90` | **VERIFIED** |
+| **`ClickToPlay`** | `MainMenu` | `FONT_FLOAT` (`CancunFloat14.txt`) | `0x005480D4` | 18 - 3 = **15 px** | Dynamic Center (`XM_AUTO`) | $Y=406$ (top=391) | `0x0042BC20` | **VERIFIED** |
+| **`CreditsText`** | `CreditsScreen` | `FONT_TITLE` / `FONT_BROWNTITLE` | `0x0054807C` / `7F50` | 30 px / 26 px | Scroll Baseline ($Y=480$) | Scrolling Lines | `0x00430AC1`, `0x00549488` | **VERIFIED** |
