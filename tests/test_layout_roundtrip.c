@@ -977,6 +977,41 @@ static bool test_gauntlet_labels_mapping_and_roundtrip(const char *layout_path) 
     return true;
 }
 
+/* 16. Test Adventure & Gauntlet Typography & Sprite Regression */
+static bool test_adventure_gauntlet_regression(void) {
+    printf("--- Test 16: Adventure & Gauntlet Typography & Sprite Regression ---\n");
+
+    /* 1. Verify get_element_sprite_name for AdvBack and AdventureTitle is not empty */
+    LayoutElement el_back = {0};
+    strncpy(el_back.section, "AdventureTemples", sizeof(el_back.section) - 1);
+    strncpy(el_back.tag, "AdvBack", sizeof(el_back.tag) - 1);
+    const char *sp_back = get_element_sprite_name(&el_back, NULL, NULL, NULL);
+    TEST_ASSERT(sp_back != NULL && strlen(sp_back) > 0, "AdvBack sprite must not be empty");
+    TEST_ASSERT(strcmp(sp_back, "advback") == 0, "AdvBack sprite must resolve to 'advback'");
+
+    LayoutElement el_title = {0};
+    strncpy(el_title.section, "AdventureLabels", sizeof(el_title.section) - 1);
+    strncpy(el_title.tag, "AdventureTitle", sizeof(el_title.tag) - 1);
+    const char *sp_title = get_element_sprite_name(&el_title, NULL, NULL, NULL);
+    TEST_ASSERT(sp_title != NULL && strlen(sp_title) > 0, "AdventureTitle sprite must not be empty");
+    TEST_ASSERT(strcmp(sp_title, "advtitle") == 0, "AdventureTitle sprite must resolve to 'advtitle'");
+
+    /* 2. Test word-wrap splits long text into >= 2 lines on rect width 211 */
+    PopCapFont dummy_font;
+    memset(&dummy_font, 0, sizeof(dummy_font));
+    dummy_font.loaded = true;
+    dummy_font.space_width = 8;
+    dummy_font.ascent = 10;
+
+    const char *long_text = "PLAY THROUGH ALL THE LEVELS YOU HAVE UNLOCKED IN ADVENTURE MODE IN RANDOM ORDER!";
+    int lines = popcap_font_count_wrapped_lines(&dummy_font, long_text, 211, 1.0f);
+    TEST_ASSERT(lines >= 2, "Word-wrap must split long InfoBox text into >= 2 lines on width 211");
+
+    printf("  [PASS] AdvBack/AdventureTitle sprite resolution and word-wrap >= 2 lines verified.\n");
+    g_tests_passed++;
+    return true;
+}
+
 int main(int argc, char **argv) {
     printf("=======================================================\n");
     printf("   ZuPather Layout Editor - Regression & Roundtrip Suite\n");
@@ -1000,6 +1035,7 @@ int main(int argc, char **argv) {
     test_advback_roundtrip_and_omission();
     test_gauntlet_buttons_mapping_and_roundtrip(full_layout);
     test_gauntlet_labels_mapping_and_roundtrip(full_layout);
+    test_adventure_gauntlet_regression();
 
     printf("\n=======================================================\n");
     printf(" Test Results: %d Passed, %d Failed\n", g_tests_passed, g_tests_failed);

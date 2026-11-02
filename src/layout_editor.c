@@ -1492,12 +1492,12 @@ static void assign_element_default_bounds(LayoutElement *el, const LayoutEditorS
             if (!(el->flags & ATTR_HAS_X)) { el->x = 776;  }
             if (!(el->flags & ATTR_HAS_Y)) { el->y = 98;  }
         } else if (_stricmp(el->tag, "HighscoreClip") == 0) {
-            el->def_w = (el->flags & ATTR_HAS_W && el->w > 0) ? el->w : 797;
+            el->def_w = (el->flags & ATTR_HAS_W && el->w > 0) ? el->w : 947;
             el->def_h = 60;
             if (!(el->flags & ATTR_HAS_X)) { el->x = 0;  }
             if (!(el->flags & ATTR_HAS_Y)) { el->y = 0;  }
         } else if (_stricmp(el->tag, "InfoBox") == 0) {
-            el->def_w = (el->flags & ATTR_HAS_W && el->w > 0) ? el->w : 150;
+            el->def_w = (el->flags & ATTR_HAS_W && el->w > 0) ? el->w : 211;
             el->def_h = (el->flags & ATTR_HAS_H && el->h > 0) ? el->h : 141;
             if (!(el->flags & ATTR_HAS_X)) { el->x = 178;  }
             if (!(el->flags & ATTR_HAS_Y)) { el->y = 84;  }
@@ -3834,7 +3834,7 @@ static void ensure_popcap_fonts(void) {
     popcap_font_load(&g_popcap_arial_12, "Arial12Bold", NULL, "_Arial12Bold", NULL);
 }
 
-static int popcap_font_get_line_width(PopCapFont *font, const char *line, int len) {
+static int popcap_font_get_line_width(const PopCapFont *font, const char *line, int len) {
     if (!font || !font->loaded || !line || len <= 0) return 0;
     int w = 0;
     for (int i = 0; i < len; ++i) {
@@ -4033,6 +4033,56 @@ static void popcap_font_draw_text(
     const RECT *rc, COLORREF color, float vscale, UINT draw_flags
 ) {
     popcap_font_draw_text_ex(mem_dc, font, text, rc, color, vscale, draw_flags, 0);
+}
+
+/* Word-wrap line counter for layout calculation and verification */
+static int popcap_font_count_wrapped_lines(const PopCapFont *font, const char *text, int max_w, float vscale) {
+    if (!font || !font->loaded || !text || max_w <= 0) return 0;
+    int line_count = 0;
+    const char *p = text;
+    while (*p) {
+        while (*p == ' ') p++;
+        if (!*p) break;
+
+        const char *line_start = p;
+        const char *last_space_end = NULL;
+        const char *cur = p;
+        int cur_w = 0;
+
+        while (*cur && *cur != '\n') {
+            const char *word_start = cur;
+            while (*cur && *cur != ' ' && *cur != '\n') cur++;
+            int word_len = (int)(cur - word_start);
+            int word_w = (int)roundf((float)popcap_font_get_line_width(font, word_start, word_len) * vscale);
+
+            int space_w = 0;
+            if (*cur == ' ') {
+                space_w = (int)roundf((float)font->space_width * vscale);
+            }
+
+            if (cur_w > 0 && cur_w + word_w > max_w) {
+                break;
+            }
+
+            cur_w += word_w + space_w;
+            last_space_end = cur;
+            if (*cur == ' ') cur++;
+        }
+
+        int line_len = 0;
+        if (last_space_end && last_space_end > line_start) {
+            line_len = (int)(last_space_end - line_start);
+            p = (*last_space_end == ' ') ? last_space_end + 1 : last_space_end;
+        } else {
+            line_len = (cur > line_start) ? (int)(cur - line_start) : 1;
+            p = line_start + line_len;
+            if (*p == ' ') p++;
+        }
+
+        line_count++;
+        if (*p == '\n') p++;
+    }
+    return line_count;
 }
 
 /* Word-wrap text renderer replicating Zuma.exe Widget::DrawStringWordWrap (0x0047A770) */
