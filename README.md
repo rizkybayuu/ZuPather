@@ -1,6 +1,6 @@
-# ZuPather (v0.3.0.1)
+# ZuPather (v0.3.0.2)
 
-> **Version:** 0.3.0.1 (Cross-Platform Windows & macOS Native Release, Cocoa/CoreGraphics Subsystem)  
+> **Version:** 0.3.0.2 (Cross-Platform Windows & macOS Native Release, Cocoa/CoreGraphics Subsystem)  
 > **Target Game:** *Zuma Deluxe* v1.0.0.1 & *ZuCompleluxe* Multi-Curve Framework  
 > **Project Scope:** High-Precision Vector Path Editor, Asset Composer & Direct-to-Engine Exporter  
 > **Core Language:** Pure C (C99 / Win32 API)  
@@ -271,12 +271,16 @@ ZuPather.exe genxml my_project.zupath
 
 ---
 
-## Third-Party Credits & Typography
+## Third-Party Dependencies & Verified Sources
 
-ZuPather embeds and utilizes the following open-source libraries and typefaces:
+ZuPather links and utilizes the following verified open-source libraries and typefaces:
 
+- **[Google libwebp (v1.4.0)](https://chromium.googlesource.com/webm/libwebp)**: Developed by Google LLC and the WebM Project. Licensed under the [BSD 3-Clause License](https://chromium.googlesource.com/webm/libwebp/+/refs/heads/main/COPYING). Provides high-performance hardware/software decoding and animation demuxing (`libwebpdemux`, `libwebpmux`, `libsharpyuv`) for animated WebP overlays in ZuCompleluxe.
+  - **Official Google WebM Distribution URL**: [`https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-1.4.0-windows-x64.zip`](https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-1.4.0-windows-x64.zip)
+  - **Linking Architecture**: Statically compiled directly into the binary on both Windows (`ZuPather.exe`) and macOS (`ZuPather.app`) to guarantee 100% standalone execution without external DLL/dylib requirements. When packaged in CI distribution archives, official Google WebM binary libraries are dynamically downloaded directly from the verified Google WebM Project URL.
+- **[Zstandard (zstd)](https://facebook.github.io/zstd/)**: Developed by Yann Collet and Meta Platforms, Inc. Licensed under the [BSD 3-Clause License](https://github.com/facebook/zstd/blob/dev/LICENSE). Statically linked (`libzstd`) for fast decompression of Serif Affinity binary chunk streams with zero runtime DLL footprint.
+  - **Official Meta GitHub Release URL**: [`https://github.com/facebook/zstd/releases`](https://github.com/facebook/zstd/releases)
 - **[Atkinson Hyperlegible](https://fonts.google.com/specimen/Atkinson+Hyperlegible)**: Copyright (c) 2020-2021, Braille Institute of America, Inc., with Reserved Font Name "Atkinson Hyperlegible". Licensed under the [SIL Open Font License 1.1](assets/fonts/OFL.txt). Engineered to provide maximum character distinction for UI labels, menus, and viewport controls.
 - **[JetBrains Mono](https://www.jetbrains.com/lp/mono/)**: Copyright (c) 2020 JetBrains s.r.o., with Reserved Font Name "JetBrains Mono". Licensed under the [SIL Open Font License 1.1](assets/fonts/OFL.txt). Utilized for monospace coordinate readouts, attribute inspector tables, and numerical telemetry.
 - **[stb_image & stb_image_write](https://github.com/nothings/stb)**: Authored by Sean T. Barrett (nothings) and contributors. Released into the Public Domain / MIT Dual License. Provides C99 image raster ingestion.
-- **[Zstandard (zstd)](https://facebook.github.io/zstd/)**: Developed by Yann Collet and Meta Platforms, Inc. Licensed under the BSD 3-Clause License. Statically linked (`libzstd`) for fast decompression of Serif Affinity binary chunk streams with zero runtime DLL footprint.
 

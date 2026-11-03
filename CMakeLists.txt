@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 3.20)
 if(WIN32)
-    project(ZuPather VERSION 0.3.0.1 LANGUAGES C RC)
+    project(ZuPather VERSION 0.3.0.2 LANGUAGES C RC)
 elseif(APPLE)
-    project(ZuPather VERSION 0.3.0.1 LANGUAGES C OBJC)
+    project(ZuPather VERSION 0.3.0.2 LANGUAGES C OBJC)
 else()
-    project(ZuPather VERSION 0.3.0.1 LANGUAGES C)
+    project(ZuPather VERSION 0.3.0.2 LANGUAGES C)
 endif()
 
 set(CMAKE_C_STANDARD 11)
@@ -100,67 +100,68 @@ elseif(APPLE)
 endif()
 
 # WebP Library Resolution
-find_package(WebP CONFIG QUIET)
-if(WebP_FOUND)
-    set(WEBP_LIBS WebP::webp WebP::webpdemux)
-    if(TARGET WebP::libwebpmux)
-        list(APPEND WEBP_LIBS WebP::libwebpmux)
-    elseif(TARGET WebP::webpmux)
-        list(APPEND WEBP_LIBS WebP::webpmux)
-    elseif(TARGET WebP::mux)
-        list(APPEND WEBP_LIBS WebP::mux)
-    endif()
-    target_link_libraries(ZuPather PRIVATE ${WEBP_LIBS})
+if(MINGW)
+    # Strictly enforce static linking on MinGW to prevent missing DLL errors
+    target_link_libraries(ZuPather PRIVATE
+        -Wl,-Bstatic
+        -lwebpmux
+        -lwebpdemux
+        -lwebp
+        -lsharpyuv
+        -Wl,-Bdynamic
+    )
 else()
-    find_package(PkgConfig QUIET)
-    if(PkgConfig_FOUND)
-        pkg_check_modules(WEBP QUIET libwebp libwebpdemux libwebpmux)
-        if(WEBP_FOUND)
-            target_include_directories(ZuPather PRIVATE ${WEBP_INCLUDE_DIRS})
-            target_link_libraries(ZuPather PRIVATE ${WEBP_LIBRARIES})
+    find_package(WebP CONFIG QUIET)
+    if(WebP_FOUND)
+        set(WEBP_LIBS WebP::webp WebP::webpdemux)
+        if(TARGET WebP::libwebpmux)
+            list(APPEND WEBP_LIBS WebP::libwebpmux)
+        elseif(TARGET WebP::webpmux)
+            list(APPEND WEBP_LIBS WebP::webpmux)
+        elseif(TARGET WebP::mux)
+            list(APPEND WEBP_LIBS WebP::mux)
         endif()
-    endif()
-    if(NOT WEBP_FOUND)
-        if(MINGW)
-            target_link_libraries(ZuPather PRIVATE
-                -Wl,-Bstatic
-                -lwebpmux
-                -lwebpdemux
-                -lwebp
-                -lsharpyuv
-                -Wl,-Bdynamic
-            )
-        else()
+        target_link_libraries(ZuPather PRIVATE ${WEBP_LIBS})
+    else()
+        find_package(PkgConfig QUIET)
+        if(PkgConfig_FOUND)
+            pkg_check_modules(WEBP QUIET libwebp libwebpdemux libwebpmux)
+            if(WEBP_FOUND)
+                target_include_directories(ZuPather PRIVATE ${WEBP_INCLUDE_DIRS})
+                target_link_libraries(ZuPather PRIVATE ${WEBP_LIBRARIES})
+            endif()
+        endif()
+        if(NOT WEBP_FOUND)
             target_link_libraries(ZuPather PRIVATE webp webpdemux webpmux)
         endif()
     endif()
 endif()
 
 # Zstandard (zstd) Library Resolution
-find_package(zstd CONFIG QUIET)
-if(zstd_FOUND)
-    if(TARGET zstd::libzstd_static)
-        target_link_libraries(ZuPather PRIVATE zstd::libzstd_static)
-    elseif(TARGET zstd::libzstd_shared)
-        target_link_libraries(ZuPather PRIVATE zstd::libzstd_shared)
-    endif()
+if(MINGW)
+    target_link_libraries(ZuPather PRIVATE
+        -Wl,-Bstatic
+        -lzstd
+        -Wl,-Bdynamic
+    )
 else()
-    find_package(PkgConfig QUIET)
-    if(PkgConfig_FOUND)
-        pkg_check_modules(ZSTD QUIET libzstd)
-        if(ZSTD_FOUND)
-            target_include_directories(ZuPather PRIVATE ${ZSTD_INCLUDE_DIRS})
-            target_link_libraries(ZuPather PRIVATE ${ZSTD_LIBRARIES})
+    find_package(zstd CONFIG QUIET)
+    if(zstd_FOUND)
+        if(TARGET zstd::libzstd_static)
+            target_link_libraries(ZuPather PRIVATE zstd::libzstd_static)
+        elseif(TARGET zstd::libzstd_shared)
+            target_link_libraries(ZuPather PRIVATE zstd::libzstd_shared)
         endif()
-    endif()
-    if(NOT ZSTD_FOUND)
-        if(MINGW)
-            target_link_libraries(ZuPather PRIVATE
-                -Wl,-Bstatic
-                -lzstd
-                -Wl,-Bdynamic
-            )
-        else()
+    else()
+        find_package(PkgConfig QUIET)
+        if(PkgConfig_FOUND)
+            pkg_check_modules(ZSTD QUIET libzstd)
+            if(ZSTD_FOUND)
+                target_include_directories(ZuPather PRIVATE ${ZSTD_INCLUDE_DIRS})
+                target_link_libraries(ZuPather PRIVATE ${ZSTD_LIBRARIES})
+            endif()
+        endif()
+        if(NOT ZSTD_FOUND)
             find_library(ZSTD_LIB NAMES zstd zstd_static)
             if(ZSTD_LIB)
                 target_link_libraries(ZuPather PRIVATE ${ZSTD_LIB})
@@ -201,5 +202,8 @@ elseif(MINGW OR CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
         -Wextra
         -Wno-unused-parameter
     )
+    if(WIN32)
+        target_link_options(ZuPather PRIVATE -static -static-libgcc)
+    endif()
     target_link_libraries(ZuPather PRIVATE -lm)
 endif()

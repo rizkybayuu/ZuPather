@@ -5,6 +5,18 @@ All notable changes to the **ZuPather** level design suite will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0.2] - 2026-11-03
+
+Maintenance update enforcing pure static linking across all build toolchains (MinGW & Apple Clang) to completely eliminate external DLL/dylib runtime dependencies, preventing `libwebpdemux-2.dll` missing errors on Windows and dylib missing errors on macOS.
+
+### Changed
+- **Static Linking & Zero Runtime DLL Footprint (`CMakeLists.txt`, `build_macos.command`, `.github/workflows/build.yml`)**:
+  - Enforced pure static archive linking (`-static -static-libgcc -Wl,-Bstatic -lwebpmux -lwebpdemux -lwebp -lsharpyuv -lzstd -Wl,-Bdynamic`) under MinGW on Windows, embedding all WebP and Zstd routines directly into the `ZuPather.exe` binary.
+  - Configured macOS build pipeline (`build_macos.command`) to prioritize static archive files (`libwebp*.a`, `libzstd.a`) from Homebrew, producing a 100% self-contained `ZuPather.app` bundle that runs without external dependencies or package managers.
+  - Updated GitHub Actions CI workflow to build with `-static -static-libgcc` and automatically bundle verified official Google WebM Project Windows binaries (`libwebp-1.4.0-windows-x64.zip`) directly into release packages without committing any DLLs into the Git repository.
+- **Third-Party Dependency Documentation (`README.md`)**:
+  - Added dedicated **Third-Party Dependencies & Verified Sources** section clearly documenting Google libwebp (v1.4.0) with official WebM project distribution URLs and BSD 3-Clause licensing.
+
 ## [0.3.0.1] - 2026-11-03
 
 Critical hotfix addressing an Access Violation (`0xC0000005`) crash during software sprite blending, an image loader I/O loop on missing default assets, and test suite alignment with canonical layout spaces.
