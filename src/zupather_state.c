@@ -1606,7 +1606,9 @@ void bgalpha_generate_masks(LevelBackgroundAlpha *ba) {
 }
 
 void load_default_cutout_sprite(void) {
-    if (g_has_default_cutout_img) return;
+    static bool s_attempted = false;
+    if (s_attempted || g_has_default_cutout_img) return;
+    s_attempted = true;
 
     char exe_dir[MAX_PATH] = {0};
     GetModuleFileNameA(NULL, exe_dir, MAX_PATH);
@@ -1637,7 +1639,9 @@ void load_default_cutout_sprite(void) {
 }
 
 void load_default_sprite_sprite(void) {
-    if (g_has_default_sprite_img) return;
+    static bool s_attempted = false;
+    if (s_attempted || g_has_default_sprite_img) return;
+    s_attempted = true;
 
     char exe_dir[MAX_PATH] = {0};
     GetModuleFileNameA(NULL, exe_dir, MAX_PATH);
@@ -1664,7 +1668,9 @@ void load_default_sprite_sprite(void) {
 }
 
 void load_default_bgalpha_sprite(void) {
-    if (g_has_default_bgalpha_img) return;
+    static bool s_attempted = false;
+    if (s_attempted || g_has_default_bgalpha_img) return;
+    s_attempted = true;
 
     char exe_dir[MAX_PATH] = {0};
     GetModuleFileNameA(NULL, exe_dir, MAX_PATH);
