@@ -1069,6 +1069,7 @@ static void draw_rotated_image_fast_cel(
 
     static HBITMAP s_rot_hbm = NULL;
     static HDC s_rot_dc = NULL;
+    static HBITMAP s_rot_old_bm = NULL;
     static uint32_t *s_rot_bits = NULL;
     static int s_rot_capacity = 0;
 
@@ -1081,8 +1082,19 @@ static void draw_rotated_image_fast_cel(
 
     int req_dim = (bw > bh) ? bw : bh;
     if (req_dim > s_rot_capacity || !s_rot_dc) {
-        if (s_rot_dc) DeleteDC(s_rot_dc);
-        if (s_rot_hbm) DeleteObject(s_rot_hbm);
+        if (s_rot_dc && s_rot_old_bm) {
+            SelectObject(s_rot_dc, s_rot_old_bm);
+            s_rot_old_bm = NULL;
+        }
+        if (s_rot_dc) {
+            DeleteDC(s_rot_dc);
+            s_rot_dc = NULL;
+        }
+        if (s_rot_hbm) {
+            DeleteObject(s_rot_hbm);
+            s_rot_hbm = NULL;
+            s_rot_bits = NULL;
+        }
 
         int new_dim = (req_dim > 128) ? req_dim + 32 : 128;
         BITMAPINFO bmi;
@@ -1094,11 +1106,25 @@ static void draw_rotated_image_fast_cel(
         bmi.bmiHeader.biBitCount = 32;
         bmi.bmiHeader.biCompression = BI_RGB;
 
-        s_rot_dc = CreateCompatibleDC(dest_dc);
+        s_rot_dc = CreateCompatibleDC(NULL);
+        if (!s_rot_dc) {
+            s_rot_capacity = 0;
+            return;
+        }
         s_rot_hbm = CreateDIBSection(s_rot_dc, &bmi, DIB_RGB_COLORS, (void**)&s_rot_bits, NULL, 0);
-        SelectObject(s_rot_dc, s_rot_hbm);
+        if (!s_rot_hbm || !s_rot_bits) {
+            DeleteDC(s_rot_dc);
+            s_rot_dc = NULL;
+            s_rot_hbm = NULL;
+            s_rot_bits = NULL;
+            s_rot_capacity = 0;
+            return;
+        }
+        s_rot_old_bm = (HBITMAP)SelectObject(s_rot_dc, s_rot_hbm);
         s_rot_capacity = new_dim;
     }
+
+    if (!s_rot_bits) return;
 
     for (int y = 0; y < bh; ++y) {
         memset(s_rot_bits + y * s_rot_capacity, 0, bw * sizeof(uint32_t));
@@ -1454,6 +1480,7 @@ static void draw_sprite_blended(
 
     static HDC s_sp_dc = NULL;
     static HBITMAP s_sp_hbm = NULL;
+    static HBITMAP s_sp_old_bm = NULL;
     static uint32_t *s_sp_bits = NULL;
     static int s_sp_cap_w = 0, s_sp_cap_h = 0;
 
@@ -1462,11 +1489,22 @@ static void draw_sprite_blended(
 
     if (needs_mask && sp_bits) {
         if (img_w > s_sp_cap_w || img_h > s_sp_cap_h || !s_sp_dc) {
-            if (s_sp_dc) DeleteDC(s_sp_dc);
-            if (s_sp_hbm) DeleteObject(s_sp_hbm);
+            if (s_sp_dc && s_sp_old_bm) {
+                SelectObject(s_sp_dc, s_sp_old_bm);
+                s_sp_old_bm = NULL;
+            }
+            if (s_sp_dc) {
+                DeleteDC(s_sp_dc);
+                s_sp_dc = NULL;
+            }
+            if (s_sp_hbm) {
+                DeleteObject(s_sp_hbm);
+                s_sp_hbm = NULL;
+                s_sp_bits = NULL;
+            }
 
-            int new_w = (img_w > s_sp_cap_w) ? img_w + 32 : s_sp_cap_w;
-            int new_h = (img_h > s_sp_cap_h) ? img_h + 32 : s_sp_cap_h;
+            int new_w = ZP_IMAX(img_w + 32, s_sp_cap_w);
+            int new_h = ZP_IMAX(img_h + 32, s_sp_cap_h);
             if (new_w < 128) new_w = 128;
             if (new_h < 128) new_h = 128;
 
@@ -1479,23 +1517,43 @@ static void draw_sprite_blended(
             bmi.bmiHeader.biBitCount = 32;
             bmi.bmiHeader.biCompression = BI_RGB;
 
-            s_sp_dc = CreateCompatibleDC(dest_dc);
-            s_sp_hbm = CreateDIBSection(s_sp_dc, &bmi, DIB_RGB_COLORS, (void**)&s_sp_bits, NULL, 0);
-            SelectObject(s_sp_dc, s_sp_hbm);
-            s_sp_cap_w = new_w;
-            s_sp_cap_h = new_h;
+            s_sp_dc = CreateCompatibleDC(NULL);
+            if (s_sp_dc) {
+                s_sp_hbm = CreateDIBSection(s_sp_dc, &bmi, DIB_RGB_COLORS, (void**)&s_sp_bits, NULL, 0);
+                if (s_sp_hbm && s_sp_bits) {
+                    s_sp_old_bm = (HBITMAP)SelectObject(s_sp_dc, s_sp_hbm);
+                    s_sp_cap_w = new_w;
+                    s_sp_cap_h = new_h;
+                } else {
+                    if (s_sp_hbm) DeleteObject(s_sp_hbm);
+                    DeleteDC(s_sp_dc);
+                    s_sp_dc = NULL;
+                    s_sp_hbm = NULL;
+                    s_sp_bits = NULL;
+                    s_sp_cap_w = 0;
+                    s_sp_cap_h = 0;
+                }
+            } else {
+                s_sp_cap_w = 0;
+                s_sp_cap_h = 0;
+            }
         }
 
-        for (int y = 0; y < img_h; ++y) {
-            memcpy(s_sp_bits + y * s_sp_cap_w, sp_bits + y * img_w, img_w * sizeof(uint32_t));
-        }
+        if (s_sp_bits && s_sp_cap_w >= img_w && s_sp_cap_h >= img_h) {
+            for (int y = 0; y < img_h; ++y) {
+                memcpy(s_sp_bits + y * s_sp_cap_w, sp_bits + y * img_w, img_w * sizeof(uint32_t));
+            }
 
-        apply_cutout_mask_to_buffer(s_sp_bits, s_sp_cap_w, img_w, img_h,
-                                    (float)sp->x + (float)img_w * 0.5f,
-                                    (float)sp->y + (float)img_h * 0.5f,
-                                    prio, true);
-        active_sp_bits = s_sp_bits;
-        active_stride = s_sp_cap_w;
+            apply_cutout_mask_to_buffer(s_sp_bits, s_sp_cap_w, img_w, img_h,
+                                        (float)sp->x + (float)img_w * 0.5f,
+                                        (float)sp->y + (float)img_h * 0.5f,
+                                        prio, true);
+            active_sp_bits = s_sp_bits;
+            active_stride = s_sp_cap_w;
+        } else {
+            active_sp_bits = sp_bits;
+            active_stride = img_w;
+        }
     }
 
     int mode = sp->blend_mode;
@@ -1519,15 +1577,27 @@ static void draw_sprite_blended(
 
     static HDC s_blend_dib_dc = NULL;
     static HBITMAP s_blend_dib_hbm = NULL;
+    static HBITMAP s_blend_old_bm = NULL;
     static uint32_t *s_blend_dib_bits = NULL;
     static int s_blend_cap_w = 0, s_blend_cap_h = 0;
 
     if (blit_w > s_blend_cap_w || blit_h > s_blend_cap_h || !s_blend_dib_dc) {
-        if (s_blend_dib_dc) DeleteDC(s_blend_dib_dc);
-        if (s_blend_dib_hbm) DeleteObject(s_blend_dib_hbm);
+        if (s_blend_dib_dc && s_blend_old_bm) {
+            SelectObject(s_blend_dib_dc, s_blend_old_bm);
+            s_blend_old_bm = NULL;
+        }
+        if (s_blend_dib_dc) {
+            DeleteDC(s_blend_dib_dc);
+            s_blend_dib_dc = NULL;
+        }
+        if (s_blend_dib_hbm) {
+            DeleteObject(s_blend_dib_hbm);
+            s_blend_dib_hbm = NULL;
+            s_blend_dib_bits = NULL;
+        }
 
-        int new_w = (blit_w > s_blend_cap_w) ? blit_w + 64 : s_blend_cap_w;
-        int new_h = (blit_h > s_blend_cap_h) ? blit_h + 64 : s_blend_cap_h;
+        int new_w = ZP_IMAX(blit_w + 64, s_blend_cap_w);
+        int new_h = ZP_IMAX(blit_h + 64, s_blend_cap_h);
         if (new_w < 128) new_w = 128;
         if (new_h < 128) new_h = 128;
 
@@ -1540,16 +1610,40 @@ static void draw_sprite_blended(
         bmi.bmiHeader.biBitCount = 32;
         bmi.bmiHeader.biCompression = BI_RGB;
 
-        s_blend_dib_dc = CreateCompatibleDC(dest_dc);
-        s_blend_dib_hbm = CreateDIBSection(s_blend_dib_dc, &bmi, DIB_RGB_COLORS, (void**)&s_blend_dib_bits, NULL, 0);
-        SelectObject(s_blend_dib_dc, s_blend_dib_hbm);
-        s_blend_cap_w = new_w;
-        s_blend_cap_h = new_h;
+        s_blend_dib_dc = CreateCompatibleDC(NULL);
+        if (s_blend_dib_dc) {
+            s_blend_dib_hbm = CreateDIBSection(s_blend_dib_dc, &bmi, DIB_RGB_COLORS, (void**)&s_blend_dib_bits, NULL, 0);
+            if (s_blend_dib_hbm && s_blend_dib_bits) {
+                s_blend_old_bm = (HBITMAP)SelectObject(s_blend_dib_dc, s_blend_dib_hbm);
+                s_blend_cap_w = new_w;
+                s_blend_cap_h = new_h;
+            } else {
+                if (s_blend_dib_hbm) DeleteObject(s_blend_dib_hbm);
+                DeleteDC(s_blend_dib_dc);
+                s_blend_dib_dc = NULL;
+                s_blend_dib_hbm = NULL;
+                s_blend_dib_bits = NULL;
+                s_blend_cap_w = 0;
+                s_blend_cap_h = 0;
+            }
+        } else {
+            s_blend_cap_w = 0;
+            s_blend_cap_h = 0;
+        }
+    }
+
+    if (!s_blend_dib_dc || !s_blend_dib_bits || s_blend_cap_w < blit_w || s_blend_cap_h < blit_h) {
+        /* Fallback if allocation fails: standard GdiAlphaBlend */
+        HDC src_dc_to_use = (needs_mask && s_sp_dc) ? s_sp_dc : sp_hdc;
+        BLENDFUNCTION bf = { AC_SRC_OVER, 0, master_alpha, AC_SRC_ALPHA };
+        GdiAlphaBlend(dest_dc, sx, sy, sw, sh, src_dc_to_use, 0, 0, img_w, img_h, bf);
+        return;
     }
 
     BitBlt(s_blend_dib_dc, 0, 0, blit_w, blit_h, dest_dc, clip_left, clip_top, SRCCOPY);
 
     for (int by = 0; by < blit_h; ++by) {
+        if (by >= s_blend_cap_h) break;
         int screen_y = clip_top + by;
         int src_y = (int)(((int64_t)(screen_y - sy) * img_h) / sh);
         if (src_y < 0) src_y = 0; else if (src_y >= img_h) src_y = img_h - 1;
@@ -1558,6 +1652,7 @@ static void draw_sprite_blended(
         uint32_t *dst_row = s_blend_dib_bits + by * s_blend_cap_w;
 
         for (int bx = 0; bx < blit_w; ++bx) {
+            if (bx >= s_blend_cap_w) break;
             int screen_x = clip_left + bx;
             int src_x = (int)(((int64_t)(screen_x - sx) * img_w) / sw);
             if (src_x < 0) src_x = 0; else if (src_x >= img_w) src_x = img_w - 1;

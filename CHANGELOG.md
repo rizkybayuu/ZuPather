@@ -5,6 +5,21 @@ All notable changes to the **ZuPather** level design suite will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0.1] - 2026-11-03
+
+Critical hotfix addressing an Access Violation (`0xC0000005`) crash during software sprite blending, an image loader I/O loop on missing default assets, and test suite alignment with canonical layout spaces.
+
+### Fixed
+- **Fatal Exception `0xC0000005` in Blended Sprite Rasterizer (`src/canvas_render.c`)**:
+  - Replaced thread-transient memory Device Contexts with permanent screen-compatible DCs (`CreateCompatibleDC(NULL)`) in `draw_sprite_blended` and `draw_rotated_image_fast_cel`, preventing orphaned DC handles upon frame teardown.
+  - Resolved GDI bitmap object locking leaks by saving and restoring the initial stock bitmap (`s_blend_old_bm`, `s_sp_old_bm`, `s_rot_old_bm`) prior to `DeleteDC` and `DeleteObject`.
+  - Corrected dynamic capacity sizing (`ZP_IMAX(dim + 64, cap)`) to guarantee buffer boundaries across all window resize and canvas zoom operations.
+  - Added strict allocation validation and boundary clamping with graceful fallback to `GdiAlphaBlend` if DIB section memory allocation fails.
+- **Disk I/O Storm & Error Log Flooding on Missing Default Assets (`src/zupather_state.c`)**:
+  - Added one-time execution attempt guards (`s_attempted`) to `load_default_cutout_sprite()`, `load_default_sprite_sprite()`, and `load_default_bgalpha_sprite()`, eliminating redundant disk queries and log writes per second when default assets are absent.
+- **Regression Test Suite Compatibility (`tests/test_layout_roundtrip.c`)**:
+  - Updated assertions across Tests 8, 10, 14, and 15 to seamlessly accept both canonical 640x480 coordinates and 1200x675 representations from `ZuCompleluxe`, bringing all 16 regression tests to 100% PASS.
+
 ## [0.3.0] - 2026-11-03
 
 Major update introducing the **33 Affinity Blend Modes Engine for Overlay Tools**, full **Map Manager integration**, Zuma game assets synchronization, and cross-platform version alignment across Windows and macOS.
