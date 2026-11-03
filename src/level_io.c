@@ -200,7 +200,7 @@ void handle_import_path(HWND hwnd) {
             snprintf(err_body, sizeof(err_body),
                 "Could not extract curve paths from the selected Affinity file.\n\n"
                 "File: %s\n\n"
-                "Affinity Tip: In Affinity Designer or Photo, choose File > Export > SVG (or EPS / PDF / AI), "
+                "Affinity Tip: In Affinity, choose File > Export > SVG (or EPS / PDF / AI), "
                 "then import that vector file into ZuPather.",
                 file_buf);
         } else {
@@ -211,7 +211,7 @@ void handle_import_path(HWND hwnd) {
                 "  - Adobe Illustrator (.ai, .eps, including Photoshop 'Paths to Illustrator')\n"
                 "  - Adobe Photoshop Document (.psd workpaths & vector masks)\n"
                 "  - Scalable Vector Graphics (.svg)\n"
-                "  - Affinity Designer / Photo (.af, .afdesign with vector streams)",
+                "  - Affinity (.af, .afdesign with vector streams)",
                 fmt_name, file_buf);
         }
         show_themed_notice_dialog(
@@ -425,7 +425,7 @@ void handle_export_path(HWND hwnd) {
                 "Export complete.\n\n"
                 "Successfully exported %d curve path%s to Adobe Illustrator format (.ai).\n\n"
                 "File: %s\n\n"
-                "Compatible with Adobe Illustrator, Adobe Photoshop ('Paths to Illustrator'), Affinity Designer, and Inkscape.",
+                "Compatible with Adobe Illustrator, Adobe Photoshop ('Paths to Illustrator'), Affinity, and Inkscape.",
                 g_path_count, g_path_count > 1 ? "s" : "", file_buf);
             show_themed_notice_dialog(
                 hwnd,
@@ -943,17 +943,25 @@ bool save_canvas_settings_xml(
     if (g_sprite_count > 0) {
         for (int i = 0; i < g_sprite_count; ++i) {
             char sp_name[64];
+            int pri = (g_sprites[i].pri >= 0 && g_sprites[i].pri <= 99) ? g_sprites[i].pri : 1;
             if (g_sprites[i].image_name[0]) {
                 strncpy(sp_name, g_sprites[i].image_name, sizeof(sp_name) - 1);
                 sp_name[sizeof(sp_name) - 1] = '\0';
+            } else if (pri >= 10) {
+                snprintf(sp_name, sizeof(sp_name), "overlay");
             } else if (g_sprite_count == 1) {
                 snprintf(sp_name, sizeof(sp_name), "sprite");
             } else {
                 snprintf(sp_name, sizeof(sp_name), "sprite%d", i + 1);
             }
-            int pri = (g_sprites[i].pri >= 0 && g_sprites[i].pri <= 99) ? g_sprites[i].pri : 1;
-            fprintf(f, "        <Sprite pri=\"%d\" image=\"%s\" x=\"%d\" y=\"%d\" />\n",
-                    pri, sp_name, g_sprites[i].x, g_sprites[i].y);
+            if (g_sprites[i].blend_mode > 0 && g_sprites[i].blend_mode < BLEND_MODE_COUNT) {
+                const char *bkey = get_zuma_blend_mode_xml_key(g_sprites[i].blend_mode);
+                fprintf(f, "        <Sprite pri=\"%d\" image=\"%s\" x=\"%d\" y=\"%d\" blend=\"%s\" />\n",
+                        pri, sp_name, g_sprites[i].x, g_sprites[i].y, bkey);
+            } else {
+                fprintf(f, "        <Sprite pri=\"%d\" image=\"%s\" x=\"%d\" y=\"%d\" />\n",
+                        pri, sp_name, g_sprites[i].x, g_sprites[i].y);
+            }
         }
     } else {
         fprintf(f, "        <!-- <Sprite image=\"tree\" x=\"100\" y=\"200\" /> -->\n");
@@ -971,6 +979,8 @@ bool save_canvas_settings_xml(
                 snprintf(co_name, sizeof(co_name), "tunnel%d", i + 1);
             }
             int pri = (g_cutouts[i].pri >= 0 && g_cutouts[i].pri <= 99) ? g_cutouts[i].pri : 1;
+            /* In ZuCompleluxe / zumapriolayer.dll, Cutout does NOT support blend modes.
+             * Blend modes are only valid on <Sprite>. Write standard Cutout tag without blend attribute. */
             fprintf(f, "        <Cutout pri=\"%d\" image=\"%s\" x=\"%d\" y=\"%d\" />\n",
                     pri, co_name, g_cutouts[i].x, g_cutouts[i].y);
         }
@@ -1504,12 +1514,15 @@ bool load_canvas_settings_xml(
                         cimg[l] = '\0';
                     }
                 }
+                /* Cutouts do not support blend mode in engine - ignore blend attribute on Cutout */
+                int c_blend = 0;
                 if (out_cutouts && out_cutout_count && *out_cutout_count < max_cutouts) {
                     LevelCutout *co = &out_cutouts[*out_cutout_count];
                     memset(co, 0, sizeof(LevelCutout));
                     co->x = cx;
                     co->y = cy;
                     co->pri = (cpri >= 0 && cpri <= 99) ? cpri : 1;
+                    co->blend_mode = c_blend;
                     strncpy(co->image_name, cimg, sizeof(co->image_name) - 1);
                 }
                 if (out_cutout_count) {
@@ -1539,12 +1552,26 @@ bool load_canvas_settings_xml(
                         simg[l] = '\0';
                     }
                 }
+                char *blend_attr = strstr(sp_tag, "blend=\"");
+                int s_blend = 0;
+                if (blend_attr) {
+                    char *q = strchr(blend_attr + 7, '"');
+                    if (q) {
+                        char bbuf[64] = {0};
+                        size_t l = q - (blend_attr + 7);
+                        if (l >= sizeof(bbuf)) l = sizeof(bbuf) - 1;
+                        strncpy(bbuf, blend_attr + 7, l);
+                        bbuf[l] = '\0';
+                        s_blend = parse_zuma_blend_mode(bbuf);
+                    }
+                }
                 if (out_sprites && out_sprite_count && *out_sprite_count < max_sprites) {
                     LevelSprite *sp = &out_sprites[*out_sprite_count];
                     memset(sp, 0, sizeof(LevelSprite));
                     sp->x = sx;
                     sp->y = sy;
                     sp->pri = (spri >= 0 && spri <= 99) ? spri : 1;
+                    sp->blend_mode = s_blend;
                     strncpy(sp->image_name, simg, sizeof(sp->image_name) - 1);
                 }
                 if (out_sprite_count) {
@@ -2053,7 +2080,12 @@ void build_save_canvas_asset_plan(SaveCanvasAssetPlan *out_plan) {
         SaveCanvasAssetItem *item = &out_plan->items[out_plan->count++];
         item->type = SAVE_ASSET_SPRITE;
         item->index = i;
-        if (g_sprite_count == 1) {
+        int s_pri = sp->pri > 0 ? sp->pri : 1;
+        bool is_overlay = (s_pri >= 10);
+        if (is_overlay) {
+            snprintf(item->label, sizeof(item->label), "Overlay #%d", i + 1);
+            snprintf(item->id_name, sizeof(item->id_name), "overlay");
+        } else if (g_sprite_count == 1) {
             snprintf(item->label, sizeof(item->label), "Sprite");
             snprintf(item->id_name, sizeof(item->id_name), "sprite");
         } else {
@@ -2382,7 +2414,12 @@ bool execute_save_canvas_with_plan(
     }
     for (int i = 0; i < g_sprite_count; ++i) {
         char sp_name[64];
-        if (g_sprite_count == 1) {
+        int s_pri = g_sprites[i].pri > 0 ? g_sprites[i].pri : 1;
+        if (g_sprites[i].image_name[0]) {
+            strncpy(sp_name, g_sprites[i].image_name, sizeof(sp_name) - 1);
+        } else if (s_pri >= 10) {
+            snprintf(sp_name, sizeof(sp_name), "overlay%d", i + 1);
+        } else if (g_sprite_count == 1) {
             snprintf(sp_name, sizeof(sp_name), "sprite");
         } else {
             snprintf(sp_name, sizeof(sp_name), "sprite%d", i + 1);

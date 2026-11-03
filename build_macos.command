@@ -74,9 +74,9 @@ cat << 'EOF' > "$CONTENTS_DIR/Info.plist"
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.2.0</string>
+    <string>0.3.0</string>
     <key>CFBundleVersion</key>
-    <string>0.2.0</string>
+    <string>0.3.0</string>
     <key>LSMinimumSystemVersion</key>
     <string>10.15</string>
     <key>NSHighResolutionCapable</key>
@@ -116,6 +116,7 @@ clang -O2 \
     "$SCRIPT_DIR/src/undo_redo.c" \
     "$SCRIPT_DIR/src/level_io.c" \
     "$SCRIPT_DIR/src/dialog_modals.c" \
+    "$SCRIPT_DIR/src/layout_editor.c" \
     "$SCRIPT_DIR/src/hud_overlay.c" \
     "$SCRIPT_DIR/src/canvas_render.c" \
     "$SCRIPT_DIR/src/image_loader.c" \

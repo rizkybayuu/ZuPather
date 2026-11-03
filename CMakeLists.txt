@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 3.20)
 if(WIN32)
-    project(ZuPather VERSION 0.2.0 LANGUAGES C RC)
+    project(ZuPather VERSION 0.3.0 LANGUAGES C RC)
 elseif(APPLE)
-    project(ZuPather VERSION 0.2.0 LANGUAGES C OBJC)
+    project(ZuPather VERSION 0.3.0 LANGUAGES C OBJC)
 else()
-    project(ZuPather VERSION 0.2.0 LANGUAGES C)
+    project(ZuPather VERSION 0.3.0 LANGUAGES C)
 endif()
 
 set(CMAKE_C_STANDARD 11)
