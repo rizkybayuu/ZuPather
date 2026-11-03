@@ -47,6 +47,22 @@ if [ $HAS_WEBP -eq 0 ] || [ $HAS_ZSTD -eq 0 ]; then
     echo "[WARN] Optional dependencies missing. To install: brew install webp zstd"
 fi
 
+STATIC_DEPS=""
+if [ -n "$BREW_PREFIX" ] && [ -f "$BREW_PREFIX/lib/libwebp.a" ]; then
+    echo "[INFO] Preferring static libraries (.a) for standalone bundle..."
+    STATIC_DEPS="$BREW_PREFIX/lib/libwebpmux.a $BREW_PREFIX/lib/libwebpdemux.a $BREW_PREFIX/lib/libwebp.a"
+    if [ -f "$BREW_PREFIX/lib/libsharpyuv.a" ]; then
+        STATIC_DEPS="$STATIC_DEPS $BREW_PREFIX/lib/libsharpyuv.a"
+    fi
+    if [ -f "$BREW_PREFIX/lib/libzstd.a" ]; then
+        STATIC_DEPS="$STATIC_DEPS $BREW_PREFIX/lib/libzstd.a"
+    else
+        STATIC_DEPS="$STATIC_DEPS -lzstd"
+    fi
+else
+    STATIC_DEPS="-lwebp -lwebpmux -lwebpdemux -lsharpyuv -lzstd"
+fi
+
 # 3. Create .app Bundle Directory Structure
 APP_DIR="$SCRIPT_DIR/ZuPather.app"
 CONTENTS_DIR="$APP_DIR/Contents"
@@ -74,9 +90,9 @@ cat << 'EOF' > "$CONTENTS_DIR/Info.plist"
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.3.0.1</string>
+    <string>0.3.0.2</string>
     <key>CFBundleVersion</key>
-    <string>0.3.0.1</string>
+    <string>0.3.0.2</string>
     <key>LSMinimumSystemVersion</key>
     <string>10.15</string>
     <key>NSHighResolutionCapable</key>
@@ -134,7 +150,7 @@ clang -O2 \
     -framework ImageIO \
     -framework UniformTypeIdentifiers \
     $BREW_LDFLAGS \
-    -lwebp -lwebpmux -lwebpdemux -lsharpyuv -lzstd -lm -lpthread \
+    $STATIC_DEPS -lm -lpthread \
     -o "$MACOS_DIR/ZuPather"
 
 # 6. Ad-hoc codesign for immediate execution on macOS Gatekeeper

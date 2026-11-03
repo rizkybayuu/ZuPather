@@ -59,7 +59,7 @@ jobs:
         if: matrix.toolchain == 'mingw'
         shell: msys2 {0}
         run: |
-          cmake -B build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
+          cmake -B build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXE_LINKER_FLAGS="-static -static-libgcc"
           cmake --build build --config Release
 
       - name: Upload Binary Artifact (MSVC)
@@ -136,9 +136,14 @@ jobs:
           # Package Windows zip
           cp artifact-windows/ZuPather.exe dist/
           cp README.md CHANGELOG.md LICENSE.md dist/
+          # Download verified official Google libwebp Windows x64 binaries dynamically
+          curl -sSL "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-1.4.0-windows-x64.zip" -o libwebp.zip
+          unzip -q libwebp.zip
+          cp libwebp-1.4.0-windows-x64/bin/*.dll dist/ 2>/dev/null || true
+          rm -rf libwebp.zip libwebp-1.4.0-windows-x64
           cd dist
-          zip -r "ZuPather-${{ github.ref_name }}-windows.zip" ZuPather.exe README.md CHANGELOG.md LICENSE.md
-          rm ZuPather.exe README.md CHANGELOG.md LICENSE.md
+          zip -r "ZuPather-${{ github.ref_name }}-windows.zip" *
+          rm -rf *
           cd ..
           # Package macOS zip
           unzip artifact-macos/ZuPather-macOS.zip -d macos-tmp
