@@ -1,5 +1,11 @@
 #include "canvas_render.h"
 
+/* Cross-platform min/max for integer types (Windows has these via windef.h; macOS Clang does not) */
+#ifndef ZP_IMAX
+#  define ZP_IMAX(a, b) ((a) > (b) ? (a) : (b))
+#  define ZP_IMIN(a, b) ((a) < (b) ? (a) : (b))
+#endif
+
 /* Forward declarations */
 static void render_placed_coins(HDC mem_dc, const RECT *rc_canvas, const ThemeColors *th);
 static void render_placed_frog(HDC mem_dc, const RECT *rc_canvas, const ThemeColors *th);
@@ -1501,10 +1507,10 @@ static void draw_sprite_blended(
     }
 
     /* Live 32-bit software blend rasterizer against destination backbuffer */
-    int clip_left   = max(rc_canvas->left, sx);
-    int clip_top    = max(rc_canvas->top, sy);
-    int clip_right  = min(rc_canvas->right, sx + sw);
-    int clip_bottom = min(rc_canvas->bottom, sy + sh);
+    int clip_left   = ZP_IMAX(rc_canvas->left, sx);
+    int clip_top    = ZP_IMAX(rc_canvas->top, sy);
+    int clip_right  = ZP_IMIN(rc_canvas->right, sx + sw);
+    int clip_bottom = ZP_IMIN(rc_canvas->bottom, sy + sh);
 
     if (clip_right <= clip_left || clip_bottom <= clip_top) return;
 
