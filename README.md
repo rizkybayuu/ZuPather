@@ -57,7 +57,7 @@ In the *Zuma Deluxe* engine, rolling balls must traverse paths at a strictly uni
   - **Visual Asset Composition & Live 33 Affinity Blend Modes Engine**:
     - Layer background artwork, foreground tunnel cutouts (`_tunnel*.gif`), dynamic sprites, and alpha masks with live alpha blending.
     - Implements all **33 industry-standard Affinity blend modes** (Normal, Multiply, Screen, Overlay, Color Dodge, Linear Burn, Difference, Exclusion, Luminosity, Erase, etc.) with real-time per-pixel compositing.
-    - Categorized 7-tier popup context selector (`show_blend_mode_popup_menu`), mouse-wheel cycling, and transactional undo/redo snapshot history in exact 100% mathematical parity with *ZuCompleluxe v0.6*.
+    - Categorized 7-tier popup context selector (`show_blend_mode_popup_menu`), mouse-wheel cycling, and transactional undo/redo snapshot history in exact 100% mathematical parity with *ZuCompleluxe v0.6+* (v0.6.0.1).
     - Seamless serialization and roundtrip of `blend="..."` attributes in `.zupath` projects and `levels.xml`.
 - **Real-Time Dynamic Ball Roll Simulation**:
   - Live physics roll simulation executing at authentic Zuma Deluxe physical speed.
