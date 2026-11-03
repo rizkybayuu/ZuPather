@@ -10,6 +10,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <stdarg.h>
 #include <math.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -1535,6 +1536,57 @@ void      zp_macos_install_crash_handler(void);
 DWORD   GetPrivateProfileStringA(LPCSTR lpAppName, LPCSTR lpKeyName, LPCSTR lpDefault, LPSTR lpReturnedString, DWORD nSize, LPCSTR lpFileName);
 UINT    GetPrivateProfileIntA(LPCSTR lpAppName, LPCSTR lpKeyName, INT nDefault, LPCSTR lpFileName);
 BOOL    WritePrivateProfileStringA(LPCSTR lpAppName, LPCSTR lpKeyName, LPCSTR lpString, LPCSTR lpFileName);
+
+#ifndef TPM_LEFTBUTTON
+#define TPM_LEFTBUTTON   0x0000L
+#endif
+#ifndef WS_EX_APPWINDOW
+#define WS_EX_APPWINDOW  0x00040000L
+#endif
+#ifndef WM_SETTINGCHANGE
+#define WM_SETTINGCHANGE 0x001A
+#endif
+#ifndef DT_NOCLIP
+#define DT_NOCLIP 0x00000100
+#endif
+
+static inline BOOL SetRectEmpty(LPRECT lprc) {
+    if (!lprc) return FALSE;
+    lprc->left = lprc->top = lprc->right = lprc->bottom = 0;
+    return TRUE;
+}
+
+static inline BOOL TextOutA(HDC hdc, int x, int y, LPCSTR lpString, int c) {
+    if (!hdc || !lpString || c <= 0) return FALSE;
+    RECT rc = { x, y, x + 2000, y + 200 };
+    DrawTextA(hdc, lpString, c, &rc, DT_LEFT | DT_TOP | DT_SINGLELINE | DT_NOCLIP);
+    return TRUE;
+}
+#define TextOut TextOutA
+
+static inline DWORD GetCurrentDirectoryA(DWORD nBufferLength, LPSTR lpBuffer) {
+    if (!lpBuffer || nBufferLength == 0) return 0;
+    if (getcwd(lpBuffer, (size_t)nBufferLength) != NULL) {
+        return (DWORD)strlen(lpBuffer);
+    }
+    lpBuffer[0] = '\0';
+    return 0;
+}
+#define GetCurrentDirectory GetCurrentDirectoryA
+
+static inline DWORD GetFullPathNameA(LPCSTR lpFileName, DWORD nBufferLength, LPSTR lpBuffer, LPSTR *lpFilePart) {
+    if (!lpFileName || !lpBuffer || nBufferLength == 0) return 0;
+    strncpy(lpBuffer, lpFileName, (size_t)nBufferLength - 1);
+    lpBuffer[nBufferLength - 1] = '\0';
+    if (lpFilePart) {
+        char *s1 = strrchr(lpBuffer, '/');
+        char *s2 = strrchr(lpBuffer, '\\');
+        char *s = (s1 > s2) ? s1 : s2;
+        *lpFilePart = s ? (s + 1) : lpBuffer;
+    }
+    return (DWORD)strlen(lpBuffer);
+}
+#define GetFullPathName GetFullPathNameA
 
 #ifdef __cplusplus
 }
