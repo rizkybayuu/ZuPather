@@ -226,7 +226,7 @@ Measurements extracted directly from `levels/coaster/coaster.dat`:
 
 ## 7. ZuPather Vector Curve Editor Mechanics (Pen Tool)
 
-ZuPather implements a professional vector pen tool workflow (mirroring Affinity Designer and Adobe Illustrator) for designing Zuma Deluxe paths:
+ZuPather implements a professional vector pen tool workflow (mirroring Affinity and Adobe Illustrator) for designing Zuma Deluxe paths:
 
 ### 7.1 Interactive Path Preview on Hover (Rubber-banding)
 - When the Curve Tool is active (`Ctrl+U`) and an active path has at least one node, moving the mouse over the canvas renders a real-time prospective cubic Bezier segment from the path's trailing node to the cursor position.

@@ -7,6 +7,7 @@ set(ZUPATHER_SOURCES
     src/ai_psd_path.c
     src/canvas_render.c
     src/dialog_modals.c
+    src/layout_editor.c
     src/hud_overlay.c
     src/image_loader.c
     src/level_io.c
@@ -22,6 +23,7 @@ set(ZUPATHER_HEADERS
     src/ai_psd_path.h
     src/canvas_render.h
     src/dialog_modals.h
+    src/layout_editor.h
     src/hud_overlay.h
     src/image_loader.h
     src/level_io.h

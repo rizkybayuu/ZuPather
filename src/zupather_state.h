@@ -124,6 +124,7 @@ typedef void(WINAPI *pfnFlushMenuThemes)(void);
 #define ID_MENU_FILE_EXIT         204
 #define ID_MENU_SET_ZUMA_FOLDER   205
 #define ID_MENU_FILE_MANAGE_LEVELS 206
+#define ID_MENU_FILE_MANAGE_LAYOUT 208
 #define ID_MENU_FILE_SPLASH       207
 #define ID_MENU_EDIT_UNDO         210
 #define ID_MENU_EDIT_REDO         211
@@ -182,6 +183,7 @@ typedef void(WINAPI *pfnFlushMenuThemes)(void);
 #define ID_BTN_ELEMENT            407
 #define ID_BTN_CANVAS             408
 #define ID_BTN_MANAGE_MAPS        409
+#define ID_BTN_MANAGE_LAYOUT      410
 #define ID_EDIT_CANVAS_W          411
 #define ID_EDIT_CANVAS_H          412
 #define ID_BTN_CANVAS_APPLY       413
@@ -214,6 +216,7 @@ typedef void(WINAPI *pfnFlushMenuThemes)(void);
 #define ID_EDIT_DEV_HUEROT        439
 #define ID_EDIT_DEV_TREASUREFREQ  440
 #define ID_EDIT_DEV_PARTIME       441
+#define ID_BLEND_MODE_BASE        2100
 
 /* New Canvas Modal Control IDs */
 #define ID_DLG_EDIT_NAME          501
@@ -262,6 +265,7 @@ typedef void(WINAPI *pfnFlushMenuThemes)(void);
 #define ID_SETTINGS_BTN_CANCEL          5813
 #define ID_SETTINGS_BTN_RESET           5814
 #define ID_SETTINGS_BTN_CHANGE_ZUMA     5815
+#define ID_SETTINGS_CHK_USE_ZUMA_ASSETS 5816
 
 /* Rename Canvas Modal Control IDs */
 #define ID_RENAME_EDIT_NAME       550
@@ -293,7 +297,7 @@ typedef void(WINAPI *pfnFlushMenuThemes)(void);
 
 #define RIGHT_PANEL_WIDTH         254
 #define TOOLBAR_NEEDED_WIDTH      620
-#define ZUPATHER_VERSION_STR      "v0.2.0"
+#define ZUPATHER_VERSION_STR      "v0.3.0"
 
 /* Embedded Resource IDs */
 #define IDR_SPLASH_JPG              101
@@ -398,6 +402,7 @@ typedef struct {
     HDC     hdc_mask_light;
     HBITMAP hbm_mask_dark;          /* Transformed mask: White transparent, Black 25% white */
     HDC     hdc_mask_dark;
+    int     blend_mode;             /* Zuma Deluxe / ZuCompleluxe Blend Mode (0..32, default 0 Normal) */
     bool selected;
 } LevelCutout;
 
@@ -409,6 +414,7 @@ typedef struct {
     char source_filepath[MAX_PATH]; /* Original source image file on disk */
     CanvasImage img;                /* Loaded image asset */
     bool has_img;
+    int  blend_mode;                /* Zuma Deluxe / ZuCompleluxe Blend Mode (0..32, default 0 Normal) */
     bool selected;
 } LevelSprite;
 
@@ -538,6 +544,7 @@ extern HDC           g_default_cutout_hdc_dark;
 extern CanvasImage   g_pending_cutout_img;
 extern bool          g_has_pending_cutout_img;
 extern char          g_pending_cutout_filepath[MAX_PATH];
+extern int           g_pending_cutout_blend_mode;
 extern HBITMAP       g_pending_cutout_mask_light;
 extern HDC           g_pending_cutout_hdc_light;
 extern HBITMAP       g_pending_cutout_mask_dark;
@@ -550,6 +557,7 @@ extern bool          g_picked_up_sprite;
 extern int           g_hovered_sprite_idx;
 extern int           g_selected_sprite_idx;
 extern int           g_pending_sprite_pri;
+extern int           g_pending_sprite_blend_mode;
 extern CanvasImage   g_default_sprite_img;
 extern bool          g_has_default_sprite_img;
 extern CanvasImage   g_pending_sprite_img;
@@ -781,6 +789,7 @@ extern int  g_drag_prev_info_bg_scroll_start;
 #define LEVEL_PREVIEW_BALL_COLORS 11
 extern CanvasImage g_ball_imgs[LEVEL_PREVIEW_BALL_COLORS];
 extern bool        g_has_ball_imgs[LEVEL_PREVIEW_BALL_COLORS];
+extern int         g_ball_rows[LEVEL_PREVIEW_BALL_COLORS];
 extern CanvasImage g_skull_img;
 extern bool        g_has_skull_img;
 
@@ -797,6 +806,7 @@ extern bool g_snap_canvas_handle_selected[10];
 
 extern HWND g_btn_canvas;
 extern HWND g_btn_manage_maps;
+extern HWND g_btn_manage_layout;
 extern HWND g_edit_cv_w;
 extern HWND g_edit_cv_h;
 extern HWND g_edit_preview_title;
@@ -934,6 +944,50 @@ void snapshot_canvas_handle_selection(void);
 void get_canvas_handle_screen_point(int client_w, int work_h, CanvasHandleType ht, int *out_x, int *out_y);
 void update_canvas_handle_marquee_selection(int min_sx, int min_sy, int max_sx, int max_sy, int client_w, int work_h);
 
+/* Zuma Deluxe / ZuCompleluxe 33 Sequential Affinity Blend Modes */
+typedef enum {
+    BLEND_MODE_NORMAL         = 0,
+    BLEND_MODE_PIGMENT        = 1,
+    BLEND_MODE_DARKEN         = 2,
+    BLEND_MODE_MULTIPLY       = 3,
+    BLEND_MODE_COLOR_BURN     = 4,
+    BLEND_MODE_LINEAR_BURN    = 5,
+    BLEND_MODE_DARKER_COLOR   = 6,
+    BLEND_MODE_LIGHTEN        = 7,
+    BLEND_MODE_SCREEN         = 8,
+    BLEND_MODE_COLOR_DODGE    = 9,
+    BLEND_MODE_ADD            = 10,
+    BLEND_MODE_LIGHTER_COLOR  = 11,
+    BLEND_MODE_OVERLAY        = 12,
+    BLEND_MODE_SOFT_LIGHT     = 13,
+    BLEND_MODE_HARD_LIGHT     = 14,
+    BLEND_MODE_VIVID_LIGHT    = 15,
+    BLEND_MODE_LINEAR_LIGHT   = 16,
+    BLEND_MODE_PIN_LIGHT      = 17,
+    BLEND_MODE_HARD_MIX       = 18,
+    BLEND_MODE_DIFFERENCE     = 19,
+    BLEND_MODE_EXCLUSION      = 20,
+    BLEND_MODE_SUBTRACT       = 21,
+    BLEND_MODE_DIVIDE         = 22,
+    BLEND_MODE_HUE            = 23,
+    BLEND_MODE_SATURATION     = 24,
+    BLEND_MODE_COLOR          = 25,
+    BLEND_MODE_LUMINOSITY     = 26,
+    BLEND_MODE_AVERAGE        = 27,
+    BLEND_MODE_NEGATION       = 28,
+    BLEND_MODE_REFLECT        = 29,
+    BLEND_MODE_GLOW           = 30,
+    BLEND_MODE_CONTRAST_NEGATE= 31,
+    BLEND_MODE_ERASE          = 32,
+    BLEND_MODE_COUNT          = 33
+} ZumaBlendMode;
+
+const char *get_zuma_blend_mode_name(int mode);
+const char *get_zuma_blend_mode_xml_key(int mode);
+const char *get_zuma_blend_mode_category(int mode);
+int parse_zuma_blend_mode(const char *str);
+void show_blend_mode_popup_menu(HWND hwnd, int screen_x, int screen_y, bool is_cutout);
+
 #define MAX_BEZIER_NODES 1024
 
 typedef struct {
@@ -986,6 +1040,12 @@ void update_open_progress(const char *status_msg, int pct);
 extern char g_zuma_levels_dir[MAX_PATH];
 extern char g_zuma_root_dir[MAX_PATH];
 extern bool g_has_zuma_dir;
+extern bool g_use_zuma_assets;
+
+bool get_zuma_images_dir(char *out_dir, size_t max_len);
+bool get_zuma_properties_dir(char *out_dir, size_t max_len);
+bool load_zuma_game_image_with_alpha(const char *images_dir, const char *base_name, const char *alpha_name, CanvasImage *out_img);
+void reload_all_game_assets(void);
 
 void load_zuma_config(void);
 void save_zuma_config(void);

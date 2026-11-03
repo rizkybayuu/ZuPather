@@ -18,7 +18,7 @@ typedef enum {
     VECTOR_FMT_AI,         /* Adobe Illustrator PostScript (.ai, .eps) */
     VECTOR_FMT_PDF,        /* PDF or PDF-based Illustrator file */
     VECTOR_FMT_PSD,        /* Adobe Photoshop Document with vector paths (.psd) */
-    VECTOR_FMT_AFFINITY    /* Serif Affinity Designer / Photo (.af, .afdesign, .afphoto) */
+    VECTOR_FMT_AFFINITY    /* Serif Affinity (.af, .afdesign, .afphoto) */
 } VectorFileFormat;
 
 /* Detect vector file format from file path and/or header bytes */
@@ -50,7 +50,7 @@ bool vector_path_import_from_memory(
 );
 
 /* Export BezierPath array to an Adobe Illustrator PostScript (.ai) file.
- * Compatible with Adobe Illustrator, Adobe Photoshop, Affinity Designer, Inkscape.
+ * Compatible with Adobe Illustrator, Adobe Photoshop, Affinity, Inkscape.
  */
 bool ai_path_export_to_file(
     const char *filepath,

@@ -5,6 +5,39 @@ All notable changes to the **ZuPather** level design suite will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-11-03
+
+Major update introducing the **33 Affinity Blend Modes Engine for Overlay Tools**, full **Map Manager integration**, Zuma game assets synchronization, and cross-platform version alignment across Windows and macOS.
+
+### Added
+- **33 Affinity Blend Modes Engine for Overlay Tools (`src/canvas_render.c`, `src/zupather_state.h`, `src/zupather_ui.c`)**:
+  - Implemented the complete suite of 33 industry-standard Affinity blend modes across 7 categories:
+    - *Normal*: Normal, Pigment
+    - *Darken*: Darken, Multiply, Color Burn, Linear Burn, Darker Color
+    - *Lighten*: Lighten, Screen, Color Dodge, Add, Lighter Color
+    - *Contrast*: Overlay, Soft Light, Hard Light, Vivid Light, Linear Light, Pin Light, Hard Mix
+    - *Comparative*: Difference, Exclusion, Subtract, Divide
+    - *Component*: Hue, Saturation, Color, Luminosity
+    - *Special / Artistic*: Average, Negation, Reflect, Glow, Contrast Negate, Erase
+  - Direct per-pixel live software blending in 100% mathematical parity with `zumapriolayer.dll` and the *ZuCompleluxe v0.6* engine specification.
+  - Interactive overlay controls: categorized 7-tier popup context menu (`show_blend_mode_popup_menu`) for selected `<Sprite>` and `<Cutout>` elements.
+  - Real-time mouse-wheel and keyboard cycling through blend modes with live viewport compositing and transactional undo/redo history support (`undo_snapshot_capture`).
+  - Seamless XML roundtripping of `blend="..."` attributes across `.zupath` canvas projects and Zuma Deluxe `levels.xml`.
+- **Map Manager & Level Synchronization (`src/dialog_modals.c`, `src/level_io.c`)**:
+  - Integrated full **Map Manager** interface (`Ctrl+Shift+M` / Toolbar `Map`) enabling direct inspection, import, export, and deletion of custom Zuma Deluxe levels.
+  - Real-time synchronization between active canvas projects and Zuma Deluxe installation directories (`levels.xml` and `settings.xml`).
+  - Validation safeguards for level names, asset paths, and XML structure integrity.
+- **Widescreen & Layout Foundation Parity**:
+  - Added widescreen layout verification and coordinate conversion foundations aligned with `ZuCompleluxe v0.6`.
+  - Added themed notification dialog for the Layout Editor directing manual modifications to `properties/layout.xml` during ongoing stability improvements.
+- **Cross-Platform Metadata & Build Synchronization**:
+  - Bumped version metadata to `v0.3.0` across Windows PE resource descriptors (`res/zupather.rc`), CMake configurations (`CMakeLists.txt`), and native macOS App bundle definitions (`build_macos.command`).
+
+### Changed
+- Temporarily disabled the Layout Editor button on the main toolbar with an informative notice dialog directing users to direct `properties/layout.xml` configuration while the visual layout system undergoes stabilization.
+
+---
+
 ## [0.2.0] - 2026-10-27
 
 Major milestone architecture release establishing native **macOS compatibility** (Apple Silicon M1/M2/M3/M4 & Intel x86_64) alongside Windows, introducing a dedicated zero-dependency **Win32-to-Cocoa/CoreGraphics/CoreText shim layer**, a decoupled **dual-OS build pipeline** (`build_windows.bat` and `build_macos.command`), **pixel-identical rendering**, and **persistence of canvas progression difficulty** across project Save and Open sessions.
@@ -71,7 +104,7 @@ Major vector interoperability, stability, and diagnostic logging release introdu
   - Parses 26-byte path records and 32-bit fixed-point coordinates (24-bit fraction, normalized to image dimensions).
 - **Adobe Illustrator (.ai) Curve Exporter (`src/ai_psd_path.c`, `src/level_io.c`)**:
   - Added `Adobe Illustrator Path (*.ai;*.eps)` export filter in the **Export Curve Path** dialog.
-  - Generates standard EPSF-3.0 Adobe Illustrator PostScript format with layer separation, fully compatible with Adobe Illustrator, Photoshop, Affinity Designer, and Inkscape.
+  - Generates standard EPSF-3.0 Adobe Illustrator PostScript format with layer separation, fully compatible with Adobe Illustrator, Photoshop, Affinity, and Inkscape.
 - **Per-Session Diagnostic Error Logging (`src/zupather_state.c`, `src/zupather_state.h`, `src/zupather_ui.c`, `src/dialog_modals.c`)**:
   - Implemented an automated single-file per-session error log (`error.txt`) created adjacent to the executable.
   - Replaces the log cleanly upon each application run without appending stale logs across sessions.
@@ -120,7 +153,7 @@ Major maintenance and feature release introducing the **Hierarchical SVG Transfo
   - Re-architected SVG path ingestion from a flat `<path>` scanner into a stack-based XML tree walker (supporting up to 64 levels of nested `<g>` elements).
   - Implemented 2D affine transformation matrices (3x3 homogeneous coordinates) with full parent-to-child matrix concatenation (M_eff = M_parent * M_child).
   - Added support for all SVG 1.1/2.0 transform operations: `matrix(a,b,c,d,e,f)`, `translate(tx[, ty])`, `scale(sx[, sy])`, `rotate(angle[, cx, cy])` with custom rotation centers, `skewX(angle)`, and `skewY(angle)`, including multi-transform chains within a single attribute.
-  - Resolved an issue where cloned, rotated, or translated paths exported from vector suites like **Affinity Designer** and **Adobe Illustrator** (such as radial pinwheels or multi-spiral tracks in `spiralof8.svg`) were stripped of their transforms and stacked directly on top of each other.
+  - Resolved an issue where cloned, rotated, or translated paths exported from vector suites like **Affinity** and **Adobe Illustrator** (such as radial pinwheels or multi-spiral tracks in `spiralof8.svg`) were stripped of their transforms and stacked directly on top of each other.
   - Resolved coordinate offset distortion in artboard-relative SVG exports (e.g. `longrangetest.svg`), ensuring artboard translations correctly map paths into project canvas world coordinates.
 - **Bézier Node & Handle Vector Transformation**:
   - Transformed both anchor positions (x, y) as spatial points and tangent handles (`hin_x, hin_y`, `hout_x, hout_y`) as relative direction vectors under any affine mapping (including non-uniform scaling, reflection, and rotation).
@@ -348,7 +381,7 @@ Initial milestone release establishing the complete, standalone vector path edit
   - Safe direct-to-engine exporter: automatically updates `<Graphics>` definitions, writes track `.dat` files, configures progression IDs (`zupath[n]-[diff]`), and creates automatic timestamped safety backups (`levels.xml.bak`).
 
 - **Vector Exchange & Headless CLI Tooling**:
-  - Bi-directional SVG vector import/export compatible with professional design suites (Affinity Designer, Canva, Adobe Illustrator).
+  - Bi-directional SVG vector import/export compatible with professional design suites (Affinity, Canva, Adobe Illustrator).
   - Integrated command-line interface for batch conversion and headless pipelines (`svg2dat`, `dat2svg`, `genxml`, `info`).
 
 - **Automated Build Pipeline**:

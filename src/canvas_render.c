@@ -1,5 +1,15 @@
 #include "canvas_render.h"
 
+/* Cross-platform min/max for integer types (Windows has these via windef.h; macOS Clang does not) */
+#ifndef ZP_IMAX
+#  define ZP_IMAX(a, b) ((a) > (b) ? (a) : (b))
+#  define ZP_IMIN(a, b) ((a) < (b) ? (a) : (b))
+#endif
+
+/* Forward declarations */
+static void render_placed_coins(HDC mem_dc, const RECT *rc_canvas, const ThemeColors *th);
+static void render_placed_frog(HDC mem_dc, const RECT *rc_canvas, const ThemeColors *th);
+
 static void get_adaptive_grid_steps(float zoom, int *out_major, int *out_minor) {
     if (zoom <= 0.40f) {
         *out_major = 160;
@@ -251,7 +261,8 @@ void update_object_marquee_selection(float min_x, float min_y, float max_x, floa
         }
         /* Coins */
         int coin_half_w = g_has_coin_img ? (g_coin_img.width / 2) : 18;
-        int coin_half_h = g_has_coin_img ? (g_coin_img.height / 2) : 18;
+        int coin_h_raw = g_has_coin_img ? ((g_coin_img.height > g_coin_img.width && g_coin_img.width > 0) ? g_coin_img.width : g_coin_img.height) : 36;
+        int coin_half_h = coin_h_raw / 2;
         for (int i = 0; i < g_treasure_point_count; ++i) {
             float ox1 = (float)(g_treasure_points[i].x - coin_half_w);
             float oy1 = (float)(g_treasure_points[i].y - coin_half_h);
@@ -1036,10 +1047,12 @@ static void apply_cutout_mask_to_buffer(
     }
 }
 
-/* Software rotation & blitting for 32-bit PBGRA images (Balls & Skulls) with spatial Cutout Masking */
-static void draw_rotated_image_fast(
+/* Software rotation & blitting for 32-bit PBGRA images (Balls & Skulls) with spatial Cutout Masking and Filmstrip Cel support */
+static void draw_rotated_image_fast_cel(
     HDC dest_dc,
     const CanvasImage *img,
+    int src_y_offset,
+    int src_h_crop,
     float center_x, float center_y,
     float angle_rad,
     float zoom,
@@ -1050,6 +1063,10 @@ static void draw_rotated_image_fast(
 ) {
     if (!img || !img->hbm || !img->bits || img->width <= 0 || img->height <= 0 || alpha == 0) return;
 
+    int src_w = img->width;
+    int src_h = (src_h_crop > 0 && src_h_crop <= img->height) ? src_h_crop : img->height;
+    int src_y0 = (src_y_offset >= 0 && src_y_offset + src_h <= img->height) ? src_y_offset : 0;
+
     static HBITMAP s_rot_hbm = NULL;
     static HDC s_rot_dc = NULL;
     static uint32_t *s_rot_bits = NULL;
@@ -1057,8 +1074,8 @@ static void draw_rotated_image_fast(
 
     float cos_a = fabsf(cosf(angle_rad));
     float sin_a = fabsf(sinf(angle_rad));
-    int bw = (int)ceilf((float)img->width * cos_a + (float)img->height * sin_a) + 2;
-    int bh = (int)ceilf((float)img->width * sin_a + (float)img->height * cos_a) + 2;
+    int bw = (int)ceilf((float)src_w * cos_a + (float)src_h * sin_a) + 2;
+    int bh = (int)ceilf((float)src_w * sin_a + (float)src_h * cos_a) + 2;
     if (bw < 4) bw = 4;
     if (bh < 4) bh = 4;
 
@@ -1089,13 +1106,12 @@ static void draw_rotated_image_fast(
 
     float cx_dst = (float)bw * 0.5f;
     float cy_dst = (float)bh * 0.5f;
-    float cx_src = (float)img->width * 0.5f;
-    float cy_src = (float)img->height * 0.5f;
+    float cx_src = (float)src_w * 0.5f;
+    float cy_src = (float)src_h * 0.5f;
     float cos_neg = cosf(-angle_rad);
     float sin_neg = sinf(-angle_rad);
     const uint32_t *src_bits = (const uint32_t *)img->bits;
-    int src_w = img->width;
-    int src_h = img->height;
+    int full_stride = img->width;
 
     for (int y = 0; y < bh; ++y) {
         float dy = (float)y - cy_dst;
@@ -1116,10 +1132,11 @@ static void draw_rotated_image_fast(
                 float w01 = (1.0f - fx) * fy;
                 float w11 = fx * fy;
 
-                uint32_t p00 = src_bits[y0 * src_w + x0];
-                uint32_t p10 = src_bits[y0 * src_w + (x0 + 1)];
-                uint32_t p01 = src_bits[(y0 + 1) * src_w + x0];
-                uint32_t p11 = src_bits[(y0 + 1) * src_w + (x0 + 1)];
+                int py = src_y0 + y0;
+                uint32_t p00 = src_bits[py * full_stride + x0];
+                uint32_t p10 = src_bits[py * full_stride + (x0 + 1)];
+                uint32_t p01 = src_bits[(py + 1) * full_stride + x0];
+                uint32_t p11 = src_bits[(py + 1) * full_stride + (x0 + 1)];
 
                 uint8_t b = (uint8_t)(w00 * (p00 & 0xFF) + w10 * (p10 & 0xFF) + w01 * (p01 & 0xFF) + w11 * (p11 & 0xFF));
                 uint8_t g = (uint8_t)(w00 * ((p00 >> 8) & 0xFF) + w10 * ((p10 >> 8) & 0xFF) + w01 * ((p01 >> 8) & 0xFF) + w11 * ((p11 >> 8) & 0xFF));
@@ -1128,7 +1145,7 @@ static void draw_rotated_image_fast(
 
                 row[x] = ((uint32_t)a << 24) | ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b;
             } else if (x0 >= 0 && x0 < src_w && y0 >= 0 && y0 < src_h) {
-                row[x] = src_bits[y0 * src_w + x0];
+                row[x] = src_bits[(src_y0 + y0) * full_stride + x0];
             }
         }
     }
@@ -1147,13 +1164,259 @@ static void draw_rotated_image_fast(
                   s_rot_dc, 0, 0, bw, bh, bf);
 }
 
-/* Draw Sprite with Cutout Alpha Masking ("IMAGE DENGAN IMAGE") */
-static void draw_sprite_masked(
+static inline void draw_rotated_image_fast(
+    HDC dest_dc,
+    const CanvasImage *img,
+    float center_x, float center_y,
+    float angle_rad,
+    float zoom,
+    BYTE alpha,
+    float canv_cx, float canv_cy,
+    int prio,
+    bool enable_cutout_mask
+) {
+    draw_rotated_image_fast_cel(dest_dc, img, 0, img ? img->height : 0,
+                                center_x, center_y, angle_rad, zoom, alpha,
+                                canv_cx, canv_cy, prio, enable_cutout_mask);
+}
+
+/* ========================================================================= */
+/* Complete 33 Sequential Affinity / ZuCompleluxe Live Blending Engine       */
+/* 100% exact parity with zumapriolayer.dll & blend_modes_specification.md   */
+/* ========================================================================= */
+
+static inline uint8_t blend_clamp255(int v) {
+    if (v < 0) return 0;
+    if (v > 255) return 255;
+    return (uint8_t)v;
+}
+
+static inline int blend_lum(int r, int g, int b) {
+    return (77 * r + 150 * g + 29 * b + 128) >> 8;
+}
+
+static inline int blend_sat(int r, int g, int b) {
+    int min_val = r < g ? (r < b ? r : b) : (g < b ? g : b);
+    int max_val = r > g ? (r > b ? r : b) : (g > b ? g : b);
+    return max_val - min_val;
+}
+
+static inline void blend_clip_color(int *r, int *g, int *b) {
+    int l = blend_lum(*r, *g, *b);
+    int n = *r < *g ? (*r < *b ? *r : *b) : (*g < *b ? *g : *b);
+    int x = *r > *g ? (*r > *b ? *r : *b) : (*g > *b ? *g : *b);
+    if (n < 0) {
+        int denom = l - n;
+        if (denom != 0) {
+            *r = l + ((*r - l) * l) / denom;
+            *g = l + ((*g - l) * l) / denom;
+            *b = l + ((*b - l) * l) / denom;
+        }
+    }
+    if (x > 255) {
+        int denom = x - l;
+        if (denom != 0) {
+            *r = l + ((*r - l) * (255 - l)) / denom;
+            *g = l + ((*g - l) * (255 - l)) / denom;
+            *b = l + ((*b - l) * (255 - l)) / denom;
+        }
+    }
+    *r = blend_clamp255(*r);
+    *g = blend_clamp255(*g);
+    *b = blend_clamp255(*b);
+}
+
+static inline void blend_set_lum(int *r, int *g, int *b, int l) {
+    int d = l - blend_lum(*r, *g, *b);
+    *r += d;
+    *g += d;
+    *b += d;
+    blend_clip_color(r, g, b);
+}
+
+static inline void blend_set_sat(int *r, int *g, int *b, int s) {
+    int *cmin, *cmid, *cmax;
+    if (*r <= *g) {
+        if (*g <= *b)      { cmin = r; cmid = g; cmax = b; }
+        else if (*r <= *b) { cmin = r; cmid = b; cmax = g; }
+        else               { cmin = b; cmid = r; cmax = g; }
+    } else {
+        if (*r <= *b)      { cmin = g; cmid = r; cmax = b; }
+        else if (*g <= *b) { cmin = g; cmid = b; cmax = r; }
+        else               { cmin = b; cmid = g; cmax = r; }
+    }
+    if (*cmax > *cmin) {
+        *cmid = ((*cmid - *cmin) * s) / (*cmax - *cmin);
+        *cmax = s;
+    } else {
+        *cmid = *cmax = 0;
+    }
+    *cmin = 0;
+}
+
+static inline uint8_t blend_channel(int mode, uint8_t d, uint8_t s) {
+    switch (mode) {
+        case BLEND_MODE_NORMAL:
+            return s;
+        case BLEND_MODE_PIGMENT: {
+            int inv_d = 255 - d;
+            int inv_s = 255 - s;
+            int mix = (int)sqrt((inv_d * inv_d + inv_s * inv_s) / 2.0);
+            return (uint8_t)(255 - blend_clamp255(mix));
+        }
+        case BLEND_MODE_DARKEN:
+            return (d < s) ? d : s;
+        case BLEND_MODE_MULTIPLY:
+            return (uint8_t)(((int)d * s) / 255);
+        case BLEND_MODE_COLOR_BURN:
+            if (s <= 0) return 0;
+            return (uint8_t)(255 - blend_clamp255(((255 - (int)d) * 255) / s));
+        case BLEND_MODE_LINEAR_BURN:
+            return blend_clamp255((int)d + s - 255);
+        case BLEND_MODE_LIGHTEN:
+            return (d > s) ? d : s;
+        case BLEND_MODE_SCREEN:
+            return blend_clamp255((int)d + s - ((int)d * s) / 255);
+        case BLEND_MODE_COLOR_DODGE:
+            if (s >= 255) return 255;
+            return blend_clamp255(((int)d * 255) / (255 - s));
+        case BLEND_MODE_ADD:
+            return blend_clamp255((int)d + s);
+        case BLEND_MODE_OVERLAY:
+            if (d < 128) return blend_clamp255((2 * (int)d * s) / 255);
+            return blend_clamp255(255 - (2 * (255 - (int)d) * (255 - s)) / 255);
+        case BLEND_MODE_SOFT_LIGHT: {
+            int num = (255 - 2 * s) * (int)d * d + 510 * s * (int)d + 32512;
+            return blend_clamp255(num / 65025);
+        }
+        case BLEND_MODE_HARD_LIGHT:
+            if (s < 128) return blend_clamp255((2 * (int)d * s) / 255);
+            return blend_clamp255(255 - (2 * (255 - (int)d) * (255 - s)) / 255);
+        case BLEND_MODE_VIVID_LIGHT:
+            if (s <= 128) {
+                if (s == 0) return 0;
+                return (uint8_t)(255 - blend_clamp255(((255 - (int)d) * 255) / (2 * s)));
+            } else {
+                if (s >= 255) return 255;
+                return blend_clamp255(((int)d * 255) / (2 * (255 - s)));
+            }
+        case BLEND_MODE_LINEAR_LIGHT:
+            return blend_clamp255((int)d + 2 * s - 255);
+        case BLEND_MODE_PIN_LIGHT:
+            if (s <= 128) {
+                int s2 = 2 * s;
+                return (d < s2) ? d : (uint8_t)s2;
+            } else {
+                int s2 = 2 * (s - 128);
+                return (d > s2) ? d : (uint8_t)s2;
+            }
+        case BLEND_MODE_HARD_MIX:
+            return ((int)d + s >= 255) ? 255 : 0;
+        case BLEND_MODE_DIFFERENCE:
+            return (d > s) ? (d - s) : (s - d);
+        case BLEND_MODE_EXCLUSION:
+            return blend_clamp255((int)d + s - (2 * (int)d * s) / 255);
+        case BLEND_MODE_SUBTRACT:
+            return (d > s) ? (d - s) : 0;
+        case BLEND_MODE_DIVIDE:
+            if (s == 0) return 255;
+            return blend_clamp255(((int)d * 255) / s);
+        case BLEND_MODE_AVERAGE:
+            return (uint8_t)(((int)d + s) >> 1);
+        case BLEND_MODE_NEGATION:
+            return (uint8_t)(255 - abs(255 - (int)d - s));
+        case BLEND_MODE_REFLECT:
+            if (s >= 255) return 255;
+            return blend_clamp255(((int)d * d) / (255 - s));
+        case BLEND_MODE_GLOW:
+            if (d >= 255) return 255;
+            return blend_clamp255(((int)s * s) / (255 - d));
+        case BLEND_MODE_CONTRAST_NEGATE:
+            if ((s > 128 && d < 128) || (s <= 128 && d >= 128)) return (uint8_t)(255 - d);
+            return d;
+        default:
+            return s;
+    }
+}
+
+static inline uint32_t blend_pixel(int mode, uint32_t dst_px, uint32_t src_px, uint8_t effective_sa) {
+    if (effective_sa == 0) return dst_px;
+
+    uint8_t sr = (uint8_t)(src_px >> 16);
+    uint8_t sg = (uint8_t)(src_px >> 8);
+    uint8_t sb = (uint8_t)(src_px);
+
+    uint8_t dr = (uint8_t)(dst_px >> 16);
+    uint8_t dg = (uint8_t)(dst_px >> 8);
+    uint8_t db = (uint8_t)(dst_px);
+    uint8_t da = (uint8_t)(dst_px >> 24);
+
+    if (mode == BLEND_MODE_ERASE) {
+        uint8_t inv_a = 255 - effective_sa;
+        uint8_t out_r = (uint8_t)(((int)dr * inv_a + 127) / 255);
+        uint8_t out_g = (uint8_t)(((int)dg * inv_a + 127) / 255);
+        uint8_t out_b = (uint8_t)(((int)db * inv_a + 127) / 255);
+        uint8_t out_a = (uint8_t)(((int)da * inv_a + 127) / 255);
+        return ((uint32_t)out_a << 24) | ((uint32_t)out_r << 16) | ((uint32_t)out_g << 8) | out_b;
+    }
+
+    uint8_t br, bg, bb;
+
+    if (mode == BLEND_MODE_DARKER_COLOR) {
+        int lum_d = blend_lum(dr, dg, db);
+        int lum_s = blend_lum(sr, sg, sb);
+        if (lum_s < lum_d) { br = sr; bg = sg; bb = sb; }
+        else               { br = dr; bg = dg; bb = db; }
+    } else if (mode == BLEND_MODE_LIGHTER_COLOR) {
+        int lum_d = blend_lum(dr, dg, db);
+        int lum_s = blend_lum(sr, sg, sb);
+        if (lum_s > lum_d) { br = sr; bg = sg; bb = sb; }
+        else               { br = dr; bg = dg; bb = db; }
+    } else if (mode == BLEND_MODE_HUE) {
+        int tr = sr, tg = sg, tb = sb;
+        blend_set_sat(&tr, &tg, &tb, blend_sat(dr, dg, db));
+        blend_set_lum(&tr, &tg, &tb, blend_lum(dr, dg, db));
+        br = (uint8_t)tr; bg = (uint8_t)tg; bb = (uint8_t)tb;
+    } else if (mode == BLEND_MODE_SATURATION) {
+        int tr = dr, tg = dg, tb = db;
+        blend_set_sat(&tr, &tg, &tb, blend_sat(sr, sg, sb));
+        blend_set_lum(&tr, &tg, &tb, blend_lum(dr, dg, db));
+        br = (uint8_t)tr; bg = (uint8_t)tg; bb = (uint8_t)tb;
+    } else if (mode == BLEND_MODE_COLOR) {
+        int tr = sr, tg = sg, tb = sb;
+        blend_set_lum(&tr, &tg, &tb, blend_lum(dr, dg, db));
+        br = (uint8_t)tr; bg = (uint8_t)tg; bb = (uint8_t)tb;
+    } else if (mode == BLEND_MODE_LUMINOSITY) {
+        int tr = dr, tg = dg, tb = db;
+        blend_set_lum(&tr, &tg, &tb, blend_lum(sr, sg, sb));
+        br = (uint8_t)tr; bg = (uint8_t)tg; bb = (uint8_t)tb;
+    } else {
+        br = blend_channel(mode, dr, sr);
+        bg = blend_channel(mode, dg, sg);
+        bb = blend_channel(mode, db, sb);
+    }
+
+    if (effective_sa == 255) {
+        return (0xFF << 24) | ((uint32_t)br << 16) | ((uint32_t)bg << 8) | bb;
+    }
+
+    uint8_t inv_a = 255 - effective_sa;
+    uint8_t out_r = (uint8_t)(((int)br * effective_sa + (int)dr * inv_a + 127) / 255);
+    uint8_t out_g = (uint8_t)(((int)bg * effective_sa + (int)dg * inv_a + 127) / 255);
+    uint8_t out_b = (uint8_t)(((int)bb * effective_sa + (int)db * inv_a + 127) / 255);
+
+    return (0xFF << 24) | ((uint32_t)out_r << 16) | ((uint32_t)out_g << 8) | out_b;
+}
+
+/* Draw Sprite with Live 32-bit Blending & Spatial Cutout Alpha Masking */
+static void draw_sprite_blended(
     HDC dest_dc,
     const RECT *rc_canvas,
     LevelSprite *sp,
     int prio,
-    float zoom
+    float zoom,
+    BYTE master_alpha,
+    bool apply_cutout_mask
 ) {
     if (!sp) return;
     HDC sp_hdc = sp->has_img ? sp->img.hdc_mem : (g_has_default_sprite_img ? g_default_sprite_img.hdc_mem : NULL);
@@ -1167,32 +1430,26 @@ static void draw_sprite_masked(
     int sy = rc_canvas->top + (int)roundf((float)sp->y * zoom);
     int sw = (int)roundf((float)img_w * zoom);
     int sh = (int)roundf((float)img_h * zoom);
+    if (sw <= 0 || sh <= 0) return;
 
-    /* Fast check: does any cutout with >= priority overlap this sprite?
-     * In Zuma.exe (FUN_00415b10), <Sprite> precedes <Cutout> in the same priority bucket,
-     * so a Cutout with co_pri >= sp->pri is drawn on top of the Sprite and masks it.
-     */
+    /* Fast check: does any cutout with >= priority overlap this sprite? */
     bool needs_mask = false;
-    for (int c = 0; c < g_cutout_count; ++c) {
-        LevelCutout *co = &g_cutouts[c];
-        int co_pri = (co->pri > 0) ? co->pri : 1;
-        if (prio > co_pri) continue;
+    if (apply_cutout_mask) {
+        for (int c = 0; c < g_cutout_count; ++c) {
+            LevelCutout *co = &g_cutouts[c];
+            int co_pri = (co->pri > 0) ? co->pri : 1;
+            if (prio > co_pri) continue;
 
-        int cw = co->has_img ? co->img.width : (g_has_default_cutout_img ? g_default_cutout_img.width : 160);
-        int ch = co->has_img ? co->img.height : (g_has_default_cutout_img ? g_default_cutout_img.height : 140);
-        if (cw <= 0 || ch <= 0) continue;
+            int cw = co->has_img ? co->img.width : (g_has_default_cutout_img ? g_default_cutout_img.width : 160);
+            int ch = co->has_img ? co->img.height : (g_has_default_cutout_img ? g_default_cutout_img.height : 140);
+            if (cw <= 0 || ch <= 0) continue;
 
-        if ((sp->x + img_w) > co->x && sp->x < (co->x + cw) &&
-            (sp->y + img_h) > co->y && sp->y < (co->y + ch)) {
-            needs_mask = true;
-            break;
+            if ((sp->x + img_w) > co->x && sp->x < (co->x + cw) &&
+                (sp->y + img_h) > co->y && sp->y < (co->y + ch)) {
+                needs_mask = true;
+                break;
+            }
         }
-    }
-
-    if (!needs_mask || !sp_bits) {
-        BLENDFUNCTION bf = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
-        GdiAlphaBlend(dest_dc, sx, sy, sw, sh, sp_hdc, 0, 0, img_w, img_h, bf);
-        return;
     }
 
     static HDC s_sp_dc = NULL;
@@ -1200,12 +1457,77 @@ static void draw_sprite_masked(
     static uint32_t *s_sp_bits = NULL;
     static int s_sp_cap_w = 0, s_sp_cap_h = 0;
 
-    if (img_w > s_sp_cap_w || img_h > s_sp_cap_h || !s_sp_dc) {
-        if (s_sp_dc) DeleteDC(s_sp_dc);
-        if (s_sp_hbm) DeleteObject(s_sp_hbm);
+    const uint32_t *active_sp_bits = sp_bits;
+    int active_stride = img_w;
 
-        int new_w = (img_w > s_sp_cap_w) ? img_w + 32 : s_sp_cap_w;
-        int new_h = (img_h > s_sp_cap_h) ? img_h + 32 : s_sp_cap_h;
+    if (needs_mask && sp_bits) {
+        if (img_w > s_sp_cap_w || img_h > s_sp_cap_h || !s_sp_dc) {
+            if (s_sp_dc) DeleteDC(s_sp_dc);
+            if (s_sp_hbm) DeleteObject(s_sp_hbm);
+
+            int new_w = (img_w > s_sp_cap_w) ? img_w + 32 : s_sp_cap_w;
+            int new_h = (img_h > s_sp_cap_h) ? img_h + 32 : s_sp_cap_h;
+            if (new_w < 128) new_w = 128;
+            if (new_h < 128) new_h = 128;
+
+            BITMAPINFO bmi;
+            memset(&bmi, 0, sizeof(bmi));
+            bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+            bmi.bmiHeader.biWidth = new_w;
+            bmi.bmiHeader.biHeight = -new_h;
+            bmi.bmiHeader.biPlanes = 1;
+            bmi.bmiHeader.biBitCount = 32;
+            bmi.bmiHeader.biCompression = BI_RGB;
+
+            s_sp_dc = CreateCompatibleDC(dest_dc);
+            s_sp_hbm = CreateDIBSection(s_sp_dc, &bmi, DIB_RGB_COLORS, (void**)&s_sp_bits, NULL, 0);
+            SelectObject(s_sp_dc, s_sp_hbm);
+            s_sp_cap_w = new_w;
+            s_sp_cap_h = new_h;
+        }
+
+        for (int y = 0; y < img_h; ++y) {
+            memcpy(s_sp_bits + y * s_sp_cap_w, sp_bits + y * img_w, img_w * sizeof(uint32_t));
+        }
+
+        apply_cutout_mask_to_buffer(s_sp_bits, s_sp_cap_w, img_w, img_h,
+                                    (float)sp->x + (float)img_w * 0.5f,
+                                    (float)sp->y + (float)img_h * 0.5f,
+                                    prio, true);
+        active_sp_bits = s_sp_bits;
+        active_stride = s_sp_cap_w;
+    }
+
+    int mode = sp->blend_mode;
+    if (mode <= 0 || mode >= BLEND_MODE_COUNT || !active_sp_bits) {
+        HDC src_dc_to_use = (needs_mask && s_sp_dc) ? s_sp_dc : sp_hdc;
+        BLENDFUNCTION bf = { AC_SRC_OVER, 0, master_alpha, AC_SRC_ALPHA };
+        GdiAlphaBlend(dest_dc, sx, sy, sw, sh, src_dc_to_use, 0, 0, img_w, img_h, bf);
+        return;
+    }
+
+    /* Live 32-bit software blend rasterizer against destination backbuffer */
+    int clip_left   = ZP_IMAX(rc_canvas->left, sx);
+    int clip_top    = ZP_IMAX(rc_canvas->top, sy);
+    int clip_right  = ZP_IMIN(rc_canvas->right, sx + sw);
+    int clip_bottom = ZP_IMIN(rc_canvas->bottom, sy + sh);
+
+    if (clip_right <= clip_left || clip_bottom <= clip_top) return;
+
+    int blit_w = clip_right - clip_left;
+    int blit_h = clip_bottom - clip_top;
+
+    static HDC s_blend_dib_dc = NULL;
+    static HBITMAP s_blend_dib_hbm = NULL;
+    static uint32_t *s_blend_dib_bits = NULL;
+    static int s_blend_cap_w = 0, s_blend_cap_h = 0;
+
+    if (blit_w > s_blend_cap_w || blit_h > s_blend_cap_h || !s_blend_dib_dc) {
+        if (s_blend_dib_dc) DeleteDC(s_blend_dib_dc);
+        if (s_blend_dib_hbm) DeleteObject(s_blend_dib_hbm);
+
+        int new_w = (blit_w > s_blend_cap_w) ? blit_w + 64 : s_blend_cap_w;
+        int new_h = (blit_h > s_blend_cap_h) ? blit_h + 64 : s_blend_cap_h;
         if (new_w < 128) new_w = 128;
         if (new_h < 128) new_h = 128;
 
@@ -1218,24 +1540,63 @@ static void draw_sprite_masked(
         bmi.bmiHeader.biBitCount = 32;
         bmi.bmiHeader.biCompression = BI_RGB;
 
-        s_sp_dc = CreateCompatibleDC(dest_dc);
-        s_sp_hbm = CreateDIBSection(s_sp_dc, &bmi, DIB_RGB_COLORS, (void**)&s_sp_bits, NULL, 0);
-        SelectObject(s_sp_dc, s_sp_hbm);
-        s_sp_cap_w = new_w;
-        s_sp_cap_h = new_h;
+        s_blend_dib_dc = CreateCompatibleDC(dest_dc);
+        s_blend_dib_hbm = CreateDIBSection(s_blend_dib_dc, &bmi, DIB_RGB_COLORS, (void**)&s_blend_dib_bits, NULL, 0);
+        SelectObject(s_blend_dib_dc, s_blend_dib_hbm);
+        s_blend_cap_w = new_w;
+        s_blend_cap_h = new_h;
     }
 
-    for (int y = 0; y < img_h; ++y) {
-        memcpy(s_sp_bits + y * s_sp_cap_w, sp_bits + y * img_w, img_w * sizeof(uint32_t));
+    BitBlt(s_blend_dib_dc, 0, 0, blit_w, blit_h, dest_dc, clip_left, clip_top, SRCCOPY);
+
+    for (int by = 0; by < blit_h; ++by) {
+        int screen_y = clip_top + by;
+        int src_y = (int)(((int64_t)(screen_y - sy) * img_h) / sh);
+        if (src_y < 0) src_y = 0; else if (src_y >= img_h) src_y = img_h - 1;
+
+        const uint32_t *src_row = active_sp_bits + src_y * active_stride;
+        uint32_t *dst_row = s_blend_dib_bits + by * s_blend_cap_w;
+
+        for (int bx = 0; bx < blit_w; ++bx) {
+            int screen_x = clip_left + bx;
+            int src_x = (int)(((int64_t)(screen_x - sx) * img_w) / sw);
+            if (src_x < 0) src_x = 0; else if (src_x >= img_w) src_x = img_w - 1;
+
+            uint32_t src_px = src_row[src_x];
+            uint8_t sa = (uint8_t)(src_px >> 24);
+            if (sa == 0) continue;
+
+            uint8_t sr, sg, sb;
+            if (sa == 255) {
+                sr = (uint8_t)(src_px >> 16);
+                sg = (uint8_t)(src_px >> 8);
+                sb = (uint8_t)(src_px);
+            } else {
+                sr = (uint8_t)blend_clamp255(((int)((src_px >> 16) & 0xFF) * 255 + sa / 2) / sa);
+                sg = (uint8_t)blend_clamp255(((int)((src_px >> 8) & 0xFF) * 255 + sa / 2) / sa);
+                sb = (uint8_t)blend_clamp255(((int)(src_px & 0xFF) * 255 + sa / 2) / sa);
+            }
+
+            uint8_t eff_sa = (master_alpha == 255) ? sa : (uint8_t)(((int)sa * master_alpha + 127) / 255);
+            if (eff_sa == 0) continue;
+
+            uint32_t straight_src = ((uint32_t)eff_sa << 24) | ((uint32_t)sr << 16) | ((uint32_t)sg << 8) | (uint32_t)sb;
+            dst_row[bx] = blend_pixel(mode, dst_row[bx], straight_src, eff_sa);
+        }
     }
 
-    apply_cutout_mask_to_buffer(s_sp_bits, s_sp_cap_w, img_w, img_h,
-                                (float)sp->x + (float)img_w * 0.5f,
-                                (float)sp->y + (float)img_h * 0.5f,
-                                prio, true);
+    BitBlt(dest_dc, clip_left, clip_top, blit_w, blit_h, s_blend_dib_dc, 0, 0, SRCCOPY);
+}
 
-    BLENDFUNCTION bf = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
-    GdiAlphaBlend(dest_dc, sx, sy, sw, sh, s_sp_dc, 0, 0, img_w, img_h, bf);
+/* Draw Sprite with Cutout Alpha Masking ("IMAGE DENGAN IMAGE") */
+static void draw_sprite_masked(
+    HDC dest_dc,
+    const RECT *rc_canvas,
+    LevelSprite *sp,
+    int prio,
+    float zoom
+) {
+    draw_sprite_blended(dest_dc, rc_canvas, sp, prio, zoom, 255, true);
 }
 
 /* Sample arc-length point and tangent heading on curve */
@@ -1385,6 +1746,7 @@ static void render_level_preview_simulation(HDC mem_dc, const RECT *rc_canvas, c
         int color_idx;
         int prio;
         BYTE alpha;
+        double dist;
     } SimBall;
 
     static SimBall s_sim_balls[2048];
@@ -1446,6 +1808,7 @@ static void render_level_preview_simulation(HDC mem_dc, const RECT *rc_canvas, c
                             s_sim_balls[sim_ball_count].color_idx = b;
                             s_sim_balls[sim_ball_count].prio = bprio;
                             s_sim_balls[sim_ball_count].alpha = 255;
+                            s_sim_balls[sim_ball_count].dist = ball_s;
                             sim_ball_count++;
                         }
                     }
@@ -1460,7 +1823,16 @@ static void render_level_preview_simulation(HDC mem_dc, const RECT *rc_canvas, c
      *   B. Skulls dengan prioritas p (di atas sprites, tetapi di bawah bola)
      *   C. Balls dengan prioritas p (paling atas: BOLA -> SKULL -> CUTOUT/SPRITE)
      */
+    bool frog_and_coins_drawn = false;
     for (int p = min_pri; p <= max_pri; ++p) {
+        /* Frog & Coins are rendered at priority threshold p == 10:
+         * Below all p >= 10 overhead layers, but above all p < 10 background layers! */
+        if (p >= 10 && !frog_and_coins_drawn) {
+            render_placed_coins(mem_dc, rc_canvas, th);
+            render_placed_frog(mem_dc, rc_canvas, th);
+            frog_and_coins_drawn = true;
+        }
+
         /* A. Sprites dengan prioritas p (Di-mask pixel-by-pixel jika overlap cutout co_pri >= s_pri) */
         for (int i = 0; i < g_sprite_count; ++i) {
             LevelSprite *sp = &g_sprites[i];
@@ -1491,12 +1863,29 @@ static void render_level_preview_simulation(HDC mem_dc, const RECT *rc_canvas, c
             if (b >= 0 && b < LEVEL_PREVIEW_BALL_COLORS && g_has_ball_imgs[b]) {
                 float scx = (float)rc_canvas->left + s_sim_balls[i].x * g_zoom;
                 float scy = (float)rc_canvas->top + s_sim_balls[i].y * g_zoom;
-                draw_rotated_image_fast(mem_dc, &g_ball_imgs[b], scx, scy,
-                                        s_sim_balls[i].angle, g_zoom, 255,
-                                        s_sim_balls[i].x, s_sim_balls[i].y,
-                                        s_sim_balls[i].prio, true);
+
+                int rows = (g_ball_rows[b] > 1) ? g_ball_rows[b] : ((g_ball_imgs[b].height > g_ball_imgs[b].width && g_ball_imgs[b].width > 0) ? (g_ball_imgs[b].height / g_ball_imgs[b].width) : 1);
+                int cel_h = (rows > 1) ? g_ball_imgs[b].width : g_ball_imgs[b].height;
+                int cel = 0;
+                if (rows > 1) {
+                    double circum = 32.0 * M_PI;
+                    cel = (int)floor((s_sim_balls[i].dist * (double)rows) / circum) % rows;
+                    if (cel < 0) cel = (cel % rows + rows) % rows;
+                }
+                int cel_y = cel * cel_h;
+
+                draw_rotated_image_fast_cel(mem_dc, &g_ball_imgs[b], cel_y, cel_h, scx, scy,
+                                            s_sim_balls[i].angle, g_zoom, 255,
+                                            s_sim_balls[i].x, s_sim_balls[i].y,
+                                            s_sim_balls[i].prio, true);
             }
         }
+    }
+
+    if (!frog_and_coins_drawn) {
+        render_placed_coins(mem_dc, rc_canvas, th);
+        render_placed_frog(mem_dc, rc_canvas, th);
+        frog_and_coins_drawn = true;
     }
 }
 
@@ -2284,8 +2673,18 @@ void render_canvas_transform_handles(HDC hdc, int client_w, int work_h, const Th
 static void render_placed_coins(HDC mem_dc, const RECT *rc_canvas, const ThemeColors *th) {
     load_coin_sprite();
     if (!g_has_coin_img || !g_coin_img.hbm || !g_coin_img.hdc_mem) return;
-    int cw = (int)roundf((float)g_coin_img.width * g_zoom);
-    int ch = (int)roundf((float)g_coin_img.height * g_zoom);
+    int coin_w = g_coin_img.width;
+    int coin_h = (g_coin_img.height > g_coin_img.width && g_coin_img.width > 0) ? g_coin_img.width : g_coin_img.height;
+    int cw = (int)roundf((float)coin_w * g_zoom);
+    int ch = (int)roundf((float)coin_h * g_zoom);
+
+    int rows = (coin_h > 0) ? (g_coin_img.height / coin_h) : 1;
+    int cel = (rows > 1) ? (rows / 2) : 0;
+    if (rows > 1 && g_level_preview_active) {
+        cel = (int)(g_preview_anim_distance * 0.15f) % rows;
+        if (cel < 0) cel = (cel % rows + rows) % rows;
+    }
+    int src_y = cel * coin_h;
 
     for (int i = 0; i < g_treasure_point_count; ++i) {
         int center_sx = rc_canvas->left + (int)roundf((float)g_treasure_points[i].x * g_zoom);
@@ -2298,7 +2697,7 @@ static void render_placed_coins(HDC mem_dc, const RECT *rc_canvas, const ThemeCo
 
         BLENDFUNCTION bf_coin = { AC_SRC_OVER, 0, alpha, AC_SRC_ALPHA };
         GdiAlphaBlend(mem_dc, cx, cy, cw, ch,
-                      g_coin_img.hdc_mem, 0, 0, g_coin_img.width, g_coin_img.height, bf_coin);
+                      g_coin_img.hdc_mem, 0, src_y, coin_w, coin_h, bf_coin);
 
         if (!g_level_preview_active && g_treasure_points[i].selected) {
             draw_object_selection_indicator(mem_dc, cx, cy, cw, ch, th->text_accent_blue);
@@ -2312,7 +2711,8 @@ static void render_placed_coin_hover_badge(HDC mem_dc, const RECT *rc_canvas, co
     if (g_hovered_coin_idx < 0 || g_hovered_coin_idx >= g_treasure_point_count) return;
 
     int i = g_hovered_coin_idx;
-    int ch = (int)roundf((float)g_coin_img.height * g_zoom);
+    int coin_h = (g_coin_img.height > g_coin_img.width && g_coin_img.width > 0) ? g_coin_img.width : g_coin_img.height;
+    int ch = (int)roundf((float)coin_h * g_zoom);
     int center_sx = rc_canvas->left + (int)roundf((float)g_treasure_points[i].x * g_zoom);
     int center_sy = rc_canvas->top + (int)roundf((float)g_treasure_points[i].y * g_zoom);
 
@@ -2566,6 +2966,109 @@ void render_splash_elements(HDC mem_dc, int view_w, int view_h, const ThemeColor
     }
 }
 
+static void render_placed_sprites_prio(HDC mem_dc, const RECT *rc_canvas, const ThemeColors *th,
+                                       int min_pri_filter, int max_pri_filter,
+                                       int *out_hovered_sp_idx, int *out_adjusting_sp_idx)
+{
+    load_default_sprite_sprite();
+    int min_sp_pri = 0, max_sp_pri = 0;
+    for (int i = 0; i < g_sprite_count; ++i) {
+        int p = (g_sprites[i].pri > 0) ? g_sprites[i].pri : 1;
+        if (i == 0 || p < min_sp_pri) min_sp_pri = p;
+        if (i == 0 || p > max_sp_pri) max_sp_pri = p;
+    }
+
+    for (int p = min_sp_pri; p <= max_sp_pri; ++p) {
+        if (p < min_pri_filter || p > max_pri_filter) continue;
+        for (int i = 0; i < g_sprite_count; ++i) {
+            LevelSprite *sp = &g_sprites[i];
+            int s_pri = (sp->pri > 0) ? sp->pri : 1;
+            if (s_pri != p) continue;
+
+            HDC sp_hdc = sp->has_img ? sp->img.hdc_mem : (g_has_default_sprite_img ? g_default_sprite_img.hdc_mem : NULL);
+            int img_w = sp->has_img ? sp->img.width : (g_has_default_sprite_img ? g_default_sprite_img.width : 120);
+            int img_h = sp->has_img ? sp->img.height : (g_has_default_sprite_img ? g_default_sprite_img.height : 120);
+
+            if (sp_hdc) {
+                int sx = rc_canvas->left + (int)roundf((float)sp->x * g_zoom);
+                int sy = rc_canvas->top + (int)roundf((float)sp->y * g_zoom);
+                int sw = (int)roundf((float)img_w * g_zoom);
+                int sh = (int)roundf((float)img_h * g_zoom);
+
+                bool is_hovered = (g_mode_overlay && !g_placing_sprite && !g_placing_cutout &&
+                                   !g_adjusting_overlay_priority && !g_placing_bgalpha_vector &&
+                                   g_hovered_sprite_idx == i);
+                bool is_adjusting = (g_adjusting_overlay_priority && g_editing_prio_type == 1 && g_editing_prio_idx == i);
+                if (is_hovered && out_hovered_sp_idx) *out_hovered_sp_idx = i;
+                if (is_adjusting && out_adjusting_sp_idx) *out_adjusting_sp_idx = i;
+                BYTE alpha = (is_hovered || is_adjusting) ? 128 : 255;
+
+                draw_sprite_blended(mem_dc, rc_canvas, sp, s_pri, g_zoom, alpha, false);
+
+                if (g_mode_overlay && !g_hud_overlay_collapsed && g_overlay_active_tab == 1 && g_selected_sprite_idx == i && !is_hovered && !is_adjusting) {
+                    draw_topleft_corner_brackets(mem_dc, sx, sy, sw, sh, th->text_secondary);
+                }
+
+                if (sp->selected) {
+                    draw_object_selection_indicator(mem_dc, sx, sy, sw, sh, th->text_accent_blue);
+                }
+            }
+        }
+    }
+}
+
+static void render_placed_cutouts_prio(HDC mem_dc, const RECT *rc_canvas, const ThemeColors *th,
+                                       int min_pri_filter, int max_pri_filter,
+                                       int *out_hovered_co_idx, int *out_adjusting_co_idx)
+{
+    load_default_cutout_sprite();
+    for (int i = 0; i < g_cutout_count; ++i) {
+        LevelCutout *co = &g_cutouts[i];
+        int co_pri = co->pri;
+        if (co_pri < min_pri_filter || co_pri > max_pri_filter) continue;
+
+        HDC co_hdc = co->has_img ? co->img.hdc_mem : (g_has_default_cutout_img ? g_default_cutout_img.hdc_mem : NULL);
+        HDC mask_light = co->hdc_mask_light ? co->hdc_mask_light : g_default_cutout_hdc_light;
+        HDC mask_dark = co->hdc_mask_dark ? co->hdc_mask_dark : g_default_cutout_hdc_dark;
+        HDC active_mask = (g_current_theme == THEME_DARK) ? mask_dark : mask_light;
+
+        int img_w = co->has_img ? co->img.width : (g_has_default_cutout_img ? g_default_cutout_img.width : 160);
+        int img_h = co->has_img ? co->img.height : (g_has_default_cutout_img ? g_default_cutout_img.height : 140);
+
+        int sx = rc_canvas->left + (int)roundf((float)co->x * g_zoom);
+        int sy = rc_canvas->top + (int)roundf((float)co->y * g_zoom);
+        int sw = (int)roundf((float)img_w * g_zoom);
+        int sh = (int)roundf((float)img_h * g_zoom);
+
+        bool is_hovered = (g_mode_overlay && !g_placing_cutout && !g_placing_sprite &&
+                           !g_adjusting_overlay_priority && !g_placing_bgalpha_vector &&
+                           g_hovered_cutout_idx == i);
+        bool is_adjusting = (g_adjusting_overlay_priority && g_editing_prio_type == 0 && g_editing_prio_idx == i);
+        if (is_hovered && out_hovered_co_idx) *out_hovered_co_idx = i;
+        if (is_adjusting && out_adjusting_co_idx) *out_adjusting_co_idx = i;
+
+        if ((is_hovered || is_adjusting) && co_hdc) {
+            /* Hovered state: 50% opacity normal appearance */
+            BLENDFUNCTION bf_co = { AC_SRC_OVER, 0, 128, AC_SRC_ALPHA };
+            GdiAlphaBlend(mem_dc, sx, sy, sw, sh,
+                          co_hdc, 0, 0, img_w, img_h, bf_co);
+        } else if (active_mask) {
+            /* Placed & Unhovered: Black is 100% transparent, White is 25% black (Light Mode) or 25% white (Dark Mode) */
+            BLENDFUNCTION bf_mask = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
+            GdiAlphaBlend(mem_dc, sx, sy, sw, sh,
+                          active_mask, 0, 0, img_w, img_h, bf_mask);
+
+            if (g_mode_overlay && !g_hud_overlay_collapsed && g_overlay_active_tab == 0 && g_selected_cutout_idx == i && !is_hovered && !is_adjusting) {
+                draw_topleft_corner_brackets(mem_dc, sx, sy, sw, sh, th->text_secondary);
+            }
+        }
+
+        if (co->selected) {
+            draw_object_selection_indicator(mem_dc, sx, sy, sw, sh, th->text_accent_blue);
+        }
+    }
+}
+
 /* Render Workspace & Canvas Scene */
 void render_scene(HWND hwnd, HDC hdc, int client_w, int client_h) {
     const ThemeColors *th = get_theme();
@@ -2720,101 +3223,22 @@ void render_scene(HWND hwnd, HDC hdc, int client_w, int client_h) {
         }
     }
 
-    /* 7. Placed Sprites (Top-Left aligned, 100% opacity normal, 50% opacity when hovered) */
+    /* 7. Low-Priority Sprites & Cutouts (pri < 10: Under coins, frog, grid, and curves) */
     int hovered_sp_idx = -1;
     int adjusting_sp_idx = -1;
-    if (!g_level_preview_active) {
-        load_default_sprite_sprite();
-        for (int i = 0; i < g_sprite_count; ++i) {
-            LevelSprite *sp = &g_sprites[i];
-            HDC sp_hdc = sp->has_img ? sp->img.hdc_mem : (g_has_default_sprite_img ? g_default_sprite_img.hdc_mem : NULL);
-            int img_w = sp->has_img ? sp->img.width : (g_has_default_sprite_img ? g_default_sprite_img.width : 120);
-            int img_h = sp->has_img ? sp->img.height : (g_has_default_sprite_img ? g_default_sprite_img.height : 120);
-
-            if (sp_hdc) {
-                int sx = rc_canvas.left + (int)roundf((float)sp->x * g_zoom);
-                int sy = rc_canvas.top + (int)roundf((float)sp->y * g_zoom);
-                int sw = (int)roundf((float)img_w * g_zoom);
-                int sh = (int)roundf((float)img_h * g_zoom);
-
-                bool is_hovered = (g_mode_overlay && !g_placing_sprite && !g_placing_cutout &&
-                                   !g_adjusting_overlay_priority && !g_placing_bgalpha_vector &&
-                                   g_hovered_sprite_idx == i);
-                bool is_adjusting = (g_adjusting_overlay_priority && g_editing_prio_type == 1 && g_editing_prio_idx == i);
-                if (is_hovered) hovered_sp_idx = i;
-                if (is_adjusting) adjusting_sp_idx = i;
-                BYTE alpha = (is_hovered || is_adjusting) ? 128 : 255;
-
-                BLENDFUNCTION bf_sp = { AC_SRC_OVER, 0, alpha, AC_SRC_ALPHA };
-                GdiAlphaBlend(mem_dc, sx, sy, sw, sh,
-                              sp_hdc, 0, 0, img_w, img_h, bf_sp);
-
-                if (g_mode_overlay && !g_hud_overlay_collapsed && g_overlay_active_tab == 1 && g_selected_sprite_idx == i && !is_hovered && !is_adjusting) {
-                    draw_topleft_corner_brackets(mem_dc, sx, sy, sw, sh, th->text_secondary);
-                }
-
-                if (sp->selected) {
-                    draw_object_selection_indicator(mem_dc, sx, sy, sw, sh, th->text_accent_blue);
-                }
-            }
-        }
-    }
-
-    /* 8. Placed Cutouts (Top-Left aligned: Black 100% transparent, White 25% black (Light) / 25% white (Dark); 50% hovered) */
     int hovered_co_idx = -1;
     int adjusting_co_idx = -1;
     if (!g_level_preview_active) {
-        load_default_cutout_sprite();
-        for (int i = 0; i < g_cutout_count; ++i) {
-            LevelCutout *co = &g_cutouts[i];
-            HDC co_hdc = co->has_img ? co->img.hdc_mem : (g_has_default_cutout_img ? g_default_cutout_img.hdc_mem : NULL);
-            HDC mask_light = co->hdc_mask_light ? co->hdc_mask_light : g_default_cutout_hdc_light;
-            HDC mask_dark = co->hdc_mask_dark ? co->hdc_mask_dark : g_default_cutout_hdc_dark;
-            HDC active_mask = (g_current_theme == THEME_DARK) ? mask_dark : mask_light;
-
-            int img_w = co->has_img ? co->img.width : (g_has_default_cutout_img ? g_default_cutout_img.width : 160);
-            int img_h = co->has_img ? co->img.height : (g_has_default_cutout_img ? g_default_cutout_img.height : 140);
-
-            int sx = rc_canvas.left + (int)roundf((float)co->x * g_zoom);
-            int sy = rc_canvas.top + (int)roundf((float)co->y * g_zoom);
-            int sw = (int)roundf((float)img_w * g_zoom);
-            int sh = (int)roundf((float)img_h * g_zoom);
-
-            bool is_hovered = (g_mode_overlay && !g_placing_cutout && !g_placing_sprite &&
-                               !g_adjusting_overlay_priority && !g_placing_bgalpha_vector &&
-                               g_hovered_cutout_idx == i);
-            bool is_adjusting = (g_adjusting_overlay_priority && g_editing_prio_type == 0 && g_editing_prio_idx == i);
-            if (is_hovered) hovered_co_idx = i;
-            if (is_adjusting) adjusting_co_idx = i;
-
-            if ((is_hovered || is_adjusting) && co_hdc) {
-                /* Hovered state: 50% opacity normal appearance */
-                BLENDFUNCTION bf_co = { AC_SRC_OVER, 0, 128, AC_SRC_ALPHA };
-                GdiAlphaBlend(mem_dc, sx, sy, sw, sh,
-                              co_hdc, 0, 0, img_w, img_h, bf_co);
-            } else if (active_mask) {
-                /* Placed & Unhovered: Black is 100% transparent, White is 25% black (Light Mode) or 25% white (Dark Mode) */
-                BLENDFUNCTION bf_mask = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
-                GdiAlphaBlend(mem_dc, sx, sy, sw, sh,
-                              active_mask, 0, 0, img_w, img_h, bf_mask);
-
-                if (g_mode_overlay && !g_hud_overlay_collapsed && g_overlay_active_tab == 0 && g_selected_cutout_idx == i && !is_hovered && !is_adjusting) {
-                    draw_topleft_corner_brackets(mem_dc, sx, sy, sw, sh, th->text_secondary);
-                }
-            }
-
-            if (co->selected) {
-                draw_object_selection_indicator(mem_dc, sx, sy, sw, sh, th->text_accent_blue);
-            }
-        }
+        render_placed_sprites_prio(mem_dc, &rc_canvas, th, 0, 9, &hovered_sp_idx, &adjusting_sp_idx);
+        render_placed_cutouts_prio(mem_dc, &rc_canvas, th, 0, 9, &hovered_co_idx, &adjusting_co_idx);
     }
 
-    /* 9. Placed Coins / Treasure Points (Edit Mode: under curves & hover tooltips) */
+    /* 8. Placed Coins / Treasure Points (Edit Mode: under high-priority layers & hover tooltips) */
     if (!g_level_preview_active) {
         render_placed_coins(mem_dc, &rc_canvas, th);
     }
 
-    /* 10. Placed Frog (Edit Mode: under curves & hover tooltips) */
+    /* 9. Placed Frog (Edit Mode: under high-priority layers & hover tooltips) */
     if (!g_level_preview_active) {
         render_placed_frog(mem_dc, &rc_canvas, th);
     }
@@ -2917,11 +3341,12 @@ void render_scene(HWND hwnd, HDC hdc, int client_w, int client_h) {
     /* 14. Bezier Curve Paths, Anchors, and Handles (Edit Mode) OR Simulation (Preview Mode) */
     if (!g_level_preview_active) {
         render_bezier_curves(mem_dc, &rc_canvas, client_w, work_h, th);
+
+        /* 14.1 High-Priority Layers (pri >= 10): Rendered ON TOP of frog, coins, and curves to occlude them! */
+        render_placed_sprites_prio(mem_dc, &rc_canvas, th, 10, 99999, &hovered_sp_idx, &adjusting_sp_idx);
+        render_placed_cutouts_prio(mem_dc, &rc_canvas, th, 10, 99999, &hovered_co_idx, &adjusting_co_idx);
     } else {
         render_level_preview_simulation(mem_dc, &rc_canvas, th);
-        /* 14.1 Level Preview Mode: Coins and Frog are on top of cutouts, sprites, skull, and balls */
-        render_placed_coins(mem_dc, &rc_canvas, th);
-        render_placed_frog(mem_dc, &rc_canvas, th);
     }
 
     /* 15. Placed Elements Hover Badges and Brackets (Always in front of grid) */
@@ -2943,8 +3368,13 @@ void render_scene(HWND hwnd, HDC hdc, int client_w, int client_h) {
             if (hovered_co_idx >= 0) {
                 char co_badge[128];
                 const char *c_id = co->image_name[0] ? co->image_name : ((g_cutout_count == 1) ? "tunnel" : "tunnel1");
-                snprintf(co_badge, sizeof(co_badge), "Cutout ID: %s | Pri: %d (#%d) [X: %d, Y: %d]",
-                         c_id, co->pri > 0 ? co->pri : 1, idx + 1, co->x, co->y);
+                if (co->blend_mode > 0 && co->blend_mode < BLEND_MODE_COUNT) {
+                    snprintf(co_badge, sizeof(co_badge), "Cutout ID: %s | Pri: %d | Blend: %s (#%d) [X: %d, Y: %d]",
+                             c_id, co->pri > 0 ? co->pri : 1, get_zuma_blend_mode_name(co->blend_mode), idx + 1, co->x, co->y);
+                } else {
+                    snprintf(co_badge, sizeof(co_badge), "Cutout ID: %s | Pri: %d (#%d) [X: %d, Y: %d]",
+                             c_id, co->pri > 0 ? co->pri : 1, idx + 1, co->x, co->y);
+                }
                 int badge_y = (sy - 24 >= rc_canvas.top + 4) ? (sy - 24) : (sy + sh + 8);
                 render_coord_badge(mem_dc, sx + sw / 2, badge_y, co_badge, th);
             }
@@ -2963,9 +3393,18 @@ void render_scene(HWND hwnd, HDC hdc, int client_w, int client_h) {
             draw_topleft_corner_brackets(mem_dc, sx, sy, sw, sh, th->text_accent_blue);
             if (hovered_sp_idx >= 0) {
                 char sp_badge[128];
-                const char *s_id = sp->image_name[0] ? sp->image_name : ((g_sprite_count == 1) ? "sprite" : "sprite1");
-                snprintf(sp_badge, sizeof(sp_badge), "Sprite ID: %s | Pri: %d (#%d) [X: %d, Y: %d]",
-                         s_id, sp->pri > 0 ? sp->pri : 1, idx + 1, sp->x, sp->y);
+                int s_pri = sp->pri > 0 ? sp->pri : 1;
+                bool is_overlay = (s_pri >= 10);
+                const char *type_name = is_overlay ? "Overlay" : "Sprite";
+                const char *def_id = is_overlay ? "overlay" : "sprite";
+                const char *s_id = sp->image_name[0] ? sp->image_name : def_id;
+                if (sp->blend_mode > 0 && sp->blend_mode < BLEND_MODE_COUNT) {
+                    snprintf(sp_badge, sizeof(sp_badge), "%s ID: %s | Pri: %d | Blend: %s (#%d) [X: %d, Y: %d]",
+                             type_name, s_id, s_pri, get_zuma_blend_mode_name(sp->blend_mode), idx + 1, sp->x, sp->y);
+                } else {
+                    snprintf(sp_badge, sizeof(sp_badge), "%s ID: %s | Pri: %d (#%d) [X: %d, Y: %d]",
+                             type_name, s_id, s_pri, idx + 1, sp->x, sp->y);
+                }
                 int badge_y = (sy - 24 >= rc_canvas.top + 4) ? (sy - 24) : (sy + sh + 8);
                 render_coord_badge(mem_dc, sx + sw / 2, badge_y, sp_badge, th);
             }
@@ -3021,14 +3460,20 @@ void render_scene(HWND hwnd, HDC hdc, int client_w, int client_h) {
     /* 9.2 Ghost Coin (Follows hover cursor with 25% opacity in workspace during placement mode) */
     if (g_placing_coin && g_has_coin_img && g_coin_img.hbm && g_coin_img.hdc_mem) {
         if (g_mouse_screen_y >= TOOLBAR_HEIGHT && g_mouse_screen_x >= 0) {
-            int cw = (int)roundf((float)g_coin_img.width * g_zoom);
-            int ch = (int)roundf((float)g_coin_img.height * g_zoom);
+            int coin_w = g_coin_img.width;
+            int coin_h = (g_coin_img.height > g_coin_img.width && g_coin_img.width > 0) ? g_coin_img.width : g_coin_img.height;
+            int cw = (int)roundf((float)coin_w * g_zoom);
+            int ch = (int)roundf((float)coin_h * g_zoom);
             int cx = g_mouse_screen_x - cw / 2;
             int cy = g_mouse_screen_y - ch / 2;
 
+            int rows = (coin_h > 0) ? (g_coin_img.height / coin_h) : 1;
+            int cel = (rows > 1) ? (rows / 2) : 0;
+            int src_y = cel * coin_h;
+
             BLENDFUNCTION bf_ghost = { AC_SRC_OVER, 0, 64, AC_SRC_ALPHA };
             GdiAlphaBlend(mem_dc, cx, cy, cw, ch,
-                          g_coin_img.hdc_mem, 0, 0, g_coin_img.width, g_coin_img.height, bf_ghost);
+                          g_coin_img.hdc_mem, 0, src_y, coin_w, coin_h, bf_ghost);
 
             /* Center reticle at cursor position for pixel-perfect placement */
             HPEN ghost_pen = CreatePen(PS_SOLID, 1, th->text_accent_blue);
@@ -3215,7 +3660,8 @@ void render_scene(HWND hwnd, HDC hdc, int client_w, int client_h) {
 
     /* 9.5 Floating Workspace HUD Panels (Canvas Mode vs Curve Mode vs Overlay Mode vs Element Mode vs Preview Mode) */
     bool need_prio_edit = (g_mode_curve && g_curve_submode == CURVE_SUBMODE_VARIABLE && !g_hud_mode_collapsed) ||
-                          (g_mode_overlay && g_has_canvas && !g_hud_overlay_collapsed);
+                          (g_mode_overlay && g_has_canvas && !g_hud_overlay_collapsed &&
+                           (get_active_selected_cutout_idx() >= 0 || get_active_selected_sprite_idx() >= 0));
     if (!need_prio_edit && g_edit_prio && IsWindowVisible(g_edit_prio)) {
         ShowWindow(g_edit_prio, SW_HIDE);
     }

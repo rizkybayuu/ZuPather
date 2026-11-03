@@ -3,6 +3,7 @@
 #include "canvas_render.h"
 #include "level_io.h"
 #include "dialog_modals.h"
+#include "layout_editor.h"
 #include "undo_redo.h"
 #if defined(_WIN32) && !defined(__APPLE__)
 #include <mmsystem.h>
@@ -87,8 +88,9 @@ static int get_toolbar_needed_width(void) {
     return xs[3] + ws[3] + 8;
 }
 
-static void get_map_button_geometry(int tb_w, int *out_mm_x, int *out_mm_w) {
+static void get_toolbar_action_buttons_geometry(int tb_w, int *out_lb_x, int *out_lb_w, int *out_mm_x, int *out_mm_w) {
     int mm_w = 48;
+    int lb_w = 60;
     HDC hdc = g_hwnd_toolbar_left ? GetDC(g_hwnd_toolbar_left) : NULL;
     if (hdc) {
         HFONT old_f = g_font_primary_bold ? (HFONT)SelectObject(hdc, g_font_primary_bold) : NULL;
@@ -96,13 +98,21 @@ static void get_map_button_geometry(int tb_w, int *out_mm_x, int *out_mm_w) {
         if (GetTextExtentPoint32A(hdc, "Map", 3, &sz)) {
             mm_w = sz.cx + 18;
         }
+        if (GetTextExtentPoint32A(hdc, "Layout", 6, &sz)) {
+            lb_w = sz.cx + 18;
+        }
         if (old_f) SelectObject(hdc, old_f);
         ReleaseDC(g_hwnd_toolbar_left, hdc);
     }
     int mm_x = tb_w - mm_w - 8;
     if (mm_x < 8) mm_x = 8;
+    int lb_x = mm_x - lb_w - 6;
+    if (lb_x < 8) lb_x = 8;
+
     if (out_mm_x) *out_mm_x = mm_x;
     if (out_mm_w) *out_mm_w = mm_w;
+    if (out_lb_x) *out_lb_x = lb_x;
+    if (out_lb_w) *out_lb_w = lb_w;
 }
 
 static int get_toolbar_avail_width(void) {
@@ -110,9 +120,9 @@ static int get_toolbar_avail_width(void) {
     RECT rc;
     GetClientRect(g_hwnd_toolbar_left, &rc);
     int tb_w = rc.right - rc.left;
-    int mm_x, mm_w;
-    get_map_button_geometry(tb_w, &mm_x, &mm_w);
-    int avail_w = mm_x - 4; /* Tepat di sebelah kiri tombol Map */
+    int lb_x, lb_w, mm_x, mm_w;
+    get_toolbar_action_buttons_geometry(tb_w, &lb_x, &lb_w, &mm_x, &mm_w);
+    int avail_w = lb_x - 4; /* Tepat di sebelah kiri tombol Layout */
     return avail_w > 0 ? avail_w : 0;
 }
 
@@ -158,14 +168,18 @@ static void update_toolbar_buttons_layout(void) {
     GetClientRect(g_hwnd_toolbar_left, &rc_tb);
     int tb_w = rc_tb.right - rc_tb.left;
 
-    int mm_x, mm_w;
-    get_map_button_geometry(tb_w, &mm_x, &mm_w);
+    int lb_x, lb_w, mm_x, mm_w;
+    get_toolbar_action_buttons_geometry(tb_w, &lb_x, &lb_w, &mm_x, &mm_w);
 
-    int avail_w = mm_x - 4; /* Tepat di sebelah kiri tombol "Map" */
+    int avail_w = lb_x - 4; /* Tepat di sebelah kiri tombol "Layout" */
     if (avail_w < 0) avail_w = 0;
 
     if (g_hwnd_toolbar_scroll) {
         SetWindowPos(g_hwnd_toolbar_scroll, NULL, 0, 0, avail_w, TOOLBAR_HEIGHT,
+                     SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    if (g_btn_manage_layout) {
+        SetWindowPos(g_btn_manage_layout, NULL, lb_x, 5, lb_w, 26,
                      SWP_NOZORDER | SWP_NOACTIVATE);
     }
     if (g_btn_manage_maps) {
@@ -196,8 +210,8 @@ static void update_toolbar_buttons_layout(void) {
 /* Force instant synchronous redraw on all toolbar buttons without message queue lag */
 void refresh_toolbar_buttons(void) {
     if (!g_hwnd_toolbar_left) return;
-    HWND btns[] = { g_btn_canvas, g_btn_element, g_btn_curve, g_btn_overlay, g_btn_manage_maps };
-    for (int i = 0; i < 5; ++i) {
+    HWND btns[] = { g_btn_canvas, g_btn_element, g_btn_curve, g_btn_overlay, g_btn_manage_layout, g_btn_manage_maps };
+    for (int i = 0; i < 6; ++i) {
         if (btns[i]) {
             RedrawWindow(btns[i], NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ERASE);
         }
@@ -217,6 +231,9 @@ static void draw_custom_button(LPDRAWITEMSTRUCT dis) {
     COLORREF bg_color = is_pressed ? th->btn_bg_pressed : th->btn_bg;
     if (dis->CtlID == ID_BTN_MANAGE_MAPS) {
         bg_color = is_pressed ? RGB(18, 70, 140) : (g_current_theme == THEME_DARK ? RGB(30, 42, 60) : RGB(232, 240, 252));
+    } else if (dis->CtlID == ID_BTN_MANAGE_LAYOUT) {
+        bg_color = is_pressed ? (g_current_theme == THEME_DARK ? RGB(35, 38, 45) : RGB(225, 226, 230))
+                              : (g_current_theme == THEME_DARK ? RGB(26, 30, 36) : RGB(238, 239, 242));
     }
     HBRUSH bg_brush = CreateSolidBrush(bg_color);
     FillRect(dis->hDC, &dis->rcItem, bg_brush);
@@ -225,6 +242,8 @@ static void draw_custom_button(LPDRAWITEMSTRUCT dis) {
     COLORREF border_color = th->btn_border;
     if (dis->CtlID == ID_BTN_MANAGE_MAPS) {
         border_color = th->text_accent_blue;
+    } else if (dis->CtlID == ID_BTN_MANAGE_LAYOUT) {
+        border_color = (g_current_theme == THEME_DARK ? RGB(55, 62, 72) : RGB(195, 198, 204));
     } else if (dis->CtlID == ID_BTN_CANVAS && g_mode_canvas) {
         border_color = th->text_accent_green;
     } else if (dis->CtlID == ID_BTN_ELEMENT && g_mode_element) {
@@ -256,6 +275,8 @@ static void draw_custom_button(LPDRAWITEMSTRUCT dis) {
     COLORREF text_color = is_pressed ? th->text_accent_blue : th->btn_text;
     if (dis->CtlID == ID_BTN_MANAGE_MAPS) {
         text_color = is_pressed ? RGB(255, 255, 255) : th->text_accent_blue;
+    } else if (dis->CtlID == ID_BTN_MANAGE_LAYOUT) {
+        text_color = (g_current_theme == THEME_DARK ? RGB(110, 118, 130) : RGB(145, 150, 158));
     } else if (dis->CtlID == ID_BTN_CANVAS && g_mode_canvas && !is_pressed) {
         text_color = th->text_accent_green;
     } else if (dis->CtlID == ID_BTN_ELEMENT && g_mode_element && !is_pressed) {
@@ -738,6 +759,14 @@ static LRESULT CALLBACK EditSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
             }
             g_pending_cutout_pri = g_overlay_current_prio;
             g_pending_sprite_pri = g_overlay_current_prio;
+            int sel_co = get_active_selected_cutout_idx();
+            int sel_sp = get_active_selected_sprite_idx();
+            if (sel_co >= 0 && sel_co < g_cutout_count) {
+                g_cutouts[sel_co].pri = g_overlay_current_prio;
+            } else if (sel_sp >= 0 && sel_sp < g_sprite_count) {
+                g_sprites[sel_sp].pri = g_overlay_current_prio;
+                sync_sprite_image_names();
+            }
             char buf[16];
             snprintf(buf, sizeof(buf), "%d", g_overlay_current_prio);
             g_in_prio_update = true;
@@ -1035,6 +1064,7 @@ static HACCEL create_app_accelerators(void) {
         { FCONTROL | FVIRTKEY, 'B', ID_MENU_CANVAS_CHANGE_IMG },
         { FCONTROL | FALT | FVIRTKEY, 'B', ID_MENU_CANVAS_REMOVE_IMG },
         { FCONTROL | FVIRTKEY, 'M', ID_BTN_CANVAS },
+        { FCONTROL | FSHIFT | FVIRTKEY, 'L', ID_MENU_FILE_MANAGE_LAYOUT },
         { FCONTROL | FSHIFT | FVIRTKEY, 'M', ID_MENU_FILE_MANAGE_LEVELS },
         { FCONTROL | FSHIFT | FVIRTKEY, 'C', ID_MENU_CANVAS_ADD_CUTOUT },
         { FCONTROL | FVIRTKEY, 'E', ID_BTN_ELEMENT },
@@ -1094,12 +1124,12 @@ static void create_toolbar_buttons(HWND hwnd) {
         hwnd, (HMENU)991, hinst, NULL
     );
 
-    int mm_x, mm_w;
-    get_map_button_geometry(client_w, &mm_x, &mm_w);
-    int avail_w = mm_x - 4; /* Tepat di sebelah kiri tombol Map */
+    int mm_x, mm_w, lb_x, lb_w;
+    get_toolbar_action_buttons_geometry(client_w, &lb_x, &lb_w, &mm_x, &mm_w);
+    int avail_w = lb_x - 4; /* Tepat di sebelah kiri tombol Layout */
     if (avail_w < 0) avail_w = 0;
 
-    /* Scrollable viewport container strictly masked right before the Map button */
+    /* Scrollable viewport container strictly masked right before the Layout button */
     g_hwnd_toolbar_scroll = CreateWindowExA(
         0, "ZuPatherToolbarScroll", NULL,
         WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
@@ -1113,7 +1143,7 @@ static void create_toolbar_buttons(HWND hwnd) {
     g_btn_apply_size = NULL;
 
     /* In-Level Attribute Authoring Buttons: Canvas, Element, Curve, and Overlay */
-    /* Created inside g_hwnd_toolbar_scroll so they are hardware-masked from the Map button area */
+    /* Created inside g_hwnd_toolbar_scroll so they are hardware-masked from the Layout & Map button area */
     g_btn_canvas  = CreateWindowA("BUTTON", "Canvas", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | BS_OWNERDRAW,
                                   8, 5, 80, 26, g_hwnd_toolbar_scroll, (HMENU)ID_BTN_CANVAS, hinst, NULL);
     g_btn_element = CreateWindowA("BUTTON", "Element", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | BS_OWNERDRAW,
@@ -1123,9 +1153,11 @@ static void create_toolbar_buttons(HWND hwnd) {
     g_btn_overlay = CreateWindowA("BUTTON", "Overlay", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | BS_OWNERDRAW,
                                   266, 5, 85, 26, g_hwnd_toolbar_scroll, (HMENU)ID_BTN_OVERLAY, hinst, NULL);
 
-    /* Map Action Button - positioned on far right with distinct style directly on g_hwnd_toolbar_left */
-    g_btn_manage_maps = CreateWindowA("BUTTON", "Map", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | BS_OWNERDRAW,
-                                      mm_x, 5, mm_w, 26, g_hwnd_toolbar_left, (HMENU)ID_BTN_MANAGE_MAPS, hinst, NULL);
+    /* Action Buttons (Layout & Map) - positioned on right side of g_hwnd_toolbar_left with distinct blue style */
+    g_btn_manage_layout = CreateWindowA("BUTTON", "Layout", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | BS_OWNERDRAW,
+                                        lb_x, 5, lb_w, 26, g_hwnd_toolbar_left, (HMENU)ID_BTN_MANAGE_LAYOUT, hinst, NULL);
+    g_btn_manage_maps   = CreateWindowA("BUTTON", "Map", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | BS_OWNERDRAW,
+                                        mm_x, 5, mm_w, 26, g_hwnd_toolbar_left, (HMENU)ID_BTN_MANAGE_MAPS, hinst, NULL);
 
     update_toolbar_buttons_layout();
 
@@ -1205,17 +1237,8 @@ static void create_toolbar_buttons(HWND hwnd) {
     }
 }
 
-void apply_theme_preference(HWND hwnd, AppThemePreference pref) {
-    g_theme_preference = pref;
-    AppTheme resolved = (pref == THEME_PREF_SYSTEM)
-        ? (is_system_dark_mode() ? THEME_DARK : THEME_LIGHT)
-        : (pref == THEME_PREF_DARK ? THEME_DARK : THEME_LIGHT);
-    apply_theme(hwnd, resolved);
-}
-
-void apply_theme(HWND hwnd, AppTheme new_theme) {
+static void apply_theme_internal(HWND hwnd, AppTheme new_theme) {
     g_current_theme = new_theme;
-    g_theme_preference = (new_theme == THEME_DARK) ? THEME_PREF_DARK : THEME_PREF_LIGHT;
     save_zuma_config();
 
     HMENU hmenu = GetMenu(hwnd);
@@ -1261,6 +1284,19 @@ void apply_theme(HWND hwnd, AppTheme new_theme) {
 
     InvalidateRect(hwnd, NULL, FALSE);
     UpdateWindow(hwnd);
+}
+
+void apply_theme_preference(HWND hwnd, AppThemePreference pref) {
+    g_theme_preference = pref;
+    AppTheme resolved = (pref == THEME_PREF_SYSTEM)
+        ? (is_system_dark_mode() ? THEME_DARK : THEME_LIGHT)
+        : (pref == THEME_PREF_DARK ? THEME_DARK : THEME_LIGHT);
+    apply_theme_internal(hwnd, resolved);
+}
+
+void apply_theme(HWND hwnd, AppTheme new_theme) {
+    g_theme_preference = (new_theme == THEME_DARK) ? THEME_PREF_DARK : THEME_PREF_LIGHT;
+    apply_theme_internal(hwnd, new_theme);
 }
 
 /* ========================================================================= */
@@ -1628,7 +1664,11 @@ static void draw_custom_menu_item(LPDRAWITEMSTRUCT dis) {
 
     COLORREF col_name;
     if (is_disabled) {
-        col_name = th->text_dim;
+        if (strncmp(v->name, "[!]", 3) == 0) {
+            col_name = is_dark ? RGB(255, 175, 50) : RGB(200, 110, 0);
+        } else {
+            col_name = th->text_dim;
+        }
     } else if (is_selected) {
         col_name = is_dark ? RGB(255, 255, 255) : RGB(10, 20, 40);
     } else if (is_checked) {
@@ -1708,6 +1748,7 @@ void create_main_menu(HWND hwnd) {
     add_custom_menu_item(hfile, MF_STRING, ID_MENU_FILE_OPEN, "&Open Canvas...\tCtrl+O");
     add_custom_menu_item(hfile, MF_STRING, ID_MENU_FILE_SAVE, "&Save Canvas...\tCtrl+S");
     add_custom_menu_item(hfile, MF_SEPARATOR, 0, NULL);
+    add_custom_menu_item(hfile, MF_STRING, ID_MENU_FILE_MANAGE_LAYOUT, "&Layout Editor (Disabled)...\tCtrl+Shift+L");
     add_custom_menu_item(hfile, MF_STRING, ID_MENU_FILE_MANAGE_LEVELS, "&Map Manager...\tCtrl+Shift+M");
     add_custom_menu_item(hfile, MF_SEPARATOR, 0, NULL);
     add_custom_menu_item(hfile, MF_STRING, ID_MENU_FILE_SPLASH, "&Splash Screen...");
@@ -1821,13 +1862,19 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             apply_control_dark_mode(g_hwnd_status, g_current_theme == THEME_DARK);
 
             update_status_bar();
-            update_window_theme_attributes(hwnd, g_current_theme == THEME_DARK);
-            if (g_current_theme == THEME_DARK) {
-                apply_theme(hwnd, THEME_DARK);
-            }
+            apply_theme_preference(hwnd, g_theme_preference);
             s_hMenuCbtHook = SetWindowsHookExA(WH_CBT, MenuCbtHookProc, NULL, GetCurrentThreadId());
             SetTimer(hwnd, IDT_MEDIA_ANIMATION, 15, NULL);
             return 0;
+        }
+
+        case WM_SETTINGCHANGE: {
+            if (g_theme_preference == THEME_PREF_SYSTEM) {
+                apply_theme_preference(hwnd, THEME_PREF_SYSTEM);
+                create_main_menu(hwnd);
+                InvalidateRect(hwnd, NULL, TRUE);
+            }
+            break;
         }
 
         case WM_TIMER: {
@@ -2082,6 +2129,17 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
                 case ID_MENU_EDIT_REDO:
                     undo_redo_perform(hwnd);
+                    break;
+
+                case ID_BTN_MANAGE_LAYOUT:
+                case ID_MENU_FILE_MANAGE_LAYOUT:
+                    show_themed_notice_dialog(
+                        hwnd,
+                        "Layout Editor - Feature Disabled",
+                        "Layout Editor Feature Not Ready",
+                        "The visual Layout Editor is temporarily disabled because it is currently under development and not yet stable.\n\n"
+                        "In the meantime, you can customize the UI layout manually by editing the 'properties\\layout.xml' file in your Zuma Deluxe folder.",
+                        580, 270);
                     break;
 
                 case ID_BTN_MANAGE_MAPS:
@@ -2635,6 +2693,14 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                             g_overlay_current_prio = val;
                             g_pending_cutout_pri = val;
                             g_pending_sprite_pri = val;
+                            int sel_co = get_active_selected_cutout_idx();
+                            int sel_sp = get_active_selected_sprite_idx();
+                            if (sel_co >= 0 && sel_co < g_cutout_count) {
+                                g_cutouts[sel_co].pri = val;
+                            } else if (sel_sp >= 0 && sel_sp < g_sprite_count) {
+                                g_sprites[sel_sp].pri = val;
+                                sync_sprite_image_names();
+                            }
                         } else {
                             if (val > 255) val = 255;
                             g_var_prio_val = (uint8_t)val;
@@ -2823,6 +2889,94 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 get_top_right_overlay_hud_rect(c_w, w_h, &rc_ov);
                 if (pt.x >= rc_ov.left && pt.x <= rc_ov.right &&
                     pt.y >= rc_ov.top && pt.y <= rc_ov.bottom) {
+                    int rel_x = pt.x - rc_ov.left;
+                    int content_y = (pt.y - rc_ov.top) + g_hud_overlay_tools_scroll_y;
+                    if (content_y >= 76 && content_y <= 98) {
+                        int sel_ba = get_active_selected_bgalpha_idx();
+                        int sel_co = get_active_selected_cutout_idx();
+                        int sel_sp = get_active_selected_sprite_idx();
+                        if (sel_ba >= 0 && sel_ba < g_bg_alpha_count) {
+                            LevelBackgroundAlpha *ba = &g_bg_alphas[sel_ba];
+                            if (rel_x >= 126 && rel_x <= 162) {
+                                undo_ensure_baseline();
+                                ba->vx += (zDelta > 0 ? 1 : -1);
+                                if (ba->vx < -99) ba->vx = -99;
+                                if (ba->vx > 99) ba->vx = 99;
+                                if (g_placing_bgalpha_vector) g_bgalpha_pending_vx = ba->vx;
+                                undo_snapshot_capture("Adjust BgAlpha Velocity");
+                                InvalidateRect(hwnd, NULL, FALSE);
+                                update_status_bar();
+                                return 0;
+                            } else if (rel_x >= 186 && rel_x <= 222) {
+                                undo_ensure_baseline();
+                                ba->vy += (zDelta > 0 ? 1 : -1);
+                                if (ba->vy < -99) ba->vy = -99;
+                                if (ba->vy > 99) ba->vy = 99;
+                                if (g_placing_bgalpha_vector) g_bgalpha_pending_vy = ba->vy;
+                                undo_snapshot_capture("Adjust BgAlpha Velocity");
+                                InvalidateRect(hwnd, NULL, FALSE);
+                                update_status_bar();
+                                return 0;
+                            }
+                        } else if (sel_co >= 0 || sel_sp >= 0) {
+                            if (rel_x >= 172 && rel_x <= 228) {
+                                undo_ensure_baseline();
+                                if (zDelta > 0) {
+                                    if (g_overlay_current_prio < 99) g_overlay_current_prio++;
+                                } else if (g_overlay_current_prio > 0) {
+                                    g_overlay_current_prio--;
+                                }
+                                g_pending_cutout_pri = g_overlay_current_prio;
+                                g_pending_sprite_pri = g_overlay_current_prio;
+                                if (sel_co >= 0 && sel_co < g_cutout_count) {
+                                    g_cutouts[sel_co].pri = g_overlay_current_prio;
+                                } else if (sel_sp >= 0 && sel_sp < g_sprite_count) {
+                                    g_sprites[sel_sp].pri = g_overlay_current_prio;
+                                    sync_sprite_image_names();
+                                }
+                                if (g_edit_prio) {
+                                    char buf[16];
+                                    snprintf(buf, sizeof(buf), "%d", g_overlay_current_prio);
+                                    g_in_prio_update = true;
+                                    SetWindowTextA(g_edit_prio, buf);
+                                    g_in_prio_update = false;
+                                }
+                                undo_snapshot_capture("Adjust BgAlpha Velocity");
+                                InvalidateRect(hwnd, NULL, FALSE);
+                                update_status_bar();
+                                return 0;
+                            }
+                        }
+                    } else if (content_y >= 102 && content_y <= 126) {
+                        int sel_co = get_active_selected_cutout_idx();
+                        int sel_sp = get_active_selected_sprite_idx();
+                        bool has_co = (g_mode_overlay && ((sel_co >= 0 && sel_co < g_cutout_count) || g_placing_cutout));
+                        bool has_sp = (g_mode_overlay && ((sel_sp >= 0 && sel_sp < g_sprite_count) || g_placing_sprite));
+                        if (has_sp || has_co) {
+                            undo_ensure_baseline();
+                            int cur = 0;
+                            if (g_placing_sprite) cur = g_pending_sprite_blend_mode;
+                            else if (g_placing_cutout) cur = g_pending_cutout_blend_mode;
+                            else if (has_sp) cur = g_sprites[sel_sp].blend_mode;
+                            else if (has_co) cur = g_cutouts[sel_co].blend_mode;
+
+                            int next = (zDelta > 0) ? ((cur + 1) % BLEND_MODE_COUNT) : ((cur + BLEND_MODE_COUNT - 1) % BLEND_MODE_COUNT);
+                            if (g_placing_sprite) {
+                                g_pending_sprite_blend_mode = next;
+                            } else if (g_placing_cutout) {
+                                g_pending_cutout_blend_mode = next;
+                            } else if (has_sp) {
+                                g_sprites[sel_sp].blend_mode = next;
+                                undo_snapshot_capture("Adjust Sprite Blend Mode");
+                            } else {
+                                g_cutouts[sel_co].blend_mode = next;
+                                undo_snapshot_capture("Adjust Cutout Blend Mode");
+                            }
+                            InvalidateRect(hwnd, NULL, FALSE);
+                            update_status_bar();
+                            return 0;
+                        }
+                    }
                     int max_s = get_overlay_tools_hud_max_scroll(w_h);
                     if (max_s > 0) {
                         g_hud_overlay_tools_scroll_y -= (zDelta > 0 ? 30 : -30);
@@ -3162,19 +3316,34 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     int tr_rel_x = g_mouse_screen_x - rc_ov.left;
                     int tr_content_y = (g_mouse_screen_y - rc_ov.top) + g_hud_overlay_tools_scroll_y;
                     if (tr_content_y >= 76 && tr_content_y <= 98) {
+                        int sel_ba = get_active_selected_bgalpha_idx();
+                        int sel_co = get_active_selected_cutout_idx();
+                        int sel_sp = get_active_selected_sprite_idx();
+                        bool has_ba = (g_mode_overlay && sel_ba >= 0 && sel_ba < g_bg_alpha_count);
+                        bool has_co = (g_mode_overlay && sel_co >= 0 && sel_co < g_cutout_count);
+                        bool has_sp = (g_mode_overlay && sel_sp >= 0 && sel_sp < g_sprite_count);
+                        bool has_t = has_ba || has_co || has_sp;
+
                         if (tr_rel_x >= 8 && tr_rel_x <= 104) {
-                            int sel_ba = get_active_selected_bgalpha_idx();
-                            if (sel_ba < 0 || sel_ba >= g_bg_alpha_count) {
+                            if (!has_t) {
                                 SetCursor(LoadCursor(NULL, IDC_ARROW));
                                 return TRUE;
                             }
-                        } else if (tr_rel_x >= 108 && tr_rel_x < 172) {
-                            SetCursor(LoadCursor(NULL, IDC_ARROW));
+                            SetCursor(LoadCursor(NULL, IDC_HAND));
                             return TRUE;
-                        } else if (tr_rel_x >= 172 && tr_rel_x <= 228) {
-                            SetCursor(LoadCursor(NULL, IDC_IBEAM));
-                            return TRUE;
+                        } else if (has_co || has_sp) {
+                            if (tr_rel_x >= 172 && tr_rel_x <= 228) {
+                                SetCursor(LoadCursor(NULL, IDC_IBEAM));
+                                return TRUE;
+                            }
+                        } else if (has_ba) {
+                            if ((tr_rel_x >= 126 && tr_rel_x <= 162) || (tr_rel_x >= 186 && tr_rel_x <= 222)) {
+                                SetCursor(LoadCursor(NULL, IDC_HAND));
+                                return TRUE;
+                            }
                         }
+                        SetCursor(LoadCursor(NULL, IDC_ARROW));
+                        return TRUE;
                     }
                     SetCursor(LoadCursor(NULL, IDC_HAND));
                     return TRUE;
@@ -4287,7 +4456,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 /* Check coins hover (Element Mode only) */
                 if (g_has_canvas && g_treasure_point_count > 0) {
                     int coin_half_w = g_has_coin_img ? (g_coin_img.width / 2) : 18;
-                    int coin_half_h = g_has_coin_img ? (g_coin_img.height / 2) : 18;
+                    int coin_h_raw = g_has_coin_img ? ((g_coin_img.height > g_coin_img.width && g_coin_img.width > 0) ? g_coin_img.width : g_coin_img.height) : 36;
+                    int coin_half_h = coin_h_raw / 2;
                     int hit_idx = -1;
                     for (int i = g_treasure_point_count - 1; i >= 0; i--) {
                         if (g_canvas_mouse_x >= (float)(g_treasure_points[i].x - coin_half_w) &&
@@ -4625,6 +4795,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     co->x = cut_x;
                     co->y = cut_y;
                     co->pri = g_overlay_current_prio;
+                    co->blend_mode = g_pending_cutout_blend_mode;
                     if (g_has_pending_cutout_img) {
                         co->img = g_pending_cutout_img;
                         co->has_img = true;
@@ -4682,6 +4853,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     sp->x = spr_x;
                     sp->y = spr_y;
                     sp->pri = g_overlay_current_prio;
+                    sp->blend_mode = g_pending_sprite_blend_mode;
                     if (g_has_pending_sprite_img) {
                         sp->img = g_pending_sprite_img;
                         sp->has_img = true;
@@ -4834,12 +5006,63 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                                         hit_btn = true;
                                         toggle_overlay_variable_mode(hwnd);
                                         return 0;
-                                    } else if (rel_x >= 172 && rel_x <= 228) {
-                                        /* Row 3 Kanan: Priority Edit Box Focus */
-                                        hit_btn = true;
-                                        if (g_edit_prio) {
-                                            SetFocus(g_edit_prio);
-                                            SendMessage(g_edit_prio, EM_SETSEL, 0, -1);
+                                    } else if (rel_x >= 108) {
+                                        int sel_ba = get_active_selected_bgalpha_idx();
+                                        int sel_co = get_active_selected_cutout_idx();
+                                        int sel_sp = get_active_selected_sprite_idx();
+                                        bool has_ba = (g_mode_overlay && sel_ba >= 0 && sel_ba < g_bg_alpha_count);
+                                        bool has_co = (g_mode_overlay && sel_co >= 0 && sel_co < g_cutout_count);
+                                        bool has_sp = (g_mode_overlay && sel_sp >= 0 && sel_sp < g_sprite_count);
+
+                                        if (has_co || has_sp) {
+                                            if (rel_x >= 172 && rel_x <= 228) {
+                                                hit_btn = true;
+                                                if (g_edit_prio && IsWindowVisible(g_edit_prio)) {
+                                                    SetFocus(g_edit_prio);
+                                                    SendMessage(g_edit_prio, EM_SETSEL, 0, -1);
+                                                }
+                                                return 0;
+                                            }
+                                        } else if (has_ba) {
+                                            LevelBackgroundAlpha *ba = &g_bg_alphas[sel_ba];
+                                            if (rel_x >= 126 && rel_x <= 162) {
+                                                /* Click Vx: Cycle preferred values: 0 -> 1 -> -1 -> 0 */
+                                                hit_btn = true;
+                                                undo_ensure_baseline();
+                                                if (ba->vx == 0) ba->vx = 1;
+                                                else if (ba->vx == 1) ba->vx = -1;
+                                                else ba->vx = 0;
+                                                if (g_placing_bgalpha_vector) g_bgalpha_pending_vx = ba->vx;
+                                                undo_snapshot_capture("Adjust BgAlpha Velocity");
+                                                InvalidateRect(hwnd, NULL, FALSE);
+                                                update_status_bar();
+                                                return 0;
+                                            } else if (rel_x >= 186 && rel_x <= 222) {
+                                                /* Click Vy: Cycle preferred values: 0 -> 1 -> -1 -> 0 */
+                                                hit_btn = true;
+                                                undo_ensure_baseline();
+                                                if (ba->vy == 0) ba->vy = 1;
+                                                else if (ba->vy == 1) ba->vy = -1;
+                                                else ba->vy = 0;
+                                                if (g_placing_bgalpha_vector) g_bgalpha_pending_vy = ba->vy;
+                                                undo_snapshot_capture("Adjust BgAlpha Velocity");
+                                                InvalidateRect(hwnd, NULL, FALSE);
+                                                update_status_bar();
+                                                return 0;
+                                            }
+                                        }
+                                    }
+                                } else if (content_y >= 102 && content_y <= 126) {
+                                    /* Row 4: Blend Mode Button (Exclusive to <Sprite>) */
+                                    int sel_sp = get_active_selected_sprite_idx();
+                                    bool has_sp = (g_mode_overlay && ((sel_sp >= 0 && sel_sp < g_sprite_count) || g_placing_sprite));
+                                    if (has_sp) {
+                                        if (rel_x >= 8 && rel_x <= 228) {
+                                            hit_btn = true;
+                                            POINT pt = { rc_ov.left + 58, rc_ov.top + (124 - g_hud_overlay_tools_scroll_y) };
+                                            ClientToScreen(hwnd, &pt);
+                                            show_blend_mode_popup_menu(hwnd, pt.x, pt.y, false);
+                                            return 0;
                                         }
                                     }
                                 }
@@ -5659,6 +5882,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     g_overlay_current_prio = g_cutouts[idx].pri;
                     g_pending_cutout_pri = g_overlay_current_prio;
                     g_pending_sprite_pri = g_overlay_current_prio;
+                    g_pending_cutout_blend_mode = g_cutouts[idx].blend_mode;
                     if (g_edit_prio) {
                         char buf[16];
                         snprintf(buf, sizeof(buf), "%d", g_overlay_current_prio);
@@ -5704,6 +5928,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     g_overlay_current_prio = g_sprites[idx].pri;
                     g_pending_cutout_pri = g_overlay_current_prio;
                     g_pending_sprite_pri = g_overlay_current_prio;
+                    g_pending_sprite_blend_mode = g_sprites[idx].blend_mode;
                     if (g_edit_prio) {
                         char buf[16];
                         snprintf(buf, sizeof(buf), "%d", g_overlay_current_prio);
@@ -6536,6 +6761,80 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         }
 
         case WM_RBUTTONDOWN: {
+            /* Check if right-clicking on Overlay Tools HUD for Vx/Vy reverse cycling */
+            if (g_mode_overlay && g_has_canvas && !g_hud_overlay_collapsed) {
+                RECT rc_c;
+                GetClientRect(hwnd, &rc_c);
+                int client_w = rc_c.right - rc_c.left;
+                int work_h = get_workspace_height(hwnd);
+                RECT rc_ov;
+                get_top_right_overlay_hud_rect(client_w, work_h, &rc_ov);
+                int r_mx = GET_X_LPARAM(lParam);
+                int r_my = GET_Y_LPARAM(lParam);
+                if (r_mx >= rc_ov.left && r_mx <= rc_ov.right && r_my >= rc_ov.top && r_my <= rc_ov.bottom) {
+                    int rel_x = r_mx - rc_ov.left;
+                    int content_y = (r_my - rc_ov.top) + g_hud_overlay_tools_scroll_y;
+                    if (content_y >= 76 && content_y <= 98) {
+                        int sel_ba = get_active_selected_bgalpha_idx();
+                        if (sel_ba >= 0 && sel_ba < g_bg_alpha_count) {
+                            LevelBackgroundAlpha *ba = &g_bg_alphas[sel_ba];
+                            if (rel_x >= 126 && rel_x <= 162) {
+                                /* Reverse cycle Vx: 0 -> -1 -> 1 -> 0 */
+                                undo_ensure_baseline();
+                                if (ba->vx == 0) ba->vx = -1;
+                                else if (ba->vx == -1) ba->vx = 1;
+                                else ba->vx = 0;
+                                if (g_placing_bgalpha_vector) g_bgalpha_pending_vx = ba->vx;
+                                undo_snapshot_capture("Adjust BgAlpha Velocity");
+                                InvalidateRect(hwnd, NULL, FALSE);
+                                update_status_bar();
+                                return 0;
+                            } else if (rel_x >= 186 && rel_x <= 222) {
+                                /* Reverse cycle Vy: 0 -> -1 -> 1 -> 0 */
+                                undo_ensure_baseline();
+                                if (ba->vy == 0) ba->vy = -1;
+                                else if (ba->vy == -1) ba->vy = 1;
+                                else ba->vy = 0;
+                                if (g_placing_bgalpha_vector) g_bgalpha_pending_vy = ba->vy;
+                                undo_snapshot_capture("Adjust BgAlpha Velocity");
+                                InvalidateRect(hwnd, NULL, FALSE);
+                                update_status_bar();
+                                return 0;
+                            }
+                        }
+                    } else if (content_y >= 102 && content_y <= 126) {
+                        int sel_co = get_active_selected_cutout_idx();
+                        int sel_sp = get_active_selected_sprite_idx();
+                        bool has_co = (g_mode_overlay && ((sel_co >= 0 && sel_co < g_cutout_count) || g_placing_cutout));
+                        bool has_sp = (g_mode_overlay && ((sel_sp >= 0 && sel_sp < g_sprite_count) || g_placing_sprite));
+                        if (has_sp || has_co) {
+                            undo_ensure_baseline();
+                            int cur = 0;
+                            if (g_placing_sprite) cur = g_pending_sprite_blend_mode;
+                            else if (g_placing_cutout) cur = g_pending_cutout_blend_mode;
+                            else if (has_sp) cur = g_sprites[sel_sp].blend_mode;
+                            else if (has_co) cur = g_cutouts[sel_co].blend_mode;
+
+                            int prev = (cur + BLEND_MODE_COUNT - 1) % BLEND_MODE_COUNT;
+                            if (g_placing_sprite) {
+                                g_pending_sprite_blend_mode = prev;
+                            } else if (g_placing_cutout) {
+                                g_pending_cutout_blend_mode = prev;
+                            } else if (has_sp) {
+                                g_sprites[sel_sp].blend_mode = prev;
+                                undo_snapshot_capture("Adjust Sprite Blend Mode");
+                            } else {
+                                g_cutouts[sel_co].blend_mode = prev;
+                                undo_snapshot_capture("Adjust Cutout Blend Mode");
+                            }
+                            InvalidateRect(hwnd, NULL, FALSE);
+                            update_status_bar();
+                            return 0;
+                        }
+                    }
+                }
+            }
+
             /* 0. If mouse drag or pen drag is active, right-click cancels drag and releases capture immediately */
             if (g_pen_drag_state != PEN_DRAG_NONE || g_obj_drag_state != OBJ_DRAG_NONE) {
                 if (GetCapture() == hwnd) ReleaseCapture();
@@ -8122,8 +8421,26 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     ShowWindow(hwnd, nCmdShow);
     UpdateWindow(hwnd);
 
-    /* Show Splash Screen on first launch */
-    show_splash_screen_dialog(hwnd);
+    /* If command line argument provided, open that canvas folder directly; otherwise show splash */
+    bool opened_from_cmd = false;
+    if (lpCmdLine && lpCmdLine[0]) {
+        char cmd[MAX_PATH];
+        strncpy(cmd, lpCmdLine, sizeof(cmd) - 1);
+        cmd[sizeof(cmd) - 1] = '\0';
+        char *p = cmd;
+        while (*p == ' ' || *p == '"') p++;
+        char *end = p + strlen(p) - 1;
+        while (end > p && (*end == ' ' || *end == '"' || *end == '\r' || *end == '\n')) {
+            *end = '\0';
+            end--;
+        }
+        if (p[0] != '\0') {
+            opened_from_cmd = execute_open_canvas_folder(hwnd, p);
+        }
+    }
+    if (!opened_from_cmd) {
+        show_splash_screen_dialog(hwnd);
+    }
     undo_ensure_baseline();
 
     HACCEL hAccel = create_app_accelerators();

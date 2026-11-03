@@ -6,6 +6,8 @@ REM 0. Keep Console Open Check (for Explorer double-click)
 REM =======================================================================
 if "%1"=="--no-pause" goto SkipKeepOpen
 if "%1"=="-nopause" goto SkipKeepOpen
+if "%1"=="--test" goto SkipKeepOpen
+if "%1"=="-test" goto SkipKeepOpen
 
 if not defined ZUPATHER_KEEP_OPEN (
     set "ZUPATHER_KEEP_OPEN=1"
@@ -251,6 +253,11 @@ if "!COMPILER_TYPE!"=="MSVC" (
 )
 echo.
 
+if "%1"=="--test" goto ExecuteUnitTests
+if "%1"=="-test" goto ExecuteUnitTests
+if "%2"=="--test" goto ExecuteUnitTests
+if "%2"=="-test" goto ExecuteUnitTests
+
 REM =======================================================================
 REM Kompilasi ZuPather.exe dari Unified Modular Codebase
 REM =======================================================================
@@ -272,7 +279,7 @@ if "!COMPILER_TYPE!"=="MSVC" (
             echo [RESOURCE] Embedded res\zupather.res (assets\media\ZUpather.ico)
         )
     )
-    cl /O2 /Fe:ZuPather.exe src\zupather_ui.c src\zupather_state.c src\undo_redo.c src\level_io.c src\dialog_modals.c src\hud_overlay.c src\canvas_render.c src\image_loader.c src\bezier_path.c src\svg_path.c src\level_progression.c src\ai_psd_path.c !RES_OBJ! user32.lib gdi32.lib comdlg32.lib comctl32.lib msimg32.lib windowscodecs.lib ole32.lib shell32.lib uxtheme.lib dwmapi.lib mfplat.lib mfreadwrite.lib mfuuid.lib winmm.lib /link /SUBSYSTEM:WINDOWS
+    cl /O2 /Fe:ZuPather.exe src\zupather_ui.c src\zupather_state.c src\undo_redo.c src\level_io.c src\dialog_modals.c src\layout_editor.c src\hud_overlay.c src\canvas_render.c src\image_loader.c src\bezier_path.c src\svg_path.c src\level_progression.c src\ai_psd_path.c !RES_OBJ! user32.lib gdi32.lib comdlg32.lib comctl32.lib msimg32.lib windowscodecs.lib ole32.lib shell32.lib uxtheme.lib dwmapi.lib mfplat.lib mfreadwrite.lib mfuuid.lib winmm.lib /link /SUBSYSTEM:WINDOWS
 ) else (
     echo [COMPILING] via GCC: "!COMPILER_BIN!"
     set "RES_OBJ="
@@ -297,7 +304,7 @@ if "!COMPILER_TYPE!"=="MSVC" (
             exit /b 1
         )
     )
-    "!COMPILER_BIN!" -O2 -mwindows -o "ZuPather.exe" src\zupather_ui.c src\zupather_state.c src\undo_redo.c src\level_io.c src\dialog_modals.c src\hud_overlay.c src\canvas_render.c src\image_loader.c src\bezier_path.c src\svg_path.c src\level_progression.c src\ai_psd_path.c !RES_OBJ! -lwindowscodecs -lole32 -lshell32 -lmfplat -lmfreadwrite -lmfuuid -Wl,-Bstatic -lwebpmux -lwebpdemux -lwebp -lsharpyuv -lzstd -Wl,-Bdynamic -lmsimg32 -lgdi32 -lcomdlg32 -lcomctl32 -luxtheme -ldwmapi -ladvapi32 -lwinmm -lm
+    "!COMPILER_BIN!" -O2 -mwindows -o "ZuPather.exe" src\zupather_ui.c src\zupather_state.c src\undo_redo.c src\level_io.c src\dialog_modals.c src\layout_editor.c src\hud_overlay.c src\canvas_render.c src\image_loader.c src\bezier_path.c src\svg_path.c src\level_progression.c src\ai_psd_path.c !RES_OBJ! -lwindowscodecs -lole32 -lshell32 -lmfplat -lmfreadwrite -lmfuuid -Wl,-Bstatic -lwebpmux -lwebpdemux -lwebp -lsharpyuv -lzstd -Wl,-Bdynamic -lmsimg32 -lgdi32 -lcomdlg32 -lcomctl32 -luxtheme -ldwmapi -ladvapi32 -lwinmm -lm
 )
 
 if !ERRORLEVEL! neq 0 (
@@ -335,3 +342,18 @@ pause
 
 :Done
 exit /b 0
+
+:ExecuteUnitTests
+echo -------------------------------------------------------
+echo  Running ZuPather Regression ^& Unit Test Suite ...
+echo -------------------------------------------------------
+del /f /q "tests\test_layout_roundtrip.exe" >nul 2>&1
+"!COMPILER_BIN!" -O2 -o "tests\test_layout_roundtrip.exe" tests\test_layout_roundtrip.c -lgdi32 -lcomctl32 -lmsimg32 -luxtheme
+if !ERRORLEVEL! neq 0 (
+    echo [ERROR] Failed to compile test suite!
+    exit /b 1
+)
+"tests\test_layout_roundtrip.exe"
+set "TEST_EXIT=!ERRORLEVEL!"
+if exist "tests\test_layout_roundtrip.exe" del /f /q "tests\test_layout_roundtrip.exe" >nul 2>&1
+exit /b !TEST_EXIT!

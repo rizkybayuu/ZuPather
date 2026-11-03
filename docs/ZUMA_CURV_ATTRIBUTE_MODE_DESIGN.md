@@ -63,6 +63,9 @@ Byte-level inspection of `coaster.dat` and automated cross-analysis of all 25 re
 
 #### 2. Cross-Level Statistical Survey (All 25 Retail Levels)
 - **Distinct Priority Values**: Strictly **`{0, 1}`** across all vanilla levels. No retail level uses priority 2 or higher.
+
+> [!NOTE]
+> **Priority Disambiguation**: The `priority` field in `.dat` trajectory points is strictly a 1-bit curve crossover flag (`0` = underpass, `1` = overpass). Do not confuse this with XML graphic rendering priorities in `levels.xml`, where `<Cutout pri="0..4">` defines background tunnel layers and `<Sprite pri="10..19">` defines high-priority visual layers.
 - **Tunnel Run Count**: Exactly **20 tunnel runs** across all 25 levels.
 - **Tunnel Length Distribution**:
   - Minimum length: **97 points** (`overunder.dat`).
