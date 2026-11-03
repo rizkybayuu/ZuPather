@@ -91,7 +91,7 @@ SOFTWARE.
 
 ### Google libwebp (v1.4.0)
 - **Copyright**: Copyright (c) 2010, Google Inc. All rights reserved.
-- **License**: [BSD 3-Clause License](https://chromium.googlesource.com/webm/libwebp/+/refs/heads/main/COPYING)
+- **License**: [BSD 3-Clause License](https://github.com/webmproject/libwebp/blob/main/COPYING)
 - **Official Source**: [Google WebM Project - libwebp](https://storage.googleapis.com/downloads.webmproject.org/releases/webp/)
 - **Role in ZuPather**: High-performance software/hardware decoding and demuxing of animated WebP image streams for *ZuCompleluxe* overlays.
 - **License Terms**:
