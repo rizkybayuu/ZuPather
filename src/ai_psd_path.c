@@ -845,7 +845,7 @@ bool vector_path_import_from_memory(
 
     VectorFileFormat fmt = vector_path_detect_format(hint_ext, data, length > 256 ? 256 : length);
 
-    /* 1. Try Affinity Designer / Photo / Publisher Native File (.af, .afdesign, .afphoto, .afpub) */
+    /* 1. Try Affinity Native File (.af, .afdesign, .afphoto, .afpub) */
     if (fmt == VECTOR_FMT_AFFINITY || (length >= 4 && data[0] == 0x00 && data[1] == 0xFF && data[2] == 'K' && data[3] == 'A')) {
 #ifdef HAVE_ZSTD
         if (parse_affinity_paths(data, length, out_paths, max_paths, out_count, out_dims)) {
@@ -944,7 +944,7 @@ bool vector_path_import_from_file(
 /* ============================================================================
  * Adobe Illustrator PostScript (.ai) Curve Exporter
  * Writes clean EPSF-3.0 Adobe Illustrator format compatible with Photoshop,
- * Illustrator, Affinity Designer, and Inkscape.
+ * Illustrator, Affinity, and Inkscape.
  * ============================================================================ */
 bool ai_path_export_to_file(
     const char *filepath,

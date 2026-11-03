@@ -200,7 +200,7 @@ void handle_import_path(HWND hwnd) {
             snprintf(err_body, sizeof(err_body),
                 "Could not extract curve paths from the selected Affinity file.\n\n"
                 "File: %s\n\n"
-                "Affinity Tip: In Affinity Designer or Photo, choose File > Export > SVG (or EPS / PDF / AI), "
+                "Affinity Tip: In Affinity, choose File > Export > SVG (or EPS / PDF / AI), "
                 "then import that vector file into ZuPather.",
                 file_buf);
         } else {
@@ -211,7 +211,7 @@ void handle_import_path(HWND hwnd) {
                 "  - Adobe Illustrator (.ai, .eps, including Photoshop 'Paths to Illustrator')\n"
                 "  - Adobe Photoshop Document (.psd workpaths & vector masks)\n"
                 "  - Scalable Vector Graphics (.svg)\n"
-                "  - Affinity Designer / Photo (.af, .afdesign with vector streams)",
+                "  - Affinity (.af, .afdesign with vector streams)",
                 fmt_name, file_buf);
         }
         show_themed_notice_dialog(
@@ -425,7 +425,7 @@ void handle_export_path(HWND hwnd) {
                 "Export complete.\n\n"
                 "Successfully exported %d curve path%s to Adobe Illustrator format (.ai).\n\n"
                 "File: %s\n\n"
-                "Compatible with Adobe Illustrator, Adobe Photoshop ('Paths to Illustrator'), Affinity Designer, and Inkscape.",
+                "Compatible with Adobe Illustrator, Adobe Photoshop ('Paths to Illustrator'), Affinity, and Inkscape.",
                 g_path_count, g_path_count > 1 ? "s" : "", file_buf);
             show_themed_notice_dialog(
                 hwnd,

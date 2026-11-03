@@ -76,7 +76,7 @@ Defines looping ambient motion layers (water streams, earthquakes, volcanic smok
 - `vy` (Float / Int): Vertical scrolling velocity (e.g., `vy="1"` or `vy="2"`).
 
 #### D. `<Sprite>` (Dynamic / High-Priority Level Overlays & Blend Modes)
-Defines decorative sprite overlays placed at specific coordinates. In ZuCompleluxe v0.6 (`zumapriolayer.dll`), `<Sprite>` elements support high-priority rendering and the full suite of 33 Affinity Photo blend modes.
+Defines decorative sprite overlays placed at specific coordinates. In ZuCompleluxe v0.6 (`zumapriolayer.dll`), `<Sprite>` elements support high-priority rendering and the full suite of 33 Affinity blend modes.
 - `image` (String) or `id` (String): Sprite image asset name (e.g., `image="fog_overlay"`, `id="vignette"`).
 - `pri` (Integer): Layer priority index:
   - `0` to `4`: Low-priority background overlays (drawn beneath frog and rolling marbles).

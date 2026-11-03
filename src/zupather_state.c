@@ -2760,7 +2760,7 @@ void set_canvas_size(HWND hwnd, int new_w, int new_h) {
     InvalidateRect(hwnd, NULL, FALSE);
 }
 
-/* 45-degree angle snapping helper (Affinity Designer / Illustrator style) */
+/* 45-degree angle snapping helper (Affinity / Illustrator style) */
 void snap_vector_45_deg(float dx, float dy, float *out_dx, float *out_dy) {
     double len = hypot((double)dx, (double)dy);
     if (len < 1e-4) {

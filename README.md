@@ -7,7 +7,7 @@
 > **Changelog:** [CHANGELOG.md](CHANGELOG.md)  
 > **License:** [LICENSE.md](LICENSE.md) (MIT License)
 
-**ZuPather** is an open-source, high-precision visual vector path creation suite, level asset composer, and binary curve compiler engineered specifically for *Zuma Deluxe* (v1.0.0.1) and the extended *ZuCompleluxe* multi-curve engine. It bridges professional vector graphic design suites (such as **Affinity Designer**, **Canva**, and **Adobe Illustrator**) with the proprietary binary curve format (`.dat`, `CURV`) required by the 2003 PopCap engine.
+**ZuPather** is an open-source, high-precision visual vector path creation suite, level asset composer, and binary curve compiler engineered specifically for *Zuma Deluxe* (v1.0.0.1) and the extended *ZuCompleluxe* multi-curve engine. It bridges professional vector graphic design suites (such as **Affinity**, **Canva**, and **Adobe Illustrator**) with the proprietary binary curve format (`.dat`, `CURV`) required by the 2003 PopCap engine.
 
 Built entirely in standalone C99 using native Win32 GDI/User32 APIs, ZuPather operates as a single unified executable with zero external runtime DLL dependencies, providing sub-pixel accuracy, real-time physics roll simulation, multi-layer visual composition, and direct-to-game level synchronization.
 
@@ -56,7 +56,7 @@ In the *Zuma Deluxe* engine, rolling balls must traverse paths at a strictly uni
   - **Attribute Spans Subsystem**: Tag curve segments with in-tunnel occlusion flags, speed modifiers, and depth priority tiers (`0..4`).
   - **Visual Asset Composition & Live 33 Affinity Blend Modes Engine**:
     - Layer background artwork, foreground tunnel cutouts (`_tunnel*.gif`), dynamic sprites, and alpha masks with live alpha blending.
-    - Implements all **33 industry-standard Affinity Photo blend modes** (Normal, Multiply, Screen, Overlay, Color Dodge, Linear Burn, Difference, Exclusion, Luminosity, Erase, etc.) with real-time per-pixel compositing.
+    - Implements all **33 industry-standard Affinity blend modes** (Normal, Multiply, Screen, Overlay, Color Dodge, Linear Burn, Difference, Exclusion, Luminosity, Erase, etc.) with real-time per-pixel compositing.
     - Categorized 7-tier popup context selector (`show_blend_mode_popup_menu`), mouse-wheel cycling, and transactional undo/redo snapshot history in exact 100% mathematical parity with *ZuCompleluxe v0.6*.
     - Seamless serialization and roundtrip of `blend="..."` attributes in `.zupath` projects and `levels.xml`.
 - **Real-Time Dynamic Ball Roll Simulation**:
@@ -67,7 +67,7 @@ In the *Zuma Deluxe* engine, rolling balls must traverse paths at a strictly uni
   - Tri-state level categorization with core vanilla level protection (prevents accidental overwriting or deletion of official progression maps).
   - Direct 1-click exporter: updates `<Graphics>` definitions in `levels.xml`, writes `.dat` binaries, registers progression, and creates timestamped safety backups (`levels.xml.bak`).
 - **Universal Vector Exchange & Headless CLI**:
-  - Full SVG import/export compatibility with vector design suites (Affinity Designer, Canva, Adobe Illustrator, Inkscape).
+  - Full SVG import/export compatibility with vector design suites (Affinity, Canva, Adobe Illustrator, Inkscape).
   - **Hierarchical SVG Transform Engine**: 2D affine matrix stack parsing (`matrix`, `translate`, `scale`, `rotate`, `skewX`, `skewY`) supporting deeply nested `<g transform="...">` groups, artboard offsets, and multi-track rotational patterns without curve stacking.
   - **Native Serif Affinity Compound Document Ingestion**: Ingests vector curves directly from `.af`, `.afdesign`, `.afphoto`, and `.afpub` files with embedded Zstandard DOM decompression, Artboard dimension deduction, and row-major 2D affine transform matrix application.
   - **Adobe Illustrator (.ai, .eps) & Photoshop Paths-to-Illustrator Ingestion**: Parses PostScript Bézier paths (`m`, `l`, `c`, `v`, `y`, `cm`), bounding boxes (`%%BoundingBox`), and coordinate normalization directly into curves.
