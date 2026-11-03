@@ -97,35 +97,54 @@ ZuPather/
 │   │   ├── JetBrainsMono-Bold.ttf
 │   │   ├── JetBrainsMono-Regular.ttf
 │   │   └── OFL.txt               # SIL Open Font License v1.1 & copyright statements
-│   └── media/                    # Ball sprites, icons, and UI visual indicators
-│       ├── baBall*.png           # 11 distinct ball color sprite previews
-│       ├── COIN.png              # Treasure point coin marker
-│       ├── SKULL.png             # Path endpoint skull marker
-│       ├── SMALLFROGonPAD.png    # Frog shooter indicator
-│       ├── ZUpather.ico          # Application multi-resolution icon
-│       └── ZuSPLASHscreen.jpg    # Application splash screen visual
+│   ├── media/                    # Ball sprites, icons, and UI visual indicators
+│   │   ├── baBall*.png           # 11 distinct ball color sprite previews
+│   │   ├── COIN.png              # Treasure point coin marker
+│   │   ├── SKULL.png             # Path endpoint skull marker
+│   │   ├── SMALLFROGonPAD.png    # Frog shooter indicator
+│   │   ├── ZUpather.ico          # Application multi-resolution icon
+│   │   └── ZuSPLASHscreen.jpg    # Application splash screen visual
+│   └── outscreen.jpg             # Reference outscreen canvas backdrop
+├── cmake/                        # Modular CMake build configuration
+│   └── sources.cmake             # Source file manifests for Windows & macOS targets
 ├── docs/                         # Reverse-engineered format specifications & architecture notes
+│   ├── ZUMA_CURV_ATTRIBUTE_MODE_DESIGN.md
 │   ├── ZUMA_CURV_PATH_SPECIFICATION.md
+│   ├── ZUMA_ENGINE_MECHANICS_AND_ZUPATHER_INTEGRATION_GUIDE.md # Cross-project integration guide with ZuCompleluxe
+│   ├── ZUMA_EXE_DEEP_TRACE_AND_LAYOUT_SPECIFICATION.md # Deep assembly trace of 134 native Zuma UI elements
+│   ├── ZUMA_LAYOUT_EDITOR_PARITY_GUIDE.md # Layout editor design & PopCap engine visual parity guide
+│   ├── ZUMA_LAYOUT_XML_SPECIFICATION.md # XML layout schema, coordinate spaces & aspect ratio adaptation
 │   ├── ZUMA_LEVELS_XML_SPECIFICATION.md
-│   └── ZUMA_CURV_ATTRIBUTE_MODE_DESIGN.md
+│   ├── ZUMA_OVERLAY_BLEND_MODES_SPECIFICATION.md # Specification for 33 Affinity blend modes on overlay sprites
+│   └── ZUMA_UNMAPPED_AND_EXTENDED_LAYOUT_ELEMENTS.md # Specification for all extended unmapped layout elements
 ├── res/                          # Win32 resource definitions & compiler scripts
 │   └── zupather.rc               # Resource script (icons, fonts, manifests)
 ├── src/                          # Modular C99 source files & headers
+│   ├── compat/                   # macOS Cocoa & CoreGraphics compatibility translation layer
+│   │   ├── win32_macos_gdi.m     # CoreGraphics & CoreText 2D vector rendering implementation
+│   │   ├── win32_macos_io.m      # ImageIO asset decoder/encoder & resource resolver
+│   │   ├── win32_macos_shim.h    # Win32 API translation headers for macOS
+│   │   └── win32_macos_user.m    # Cocoa windowing, NSView & event loop message translation
 │   ├── ai_psd_path.c / .h        # Serif Affinity, Adobe AI/EPS & Photoshop PSD vector parser/exporter
 │   ├── bezier_path.c / .h        # Bézier math, arc-length integration & delta quantization
-│   ├── canvas_render.c / .h      # High-performance GDI canvas renderer & double-buffer
+│   ├── canvas_render.c / .h      # High-performance GDI canvas renderer, double-buffer & 33 blend modes
 │   ├── dialog_modals.c / .h      # Themed modal dialogues, map manager & export workflows
 │   ├── hud_overlay.c / .h        # Viewport navigation bar, tools, zoom & status indicators
 │   ├── image_loader.c / .h       # Asset decoding pipeline (stb_image integration)
+│   ├── layout_editor.c / .h      # Interactive layout editor, coordinate spaces & XML roundtrip
 │   ├── level_io.c / .h           # Binary CURV (.dat) serializer & XML parser
 │   ├── level_progression.c / .h  # Zuma Deluxe stage progression resolver & mapper
 │   ├── svg_path.c / .h           # SVG vector command tokenizer & path generator
 │   ├── undo_redo.c / .h          # Transactional history & undo/redo command stack
 │   ├── zupather_state.c / .h     # Global application state management & configuration
 │   └── zupather_ui.c             # Win32 window procedure, message dispatcher & CLI entry point
+├── tests/                        # Automated regression and unit test suite
+│   ├── run_tests.bat             # Standalone test runner script
+│   └── test_layout_roundtrip.c   # Regression test suite for layout roundtrip & semantic parity
 ├── .gitignore                    # Comprehensive Git exclusion rules
 ├── build_windows.bat             # Dedicated Windows 1-click build script
 ├── build_macos.command           # Dedicated macOS double-clickable console builder
+├── CMakeLists.txt                # Unified cross-platform CMake build configuration
 ├── CHANGELOG.md                  # Detailed version release notes
 ├── LICENSE.md                    # Legal notices, disclaimers & MIT license
 └── README.md                     # Project documentation
