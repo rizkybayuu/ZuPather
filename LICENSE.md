@@ -89,5 +89,82 @@ SOFTWARE.
 - **Official Source**: [stb single-file public domain libraries](https://github.com/nothings/stb)
 - **Role in ZuPather**: Embedded C99 image parsing for level background art, tunnel cutouts, sprites, and alpha masks.
 
+### Google libwebp (v1.4.0)
+- **Copyright**: Copyright (c) 2010, Google Inc. All rights reserved.
+- **License**: [BSD 3-Clause License](https://chromium.googlesource.com/webm/libwebp/+/refs/heads/main/COPYING)
+- **Official Source**: [Google WebM Project - libwebp](https://storage.googleapis.com/downloads.webmproject.org/releases/webp/)
+- **Role in ZuPather**: High-performance software/hardware decoding and demuxing of animated WebP image streams for *ZuCompleluxe* overlays.
+- **License Terms**:
+  ```text
+  Copyright (c) 2010, Google Inc. All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions are
+  met:
+
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in
+      the documentation and/or other materials provided with the
+      distribution.
+
+    * Neither the name of Google nor the names of its contributors may
+      be used to endorse or promote products derived from this software
+      without specific prior written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+  HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  ```
+
+### Meta Zstandard / zstd (v1.5.6)
+- **Copyright**: Copyright (c) 2016-present, Meta Platforms, Inc. and affiliates. All rights reserved.
+- **License**: [BSD 3-Clause License](https://github.com/facebook/zstd/blob/dev/LICENSE)
+- **Official Source**: [Zstandard (zstd)](https://github.com/facebook/zstd/releases)
+- **Role in ZuPather**: Fast decompression of Affinity binary chunk streams and archive segments with zero external runtime footprint.
+- **License Terms**:
+  ```text
+  BSD License
+
+  For Zstandard software
+
+  Copyright (c) 2016-present, Meta Platforms, Inc. and affiliates. All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without modification,
+  are permitted provided that the following conditions are met:
+
+   * Redistributions of source code must retain the above copyright notice, this
+     list of conditions and the following disclaimer.
+
+   * Redistributions in binary form must reproduce the above copyright notice,
+     this list of conditions and the following disclaimer in the documentation
+     and/or other materials provided with the distribution.
+
+   * Neither the name Facebook, Meta, nor the names of its contributors may be used
+     to endorse or promote products derived from this software without specific
+     prior written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+  ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  ```
+
 ### Reverse Engineering Specifications
 - Documents in `docs/` contain independent technical descriptions derived from clean-room static and dynamic analysis of binary formats (`.dat`, `CURV`, `levels.xml`) conducted strictly for the purpose of software interoperability.
