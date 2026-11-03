@@ -5,6 +5,39 @@ All notable changes to the **ZuPather** level design suite will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-11-03
+
+Major update introducing the **33 Affinity Photo Blend Modes Engine for Overlay Tools**, full **Map Manager integration**, Zuma game assets synchronization, and cross-platform version alignment across Windows and macOS.
+
+### Added
+- **33 Affinity Photo Blend Modes Engine for Overlay Tools (`src/canvas_render.c`, `src/zupather_state.h`, `src/zupather_ui.c`)**:
+  - Implemented the complete suite of 33 industry-standard Affinity blend modes across 7 categories:
+    - *Normal*: Normal, Pigment
+    - *Darken*: Darken, Multiply, Color Burn, Linear Burn, Darker Color
+    - *Lighten*: Lighten, Screen, Color Dodge, Add, Lighter Color
+    - *Contrast*: Overlay, Soft Light, Hard Light, Vivid Light, Linear Light, Pin Light, Hard Mix
+    - *Comparative*: Difference, Exclusion, Subtract, Divide
+    - *Component*: Hue, Saturation, Color, Luminosity
+    - *Special / Artistic*: Average, Negation, Reflect, Glow, Contrast Negate, Erase
+  - Direct per-pixel live software blending in 100% mathematical parity with `zumapriolayer.dll` and the *ZuCompleluxe v0.6* engine specification.
+  - Interactive overlay controls: categorized 7-tier popup context menu (`show_blend_mode_popup_menu`) for selected `<Sprite>` and `<Cutout>` elements.
+  - Real-time mouse-wheel and keyboard cycling through blend modes with live viewport compositing and transactional undo/redo history support (`undo_snapshot_capture`).
+  - Seamless XML roundtripping of `blend="..."` attributes across `.zupath` canvas projects and Zuma Deluxe `levels.xml`.
+- **Map Manager & Level Synchronization (`src/dialog_modals.c`, `src/level_io.c`)**:
+  - Integrated full **Map Manager** interface (`Ctrl+Shift+M` / Toolbar `Map`) enabling direct inspection, import, export, and deletion of custom Zuma Deluxe levels.
+  - Real-time synchronization between active canvas projects and Zuma Deluxe installation directories (`levels.xml` and `settings.xml`).
+  - Validation safeguards for level names, asset paths, and XML structure integrity.
+- **Widescreen & Layout Foundation Parity**:
+  - Added widescreen layout verification and coordinate conversion foundations aligned with `ZuCompleluxe v0.6`.
+  - Added themed notification dialog for the Layout Editor directing manual modifications to `properties/layout.xml` during ongoing stability improvements.
+- **Cross-Platform Metadata & Build Synchronization**:
+  - Bumped version metadata to `v0.3.0` across Windows PE resource descriptors (`res/zupather.rc`), CMake configurations (`CMakeLists.txt`), and native macOS App bundle definitions (`build_macos.command`).
+
+### Changed
+- Temporarily disabled the Layout Editor button on the main toolbar with an informative notice dialog directing users to direct `properties/layout.xml` configuration while the visual layout system undergoes stabilization.
+
+---
+
 ## [0.2.0] - 2026-10-27
 
 Major milestone architecture release establishing native **macOS compatibility** (Apple Silicon M1/M2/M3/M4 & Intel x86_64) alongside Windows, introducing a dedicated zero-dependency **Win32-to-Cocoa/CoreGraphics/CoreText shim layer**, a decoupled **dual-OS build pipeline** (`build_windows.bat` and `build_macos.command`), **pixel-identical rendering**, and **persistence of canvas progression difficulty** across project Save and Open sessions.

@@ -229,16 +229,21 @@ static void draw_custom_button(LPDRAWITEMSTRUCT dis) {
     bool is_pressed = (dis->itemState & ODS_SELECTED) != 0;
 
     COLORREF bg_color = is_pressed ? th->btn_bg_pressed : th->btn_bg;
-    if (dis->CtlID == ID_BTN_MANAGE_MAPS || dis->CtlID == ID_BTN_MANAGE_LAYOUT) {
+    if (dis->CtlID == ID_BTN_MANAGE_MAPS) {
         bg_color = is_pressed ? RGB(18, 70, 140) : (g_current_theme == THEME_DARK ? RGB(30, 42, 60) : RGB(232, 240, 252));
+    } else if (dis->CtlID == ID_BTN_MANAGE_LAYOUT) {
+        bg_color = is_pressed ? (g_current_theme == THEME_DARK ? RGB(35, 38, 45) : RGB(225, 226, 230))
+                              : (g_current_theme == THEME_DARK ? RGB(26, 30, 36) : RGB(238, 239, 242));
     }
     HBRUSH bg_brush = CreateSolidBrush(bg_color);
     FillRect(dis->hDC, &dis->rcItem, bg_brush);
     DeleteObject(bg_brush);
 
     COLORREF border_color = th->btn_border;
-    if (dis->CtlID == ID_BTN_MANAGE_MAPS || dis->CtlID == ID_BTN_MANAGE_LAYOUT) {
+    if (dis->CtlID == ID_BTN_MANAGE_MAPS) {
         border_color = th->text_accent_blue;
+    } else if (dis->CtlID == ID_BTN_MANAGE_LAYOUT) {
+        border_color = (g_current_theme == THEME_DARK ? RGB(55, 62, 72) : RGB(195, 198, 204));
     } else if (dis->CtlID == ID_BTN_CANVAS && g_mode_canvas) {
         border_color = th->text_accent_green;
     } else if (dis->CtlID == ID_BTN_ELEMENT && g_mode_element) {
@@ -268,8 +273,10 @@ static void draw_custom_button(LPDRAWITEMSTRUCT dis) {
 
     SetBkMode(dis->hDC, TRANSPARENT);
     COLORREF text_color = is_pressed ? th->text_accent_blue : th->btn_text;
-    if (dis->CtlID == ID_BTN_MANAGE_MAPS || dis->CtlID == ID_BTN_MANAGE_LAYOUT) {
+    if (dis->CtlID == ID_BTN_MANAGE_MAPS) {
         text_color = is_pressed ? RGB(255, 255, 255) : th->text_accent_blue;
+    } else if (dis->CtlID == ID_BTN_MANAGE_LAYOUT) {
+        text_color = (g_current_theme == THEME_DARK ? RGB(110, 118, 130) : RGB(145, 150, 158));
     } else if (dis->CtlID == ID_BTN_CANVAS && g_mode_canvas && !is_pressed) {
         text_color = th->text_accent_green;
     } else if (dis->CtlID == ID_BTN_ELEMENT && g_mode_element && !is_pressed) {
@@ -289,7 +296,7 @@ static void draw_custom_button(LPDRAWITEMSTRUCT dis) {
     }
     SetTextColor(dis->hDC, text_color);
     HFONT btn_font = (dis->CtlID == ID_BTN_CANVAS_APPLY) ? g_font_mono_bold :
-                     (((dis->CtlID == ID_BTN_MANAGE_MAPS || dis->CtlID == ID_BTN_MANAGE_LAYOUT) && g_font_primary_bold) ? g_font_primary_bold : g_font_primary_regular);
+                     ((dis->CtlID == ID_BTN_MANAGE_MAPS && g_font_primary_bold) ? g_font_primary_bold : g_font_primary_regular);
     SelectObject(dis->hDC, btn_font);
 
     wchar_t wtext[64];
@@ -1741,7 +1748,7 @@ void create_main_menu(HWND hwnd) {
     add_custom_menu_item(hfile, MF_STRING, ID_MENU_FILE_OPEN, "&Open Canvas...\tCtrl+O");
     add_custom_menu_item(hfile, MF_STRING, ID_MENU_FILE_SAVE, "&Save Canvas...\tCtrl+S");
     add_custom_menu_item(hfile, MF_SEPARATOR, 0, NULL);
-    add_custom_menu_item(hfile, MF_STRING, ID_MENU_FILE_MANAGE_LAYOUT, "&Layout Editor...\tCtrl+Shift+L");
+    add_custom_menu_item(hfile, MF_STRING, ID_MENU_FILE_MANAGE_LAYOUT, "&Layout Editor (Disabled)...\tCtrl+Shift+L");
     add_custom_menu_item(hfile, MF_STRING, ID_MENU_FILE_MANAGE_LEVELS, "&Map Manager...\tCtrl+Shift+M");
     add_custom_menu_item(hfile, MF_SEPARATOR, 0, NULL);
     add_custom_menu_item(hfile, MF_STRING, ID_MENU_FILE_SPLASH, "&Splash Screen...");
@@ -2126,7 +2133,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
                 case ID_BTN_MANAGE_LAYOUT:
                 case ID_MENU_FILE_MANAGE_LAYOUT:
-                    show_layout_editor_dialog(hwnd);
+                    show_themed_notice_dialog(
+                        hwnd,
+                        "Layout Editor - Feature Disabled",
+                        "Layout Editor Feature Not Ready",
+                        "The visual Layout Editor is temporarily disabled because it is currently under development and not yet stable.\n\n"
+                        "In the meantime, you can customize the UI layout manually by editing the 'properties\\layout.xml' file in your Zuma Deluxe folder.",
+                        580, 270);
                     break;
 
                 case ID_BTN_MANAGE_MAPS:

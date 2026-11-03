@@ -1,6 +1,6 @@
-# ZuPather (v0.2.0)
+# ZuPather (v0.3.0)
 
-> **Version:** 0.2.0 (Cross-Platform Windows & macOS Native Release, Cocoa/CoreGraphics Subsystem)  
+> **Version:** 0.3.0 (Cross-Platform Windows & macOS Native Release, Cocoa/CoreGraphics Subsystem)  
 > **Target Game:** *Zuma Deluxe* v1.0.0.1 & *ZuCompleluxe* Multi-Curve Framework  
 > **Project Scope:** High-Precision Vector Path Editor, Asset Composer & Direct-to-Engine Exporter  
 > **Core Language:** Pure C (C99 / Win32 API)  
@@ -54,7 +54,11 @@ In the *Zuma Deluxe* engine, rolling balls must traverse paths at a strictly uni
   - **Frog Shooter Placement**: Interactive positioning of the central frog anchor (`gx`, `gy`) with real-time pad visualization.
   - **Treasure Point Coin Placer**: Interactive coin waypoint positioning with automatic curve proximity indexing.
   - **Attribute Spans Subsystem**: Tag curve segments with in-tunnel occlusion flags, speed modifiers, and depth priority tiers (`0..4`).
-  - **Visual Asset Composition**: Layer background artwork, foreground tunnel cutouts (`_tunnel*.gif`), dynamic sprites, and alpha masks with live alpha blending.
+  - **Visual Asset Composition & Live 33 Affinity Blend Modes Engine**:
+    - Layer background artwork, foreground tunnel cutouts (`_tunnel*.gif`), dynamic sprites, and alpha masks with live alpha blending.
+    - Implements all **33 industry-standard Affinity Photo blend modes** (Normal, Multiply, Screen, Overlay, Color Dodge, Linear Burn, Difference, Exclusion, Luminosity, Erase, etc.) with real-time per-pixel compositing.
+    - Categorized 7-tier popup context selector (`show_blend_mode_popup_menu`), mouse-wheel cycling, and transactional undo/redo snapshot history in exact 100% mathematical parity with *ZuCompleluxe v0.6*.
+    - Seamless serialization and roundtrip of `blend="..."` attributes in `.zupath` projects and `levels.xml`.
 - **Real-Time Dynamic Ball Roll Simulation**:
   - Live physics roll simulation executing at authentic Zuma Deluxe physical speed.
   - Dynamic 11-color ball visualization with exact ball spacing, tunnel occlusion, and skull terminus deceleration.
